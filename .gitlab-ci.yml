@@ -1,0 +1,67 @@
+stages:
+  - build
+
+variables:
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+
+# Cache pour accélérer les builds
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .npm/
+    - node_modules/
+
+# Build Windows (cross-compilation avec Wine sur Linux)
+build-windows:
+  stage: build
+  image: electronuserland/builder:wine
+  tags:
+    - docker
+  script:
+    - npm ci
+    - npm run build:win-portable
+    - npm run build:win
+  artifacts:
+    name: "synkapos-windows-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - release/*.exe
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# Build Windows (runner Windows natif - optionnel)
+# Décommentez si vous avez un runner Windows
+# build-windows-native:
+#   stage: build
+#   tags:
+#     - windows
+#   script:
+#     - npm ci
+#     - npm run build:win-portable
+#     - npm run build:win
+#   artifacts:
+#     name: "synkapos-windows-${CI_COMMIT_SHORT_SHA}"
+#     paths:
+#       - release/*.exe
+#     expire_in: 30 days
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+
+# Build macOS (nécessite un runner macOS self-hosted)
+# build-macos:
+#   stage: build
+#   tags:
+#     - macos
+#   script:
+#     - npm ci
+#     - npm run build:mac
+#   artifacts:
+#     name: "synkapos-macos-${CI_COMMIT_SHORT_SHA}"
+#     paths:
+#       - release/*.dmg
+#       - release/*.zip
+#     expire_in: 30 days
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"

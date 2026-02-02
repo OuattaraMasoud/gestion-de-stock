@@ -1,0 +1,168 @@
+name: Build Windows & macOS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (optional)"
+        required: false
+        default: ""
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows Portable (with obfuscation)
+        run: npm run build:win-portable
+        env:
+          CSC_KEY: ${{ secrets.CSC_KEY }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+
+      - name: Build Windows Setup (NSIS with obfuscation)
+        run: npm run build:win
+        env:
+          CSC_KEY: ${{ secrets.CSC_KEY }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+
+      - name: Rename artifacts
+        shell: powershell
+        run: |
+          $version = "${{ github.event.inputs.version }}"
+          if ([string]::IsNullOrEmpty($version)) {
+            $version = "${{ github.run_number }}"
+          }
+
+          Get-ChildItem release\*.exe | ForEach-Object {
+            $newName = $_.Name -replace '\.', "-$version."
+            Write-Host "Renaming $($_.Name) to $newName"
+            Rename-Item $_.FullName -NewName $newName
+          }
+
+      - name: List build artifacts
+        run: |
+          echo "Build output:"
+          dir release
+
+      - name: Upload Windows Portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: gestion-stock-portable
+          path: release/Gestion de Stock-*-portable.exe
+          retention-days: 30
+
+      - name: Upload Windows Setup
+        uses: actions/upload-artifact@v4
+        with:
+          name: gestion-stock-setup
+          path: release/Gestion de Stock-*-setup.exe
+          retention-days: 30
+
+      - name: Upload all artifacts (debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-release-files
+          path: release/*
+          retention-days: 7
+
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/Gestion de Stock-*-portable.exe
+            release/Gestion de Stock-*-setup.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # build-macos:
+  #   runs-on: macos-latest
+
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: '20'
+  #         cache: 'npm'
+
+  #     - name: Install dependencies
+  #       run: npm ci
+
+  #     - name: Build macOS DMG (with obfuscation)
+  #       run: npm run build:mac
+  #       env:
+  #         CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+  #         CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+  #         APPLE_ID: ${{ secrets.APPLE_ID }}
+  #         APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+  #         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+  #     - name: Rename artifacts
+  #       run: |
+  #         version="${{ github.event.inputs.version }}"
+  #         if [ -z "$version" ]; then
+  #           version="${{ github.run_number }}"
+  #         fi
+
+  #         for file in release/*.dmg; do
+  #           if [ -f "$file" ]; then
+  #             newName=$(echo "$file" | sed "s/\.dmg/-${version}.dmg/")
+  #             echo "Renaming $file to $newName"
+  #             mv "$file" "$newName"
+  #           fi
+  #         done
+
+  #     - name: List build artifacts
+  #       run: |
+  #         echo "Build output:"
+  #         ls -la release/
+
+  #     - name: Upload macOS DMG
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: gestion-stock-macos
+  #         path: release/*.dmg
+  #         retention-days: 30
+
+  #     - name: Upload all macOS artifacts (debug)
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: all-release-files-macos
+  #         path: release/*
+  #         retention-days: 7
+
+  #     - name: Create Release (on tag)
+  #       if: startsWith(github.ref, 'refs/tags/')
+  #       uses: softprops/action-gh-release@v1
+  #       with:
+  #         files: |
+  #           release/*.dmg
+  #         draft: false
+  #         prerelease: false
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
