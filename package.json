@@ -1,0 +1,142 @@
+{
+  "name": "gestion-de-stock",
+  "version": "1.17.0",
+  "description": "Application de gestion de stock et caisse avec MySQL",
+  "main": "out/main/index.js",
+  "author": "Votre Nom",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run rebuild && electron-vite build",
+    "build:prod": "npm run rebuild && cross-env OBFUSCATE=true electron-vite build",
+    "rebuild": "electron-rebuild",
+    "package": "npm run build:prod && electron-builder",
+    "package:win": "npm run build:prod && CSC_KEY= CSC_LINK= electron-builder --win",
+    "package:mac": "npm run build:prod && electron-builder --mac",
+    "package:win-unsigned": "npm run build:prod && CSC_KEY= CSC_LINK= electron-builder --win --publish=never",
+    "build:win": "npm run build:prod && electron-builder --win --x64 --publish=never",
+    "build:win-portable": "npm run build:prod && electron-builder --win portable --x64 --publish=never",
+    "build:win-all": "npm run build:prod && electron-builder --win --x64 --publish=never",
+    "build:mac": "npm run build:prod && electron-builder --mac --publish=never",
+    "postinstall": "electron-builder install-app-deps && electron-rebuild"
+  },
+  "build": {
+    "appId": "com.gestionstock.app",
+    "productName": "SynkaPOS",
+    "icon": "build/icon",
+    "electronDownload": {
+      "mirror": "https://npmmirror.com/mirrors/electron/"
+    },
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "dist-react/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": null,
+      "entitlementsInherit": null
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "forceCodeSigning": false,
+      "signtoolOptions": {
+        "sign": false
+      }
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": true,
+      "runAfterFinish": false,
+      "shortcutName": "SynkaPOS",
+      "uninstallDisplayName": "SynkaPOS",
+      "license": "LICENSE.txt",
+      "displayLanguageSelector": true,
+      "guid": "com.gestionstock.app",
+      "artifactName": "${productName}-${version}-setup.${ext}",
+      "differentialPackage": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office"
+    }
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.22",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.4",
+    "electron-builder": "^26.0.12",
+    "electron-rebuild": "^3.2.9",
+    "electron-vite": "^4.0.1",
+    "javascript-obfuscator": "^5.2.1",
+    "png-to-ico": "^3.0.1",
+    "postcss": "^8.5.6",
+    "rollup-plugin-obfuscator": "^1.1.0",
+    "tailwindcss": "^4.1.17",
+    "terser": "^5.46.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4",
+    "wait-on": "^9.0.3"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.5.0",
+    "firebase": "^12.7.0",
+    "firebase-admin": "^13.6.0",
+    "lucide-react": "^0.555.0",
+    "mysql2": "^3.15.3",
+    "node-machine-id": "^1.1.12",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.9.6",
+    "zustand": "^5.0.8"
+  }
+}

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Simple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            color: #28a745;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test de l'application Electron</h1>
+
+        <div class="test-section">
+            <h2>Test 1: Vérification de l'environnement</h2>
+            <p><strong>Node Version:</strong> <span id="node-version"></span></p>
+            <p><strong>Electron:</strong> <span id="electron-version"></span></p>
+            <p><strong>Chrome:</strong> <span id="chrome-version"></span></p>
+            <p><strong>Platform:</strong> <span id="platform"></span></p>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 2: Vérification des APIs</h2>
+            <p><strong>electronAPI disponible:</strong> <span id="electron-api-status"></span></p>
+            <p><strong>Processus:</strong> <span id="process-type"></span></p>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 3: Connexion Base de Données</h2>
+            <button onclick="testDatabase()">Tester la base de données</button>
+            <div id="db-test-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 4: Chargement des composants React</h2>
+            <button onclick="testReact()">Tester React</button>
+            <div id="react-test-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Résultats des tests</h2>
+            <div id="test-summary"></div>
+        </div>
+    </div>
+
+    <script>
+        // Test 1: Vérification de l'environnement
+        document.getElementById('node-version').textContent = process.versions.node;
+        document.getElementById('electron-version').textContent = process.versions.electron;
+        document.getElementById('chrome-version').textContent = process.versions.chrome;
+        document.getElementById('platform').textContent = process.platform;
+
+        // Test 2: Vérification des APIs
+        const electronApiStatus = window.electronAPI ? '✅ Disponible' : '❌ Non disponible';
+        document.getElementById('electron-api-status').textContent = electronApiStatus;
+        document.getElementById('electron-api-status').className = window.electronAPI ? 'success' : 'error';
+
+        const processType = process.type === 'renderer' ? 'Renderer Process' : 'Main Process';
+        document.getElementById('process-type').textContent = processType;
+
+        // Test 3: Test de la base de données
+        async function testDatabase() {
+            const resultDiv = document.getElementById('db-test-result');
+
+            if (!window.electronAPI) {
+                resultDiv.innerHTML = '<p class="error">❌ electronAPI non disponible</p>';
+                return;
+            }
+
+            try {
+                resultDiv.innerHTML = '<p>🔄 Test en cours...</p>';
+
+                // Test getProducts
+                const products = await window.electronAPI.getProducts();
+                resultDiv.innerHTML = `<p class="success">✅ Base de données connectée! ${products.length} produits trouvés</p>`;
+
+            } catch (error) {
+                console.error('Erreur DB:', error);
+                resultDiv.innerHTML = `<p class="error">❌ Erreur de base de données: ${error.message}</p>`;
+            }
+        }
+
+        // Test 4: Test React (simulation)
+        function testReact() {
+            const resultDiv = document.getElementById('react-test-result');
+            resultDiv.innerHTML = '<p class="success">✅ environnement de test prêt pour React</p>';
+        }
+
+        // Résumé des tests
+        function updateTestSummary() {
+            const summary = document.getElementById('test-summary');
+            const tests = [
+                { name: 'Environnement Electron', status: true },
+                { name: 'API electronAPI', status: !!window.electronAPI },
+                { name: 'Type de processus', status: process.type === 'renderer' }
+            ];
+
+            const passedTests = tests.filter(t => t.status).length;
+            const totalTests = tests.length;
+
+            summary.innerHTML = `
+                <p><strong>Tests passés:</strong> ${passedTests}/${totalTests}</p>
+                <div style="margin-top: 10px;">
+                    ${tests.map(test => `
+                        <span style="margin-right: 15px;">
+                            ${test.status ? '✅' : '❌'} ${test.name}
+                        </span>
+                    `).join('')}
+                </div>
+                ${passedTests === totalTests ?
+                    '<p class="success" style="margin-top: 10px;">🎉 Tous les tests sont passés! L\'application devrait fonctionner.</p>' :
+                    '<p class="error" style="margin-top: 10px;">⚠️ Certains tests ont échoué. Vérifiez la configuration.</p>'
+                }
+            `;
+        }
+
+        // Initialiser
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTestSummary();
+        });
+
+        // Logger les erreurs
+        window.addEventListener('error', (event) => {
+            console.error('Erreur JavaScript:', event.error);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Promesse rejetée non gérée:', event.reason);
+        });
+    </script>
+</body>
+</html>

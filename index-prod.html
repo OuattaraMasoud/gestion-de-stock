@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SynkaPOS</title>
+    <script>
+      // Désactiver le CSP temporairement
+      if (typeof window !== 'undefined') {
+        window.addEventListener('DOMContentLoaded', function() {
+          console.log('DOM Loaded - Starting React app');
+
+          // Charger React manuellement si nécessaire
+          const script = document.createElement('script');
+          script.src = './assets/index-Clr_44z4.js';
+          script.type = 'module';
+          script.onerror = function(e) {
+            console.error('Failed to load React script:', e);
+            document.getElementById('root').innerHTML = `
+              <div style="padding: 20px; background: #fee; color: #c00; border-radius: 8px; margin: 20px;">
+                <h2>❌ Erreur de chargement de l'application</h2>
+                <p>Le script React n'a pas pu être chargé: ${e.message}</p>
+                <p>Chemin tenté: ${script.src}</p>
+              </div>
+            `;
+          };
+          script.onload = function() {
+            console.log('React script loaded successfully');
+          };
+          document.head.appendChild(script);
+        });
+      }
+    </script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BkUdjtyN.css">
+    <style>
+      body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; }
+      #root { min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f3f4f6;">
+        <div style="text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <div style="font-size: 24px; color: #10b981; margin-bottom: 16px;">⏳</div>
+          <h2 style="color: #374151; margin: 0 0 16px 0;">Chargement de l'application...</h2>
+          <p style="color: #6b7280; margin: 0;">Veuillez patienter pendant le démarrage.</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" crossorigin src="./assets/index-Clr_44z4.js"></script>
+  </body>
+</html>
