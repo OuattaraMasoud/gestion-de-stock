@@ -17,8 +17,11 @@ import {
   ChevronRight,
   Settings,
   FileText,
+  FileCheck,
   Shield,
   Database,
+  AlertCircle,
+  ClipboardList,
 } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { getAllowedRoutes } from "../utils/permissions";
@@ -62,8 +65,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     DollarSign,
     Settings,
     FileText,
+    FileCheck,
     Shield,
     Database,
+    AlertCircle,
+    ClipboardList,
   };
 
   // Obtenir uniquement les routes autorisées pour l'utilisateur connecté
@@ -85,8 +91,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* Sidebar */}
         <aside
           className={`${
-            isCollapsed ? "w-16" : "w-64"
-          } bg-gradient-to-b from-blue-600 to-blue-800 text-white flex flex-col shadow-xl transition-all duration-300`}
+            isCollapsed ? "w-22" : "w-64"
+          } bg-linear-to-b from-blue-600 to-blue-800 text-white flex flex-col shadow-xl transition-all duration-300`}
         >
           <div className="p-4 border-b border-blue-500 flex items-center justify-between">
             {!isCollapsed && (

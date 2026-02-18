@@ -7,7 +7,7 @@ let db: Database.Database;
 
 // Version actuelle du schéma de la base de données
 // Incrémentez ce numéro à chaque nouveau changement de schéma
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 8;
 
 // Vérifier l'intégrité de la base de données
 function checkAndRepairDatabase(): { success: boolean; message: string } {
@@ -16,7 +16,10 @@ function checkAndRepairDatabase(): { success: boolean; message: string } {
     if (result === "ok") {
       return { success: true, message: "Base de données saine" };
     } else {
-      return { success: false, message: result || "Erreur d'intégrité détectée" };
+      return {
+        success: false,
+        message: result || "Erreur d'intégrité détectée",
+      };
     }
   } catch (error) {
     return { success: false, message: String(error) };
@@ -61,7 +64,11 @@ function recreateFTSTables() {
 }
 
 // Réparer une base de données corrompue en dumpant et restaurant
-export function repairDatabase(): { success: boolean; message: string; backupPath?: string } {
+export function repairDatabase(): {
+  success: boolean;
+  message: string;
+  backupPath?: string;
+} {
   const userDataPath = app.getPath("userData");
   const dbPath = path.join(userDataPath, "data", "gestion_stock.db");
   const backupDir = path.join(userDataPath, "backups");
@@ -79,14 +86,25 @@ export function repairDatabase(): { success: boolean; message: string; backupPat
 
     // Essayer d'exporter les données
     try {
-      const tables = db.prepare(`
+      const tables = db
+        .prepare(
+          `
         SELECT name FROM sqlite_master
         WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%'
-      `).all() as { name: string }[];
+      `,
+        )
+        .all() as { name: string }[];
 
       const dump: string[] = [];
       for (const table of tables) {
-        if (["produits_fts", "clients_fts", "fournisseurs_fts", "utilisateurs_fts"].includes(table.name)) {
+        if (
+          [
+            "produits_fts",
+            "clients_fts",
+            "fournisseurs_fts",
+            "utilisateurs_fts",
+          ].includes(table.name)
+        ) {
           continue; // Ignorer les tables FTS5 corrompues
         }
 
@@ -170,7 +188,10 @@ export function initDatabase() {
   // Vérifier l'intégrité de la base de données et réparer si nécessaire
   const integrityCheck = checkAndRepairDatabase();
   if (!integrityCheck.success) {
-    console.error("Erreur d'intégrité de la base de données:", integrityCheck.message);
+    console.error(
+      "Erreur d'intégrité de la base de données:",
+      integrityCheck.message,
+    );
     // Tenter de recréer les tables FTS5 si elles sont corrompues
     try {
       recreateFTSTables();
@@ -209,7 +230,9 @@ function createSchemaVersionTable() {
 function detectExistingMigrations() {
   // Si la table schema_versions est vide mais que la base a des données,
   // on détecte quelles migrations ont déjà été appliquées
-  const hasVersions = db.prepare("SELECT COUNT(*) as count FROM schema_versions").get() as { count: number };
+  const hasVersions = db
+    .prepare("SELECT COUNT(*) as count FROM schema_versions")
+    .get() as { count: number };
 
   if (hasVersions.count > 0) {
     return; // Les versions sont déjà trackées
@@ -220,7 +243,9 @@ function detectExistingMigrations() {
     return; // Nouvelle installation, pas besoin de détecter
   }
 
-  console.log("🔍 Détection des migrations existantes sur ancienne base de données...");
+  console.log(
+    "🔍 Détection des migrations existantes sur ancienne base de données...",
+  );
 
   // Détecter migration 1: client_id dans ventes
   if (columnExists("ventes", "client_id")) {
@@ -243,7 +268,36 @@ function detectExistingMigrations() {
   // Détecter migration 4: colonnes de remise
   if (columnExists("ventes", "remise_type")) {
     console.log("  → Migration 4 déjà appliquée (remise_type existe)");
-    recordMigration(4, "Ajout colonnes de remise à ventes et factures (pré-existant)");
+    recordMigration(
+      4,
+      "Ajout colonnes de remise à ventes et factures (pré-existant)",
+    );
+  }
+
+  // Détecter migration 5: (si nécessaire - vérifier ce qui a été ajouté)
+  // Migration 5 concerne probablement les remises sur factures aussi
+  if (
+    tableExists("factures") &&
+    columnExists("factures", "remise_type") &&
+    columnExists("factures", "remise_valeur")
+  ) {
+    console.log("  → Migration 5 déjà appliquée (remise sur factures existe)");
+    recordMigration(5, "Colonnes remise factures (pré-existant)");
+  }
+
+  // Détecter migration 6: client_telephone et client_email dans factures
+  if (
+    tableExists("factures") &&
+    columnExists("factures", "client_telephone") &&
+    columnExists("factures", "client_email")
+  ) {
+    console.log(
+      "  → Migration 6 déjà appliquée (client_telephone/client_email existent)",
+    );
+    recordMigration(
+      6,
+      "Ajout client_telephone et client_email aux factures (pré-existant)",
+    );
   }
 
   console.log("✓ Détection terminée");
@@ -253,14 +307,18 @@ function detectExistingMigrations() {
 function getCurrentSchemaVersion(): number {
   try {
     const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_versions'")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_versions'",
+      )
       .all();
 
     if (tables.length === 0) {
       return 0; // Nouvelle base ou ancienne version sans tracking
     }
 
-    const result = db.prepare("SELECT MAX(version) as version FROM schema_versions").get() as { version: number | null };
+    const result = db
+      .prepare("SELECT MAX(version) as version FROM schema_versions")
+      .get() as { version: number | null };
     return result?.version || 0;
   } catch {
     return 0;
@@ -269,7 +327,9 @@ function getCurrentSchemaVersion(): number {
 
 // Enregistrer une migration appliquée
 function recordMigration(version: number, description: string) {
-  db.prepare("INSERT OR IGNORE INTO schema_versions (version, description) VALUES (?, ?)").run(version, description);
+  db.prepare(
+    "INSERT OR IGNORE INTO schema_versions (version, description) VALUES (?, ?)",
+  ).run(version, description);
 }
 
 // Vérifier si une colonne existe dans une table
@@ -341,7 +401,9 @@ const migrations: Migration[] = [
           ? db.prepare("SELECT * FROM paiements_clients").all()
           : [];
 
-        console.log(`  Sauvegarde: ${oldVentes.length} ventes, ${oldVentesProduits.length} produits, ${oldPaiementsClients.length} paiements`);
+        console.log(
+          `  Sauvegarde: ${oldVentes.length} ventes, ${oldVentesProduits.length} produits, ${oldPaiementsClients.length} paiements`,
+        );
 
         // Supprimer les tables dépendantes
         db.exec("DROP TABLE IF EXISTS ventes_produits");
@@ -412,9 +474,19 @@ const migrations: Migration[] = [
 
           for (const vp of oldVentesProduits as any[]) {
             try {
-              insertVPStmt.run(vp.id, vp.vente_id, vp.produit_id, vp.quantite, vp.prix_unitaire, vp.sous_total);
+              insertVPStmt.run(
+                vp.id,
+                vp.vente_id,
+                vp.produit_id,
+                vp.quantite,
+                vp.prix_unitaire,
+                vp.sous_total,
+              );
             } catch (e) {
-              console.log(`  Impossible de restaurer vente_produit ${vp.id}:`, e);
+              console.log(
+                `  Impossible de restaurer vente_produit ${vp.id}:`,
+                e,
+              );
             }
           }
         }
@@ -455,12 +527,17 @@ const migrations: Migration[] = [
                 pc.date_paiement,
               );
             } catch (e) {
-              console.log(`  Impossible de restaurer paiement_client ${pc.id}:`, e);
+              console.log(
+                `  Impossible de restaurer paiement_client ${pc.id}:`,
+                e,
+              );
             }
           }
         }
 
-        console.log(`✓ Migration 1: ${oldVentes.length} vente(s), ${oldVentesProduits.length} produit(s), ${oldPaiementsClients.length} paiement(s) migré(s)`);
+        console.log(
+          `✓ Migration 1: ${oldVentes.length} vente(s), ${oldVentesProduits.length} produit(s), ${oldPaiementsClients.length} paiement(s) migré(s)`,
+        );
       }
     },
   },
@@ -495,28 +572,120 @@ const migrations: Migration[] = [
         console.log("Migration 4: Ajout des colonnes de remise à ventes...");
         db.exec("ALTER TABLE ventes ADD COLUMN remise_type TEXT DEFAULT NULL");
         db.exec("ALTER TABLE ventes ADD COLUMN remise_valeur REAL DEFAULT 0");
-        db.exec("ALTER TABLE ventes ADD COLUMN total_avant_remise REAL DEFAULT NULL");
+        db.exec(
+          "ALTER TABLE ventes ADD COLUMN total_avant_remise REAL DEFAULT NULL",
+        );
       }
 
       // Remise dans factures
       if (tableExists("factures") && !columnExists("factures", "remise_type")) {
         console.log("Migration 4: Ajout des colonnes de remise à factures...");
-        db.exec("ALTER TABLE factures ADD COLUMN remise_type TEXT DEFAULT NULL");
+        db.exec(
+          "ALTER TABLE factures ADD COLUMN remise_type TEXT DEFAULT NULL",
+        );
         db.exec("ALTER TABLE factures ADD COLUMN remise_valeur REAL DEFAULT 0");
-        db.exec("ALTER TABLE factures ADD COLUMN total_avant_remise REAL DEFAULT NULL");
+        db.exec(
+          "ALTER TABLE factures ADD COLUMN total_avant_remise REAL DEFAULT NULL",
+        );
       }
       console.log("✓ Migration 4 terminée");
     },
   },
+  {
+    version: 5,
+    description: "Correction colonnes remise dans factures (fix migration 4)",
+    up: () => {
+      // Cette migration corrige le cas où la migration 4 a été marquée comme
+      // appliquée mais les colonnes n'ont pas été ajoutées à factures
+      if (tableExists("factures")) {
+        if (!columnExists("factures", "remise_type")) {
+          console.log("Migration 5: Ajout de remise_type à factures...");
+          db.exec(
+            "ALTER TABLE factures ADD COLUMN remise_type TEXT DEFAULT NULL",
+          );
+        }
+        if (!columnExists("factures", "remise_valeur")) {
+          console.log("Migration 5: Ajout de remise_valeur à factures...");
+          db.exec(
+            "ALTER TABLE factures ADD COLUMN remise_valeur REAL DEFAULT 0",
+          );
+        }
+        if (!columnExists("factures", "total_avant_remise")) {
+          console.log("Migration 5: Ajout de total_avant_remise à factures...");
+          db.exec(
+            "ALTER TABLE factures ADD COLUMN total_avant_remise REAL DEFAULT NULL",
+          );
+        }
+      }
+      console.log("✓ Migration 5 terminée");
+    },
+  },
+  {
+    version: 6,
+    description: "Ajout client_telephone et client_email aux factures",
+    up: () => {
+      // Ajouter les colonnes client_telephone et client_email à la table factures
+      try {
+        db.exec("ALTER TABLE factures ADD COLUMN client_telephone TEXT");
+        console.log("  ✓ Colonne client_telephone ajoutée à factures");
+      } catch (e) {
+        console.log("  - Colonne client_telephone existe déjà");
+      }
+      try {
+        db.exec("ALTER TABLE factures ADD COLUMN client_email TEXT");
+        console.log("  ✓ Colonne client_email ajoutée à factures");
+      } catch (e) {
+        console.log("  - Colonne client_email existe déjà");
+      }
+      console.log("✓ Migration 6 terminée");
+    },
+  },
   // ==================== AJOUTEZ VOS NOUVELLES MIGRATIONS ICI ====================
-  // Exemple:
-  // {
-  //   version: 5,
-  //   description: "Description de votre migration",
-  //   up: () => {
-  //     // Votre code de migration
-  //   },
-  // },
+  {
+    version: 7,
+    description: "Ajout description_entreprise à configuration",
+    up: () => {
+      try {
+        db.exec(
+          "ALTER TABLE configuration ADD COLUMN description_entreprise TEXT",
+        );
+        console.log(
+          "  ✓ Colonne description_entreprise ajoutée à configuration",
+        );
+      } catch (e) {
+        console.log("  - Colonne description_entreprise existe déjà");
+      }
+      console.log("✓ Migration 7 terminée");
+    },
+  },
+  {
+    version: 8,
+    description: "Création de la table client_prix pour les prix personnalisés",
+    up: () => {
+      if (!tableExists("client_prix")) {
+        console.log("Migration 8: Création de la table client_prix...");
+        db.exec(`
+          CREATE TABLE client_prix (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            produit_id INTEGER NOT NULL,
+            prix_personnalise REAL NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+            FOREIGN KEY (produit_id) REFERENCES produits(id) ON DELETE CASCADE,
+            UNIQUE(client_id, produit_id)
+          )
+        `);
+        db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_client_prix_client ON client_prix(client_id);
+          CREATE INDEX IF NOT EXISTS idx_client_prix_produit ON client_prix(produit_id);
+          CREATE INDEX IF NOT EXISTS idx_client_prix_unique ON client_prix(client_id, produit_id);
+        `);
+        console.log("✓ Migration 8 terminée");
+      }
+    },
+  },
 ];
 
 function runMigrations() {
@@ -535,7 +704,9 @@ function runMigrations() {
     console.log(`Version cible du schéma: ${CURRENT_SCHEMA_VERSION}`);
 
     // Filtrer les migrations à appliquer
-    const pendingMigrations = migrations.filter((m) => m.version > currentVersion);
+    const pendingMigrations = migrations.filter(
+      (m) => m.version > currentVersion,
+    );
 
     if (pendingMigrations.length === 0) {
       console.log("✓ Base de données à jour, aucune migration nécessaire");
@@ -548,12 +719,18 @@ function runMigrations() {
     // Créer un backup avant les migrations
     const backupPath = createMigrationBackup();
     if (!backupPath) {
-      console.warn("⚠️  Impossible de créer un backup, continuation avec précaution...");
+      console.warn(
+        "⚠️  Impossible de créer un backup, continuation avec précaution...",
+      );
     }
 
     // Appliquer chaque migration dans l'ordre
-    for (const migration of pendingMigrations.sort((a, b) => a.version - b.version)) {
-      console.log(`\n--- Migration ${migration.version}: ${migration.description} ---`);
+    for (const migration of pendingMigrations.sort(
+      (a, b) => a.version - b.version,
+    )) {
+      console.log(
+        `\n--- Migration ${migration.version}: ${migration.description} ---`,
+      );
 
       try {
         // Exécuter la migration dans une transaction
@@ -564,7 +741,10 @@ function runMigrations() {
         console.log(`✓ Migration ${migration.version} appliquée avec succès`);
       } catch (migrationError) {
         db.exec("ROLLBACK");
-        console.error(`❌ Échec de la migration ${migration.version}:`, migrationError);
+        console.error(
+          `❌ Échec de la migration ${migration.version}:`,
+          migrationError,
+        );
 
         // Informer l'utilisateur du backup disponible
         if (backupPath) {
@@ -578,7 +758,9 @@ function runMigrations() {
     }
 
     console.log(`\n✓ Toutes les migrations ont été appliquées avec succès`);
-    console.log(`Version du schéma: ${currentVersion} → ${CURRENT_SCHEMA_VERSION}`);
+    console.log(
+      `Version du schéma: ${currentVersion} → ${CURRENT_SCHEMA_VERSION}`,
+    );
   } catch (error) {
     console.error("❌ ERREUR CRITIQUE lors de la migration:", error);
     console.error("Stack trace:", (error as Error).stack);
@@ -800,14 +982,48 @@ function createTables() {
       heure_facture TEXT NOT NULL,
       vendeur TEXT NOT NULL,
       client_nom TEXT DEFAULT 'Client comptoir',
+      client_telephone TEXT,
+      client_email TEXT,
       serveur_nom TEXT,
       total_ttc REAL NOT NULL,
       methode_paiement TEXT NOT NULL,
       montant_paye REAL NOT NULL,
       monnaie_rendue REAL DEFAULT 0,
+      remise_type TEXT DEFAULT NULL,
+      remise_valeur REAL DEFAULT 0,
+      total_avant_remise REAL DEFAULT NULL,
       articles TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (vente_id) REFERENCES ventes(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Table factures proforma
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS factures_proforma (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero TEXT NOT NULL UNIQUE,
+      client_id INTEGER,
+      client_nom TEXT DEFAULT 'Client comptoir',
+      client_telephone TEXT,
+      client_email TEXT,
+      date_proforma TEXT NOT NULL,
+      date_validite TEXT,
+      total_ht REAL NOT NULL DEFAULT 0,
+      total_ttc REAL NOT NULL,
+      remise_type TEXT DEFAULT NULL,
+      remise_valeur REAL DEFAULT 0,
+      total_avant_remise REAL DEFAULT NULL,
+      articles TEXT NOT NULL,
+      notes TEXT,
+      statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'acceptee', 'refusee', 'convertie', 'expiree')),
+      vente_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_by INTEGER,
+      FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+      FOREIGN KEY (vente_id) REFERENCES ventes(id) ON DELETE SET NULL,
+      FOREIGN KEY (created_by) REFERENCES utilisateurs(id) ON DELETE SET NULL
     )
   `);
 
@@ -816,6 +1032,7 @@ function createTables() {
     CREATE TABLE IF NOT EXISTS configuration (
       id INTEGER PRIMARY KEY,
       nom_entreprise TEXT NOT NULL DEFAULT 'Mon Entreprise',
+      description_entreprise TEXT,
       logo_url TEXT,
       adresse TEXT,
       telephone TEXT,
@@ -1142,6 +1359,93 @@ export function getProductImage(filename: string): string | null {
   }
 }
 
+export function saveCompanyLogo(base64Data: string): string {
+  try {
+    const userDataPath = app.getPath("userData");
+    const imagesDir = path.join(userDataPath, "images");
+
+    if (!fs.existsSync(imagesDir)) {
+      fs.mkdirSync(imagesDir, { recursive: true });
+    }
+
+    const matches = base64Data.match(
+      /^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/,
+    );
+    if (!matches) {
+      throw new Error("Format d'image invalide");
+    }
+
+    const mimeType = matches[1];
+    const extension = mimeType.split("/")[1].replace("+xml", "");
+    const filename = `company_logo.${extension}`;
+    const filepath = path.join(imagesDir, filename);
+
+    // Supprimer l'ancien logo s'il existe
+    try {
+      const existingLogos = fs
+        .readdirSync(imagesDir)
+        .filter((f) => f.startsWith("company_logo."));
+      for (const oldLogo of existingLogos) {
+        fs.unlinkSync(path.join(imagesDir, oldLogo));
+      }
+    } catch (e) {
+      // Ignorer les erreurs de suppression
+    }
+
+    fs.writeFileSync(filepath, matches[2], "base64");
+
+    // Mettre à jour ou créer la configuration avec le logo
+    const checkStmt = db.prepare("SELECT id FROM configuration WHERE id = 1");
+    const exists = checkStmt.get();
+
+    if (exists) {
+      db.prepare("UPDATE configuration SET logo_url = ? WHERE id = 1").run(
+        filename,
+      );
+    } else {
+      db.prepare(
+        "INSERT INTO configuration (id, nom_entreprise, logo_url) VALUES (1, 'Mon Entreprise', ?)",
+      ).run(filename);
+    }
+
+    return filename;
+  } catch (error) {
+    console.error("Erreur sauvegarde logo:", error);
+    throw error;
+  }
+}
+
+export function getCompanyLogo(): string | null {
+  try {
+    const config = getConfiguration();
+    if (!config.logo_url) return null;
+    return getProductImage(config.logo_url);
+  } catch (error) {
+    console.error("Erreur lecture logo:", error);
+    return null;
+  }
+}
+
+export function deleteCompanyLogo(): void {
+  try {
+    const config = getConfiguration();
+    if (config.logo_url) {
+      const userDataPath = app.getPath("userData");
+      const filepath = path.join(userDataPath, "images", config.logo_url);
+      if (fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+    }
+    const stmt = db.prepare(
+      "UPDATE configuration SET logo_url = NULL WHERE id = 1",
+    );
+    stmt.run();
+  } catch (error) {
+    console.error("Erreur suppression logo:", error);
+    throw error;
+  }
+}
+
 // export function deleteProductImage(filename: string): void {
 //   try {
 //     if (!filename) {
@@ -1256,8 +1560,10 @@ export function createProduct(product: any) {
 
 export function updateProduct(id: number, product: any) {
   try {
-    const oldProduct = db.prepare("SELECT * FROM produits WHERE id = ?").get(id) as any;
-    
+    const oldProduct = db
+      .prepare("SELECT * FROM produits WHERE id = ?")
+      .get(id) as any;
+
     if (!oldProduct) {
       throw new Error("Produit non trouvé");
     }
@@ -1284,19 +1590,43 @@ export function updateProduct(id: number, product: any) {
     );
 
     const changes = [];
-    if (oldProduct.nom !== product.nom) changes.push(`nom: "${oldProduct.nom}" → "${product.nom}"`);
-    if (oldProduct.description !== product.description) changes.push(`description: "${oldProduct.description}" → "${product.description}"`);
-    if (oldProduct.code_barre !== product.code_barre) changes.push(`code_barre: "${oldProduct.code_barre}" → "${product.code_barre}"`);
-    if (oldProduct.prix_achat !== product.prix_achat) changes.push(`prix_achat: ${oldProduct.prix_achat} → ${product.prix_achat}`);
-    if (oldProduct.prix_vente !== product.prix_vente) changes.push(`prix_vente: ${oldProduct.prix_vente} → ${product.prix_vente}`);
-    if (oldProduct.quantite_stock !== product.quantite_stock) changes.push(`quantite_stock: ${oldProduct.quantite_stock} → ${product.quantite_stock}`);
-    if (oldProduct.stock_min !== product.stock_min) changes.push(`stock_min: ${oldProduct.stock_min} → ${product.stock_min}`);
-    if (oldProduct.categorie_id !== product.categorie_id) changes.push(`categorie_id: ${oldProduct.categorie_id} → ${product.categorie_id}`);
-    if (oldProduct.image_url !== product.image_url) changes.push(`image_url: "${oldProduct.image_url}" → "${product.image_url}"`);
+    if (oldProduct.nom !== product.nom)
+      changes.push(`nom: "${oldProduct.nom}" → "${product.nom}"`);
+    if (oldProduct.description !== product.description)
+      changes.push(
+        `description: "${oldProduct.description}" → "${product.description}"`,
+      );
+    if (oldProduct.code_barre !== product.code_barre)
+      changes.push(
+        `code_barre: "${oldProduct.code_barre}" → "${product.code_barre}"`,
+      );
+    if (oldProduct.prix_achat !== product.prix_achat)
+      changes.push(
+        `prix_achat: ${oldProduct.prix_achat} → ${product.prix_achat}`,
+      );
+    if (oldProduct.prix_vente !== product.prix_vente)
+      changes.push(
+        `prix_vente: ${oldProduct.prix_vente} → ${product.prix_vente}`,
+      );
+    if (oldProduct.quantite_stock !== product.quantite_stock)
+      changes.push(
+        `quantite_stock: ${oldProduct.quantite_stock} → ${product.quantite_stock}`,
+      );
+    if (oldProduct.stock_min !== product.stock_min)
+      changes.push(`stock_min: ${oldProduct.stock_min} → ${product.stock_min}`);
+    if (oldProduct.categorie_id !== product.categorie_id)
+      changes.push(
+        `categorie_id: ${oldProduct.categorie_id} → ${product.categorie_id}`,
+      );
+    if (oldProduct.image_url !== product.image_url)
+      changes.push(
+        `image_url: "${oldProduct.image_url}" → "${product.image_url}"`,
+      );
 
-    const details = changes.length > 0 
-      ? `Modifications: ${changes.join(", ")}`
-      : `Produit: ${product.nom}`;
+    const details =
+      changes.length > 0
+        ? `Modifications: ${changes.join(", ")}`
+        : `Produit: ${product.nom}`;
 
     logAudit(
       "modifier produit",
@@ -1314,9 +1644,15 @@ export function updateProduct(id: number, product: any) {
   }
 }
 
-export function deleteProduct(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deleteProduct(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
-    const product = db.prepare("SELECT * FROM produits WHERE id = ?").get(id) as any;
+    const product = db
+      .prepare("SELECT * FROM produits WHERE id = ?")
+      .get(id) as any;
     const stmt = db.prepare("DELETE FROM produits WHERE id = ?");
     const result = stmt.run(id);
 
@@ -1374,7 +1710,7 @@ export function createCategory(category: any) {
       "INSERT INTO categories (nom, description) VALUES (?, ?)",
     );
     const result = stmt.run(category.nom, category.description || null);
-    
+
     const categoryId = result.lastInsertRowid;
     logAudit(
       "créer catégorie",
@@ -1384,7 +1720,7 @@ export function createCategory(category: any) {
       category.utilisateur_id,
       category.utilisateur_nom,
     );
-    
+
     return result;
   } catch (error) {
     console.error("Erreur create category:", error);
@@ -1394,27 +1730,34 @@ export function createCategory(category: any) {
 
 export function updateCategory(id: number, category: any) {
   try {
-    const oldCategory = db.prepare("SELECT * FROM categories WHERE id = ?").get(id) as any;
-    
+    const oldCategory = db
+      .prepare("SELECT * FROM categories WHERE id = ?")
+      .get(id) as any;
+
     if (!oldCategory) {
       throw new Error("Catégorie non trouvée");
     }
-    
+
     const stmt = db.prepare(`
       UPDATE categories
       SET nom = ?, description = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
     const result = stmt.run(category.nom, category.description || null, id);
-    
+
     const changes = [];
-    if (oldCategory.nom !== category.nom) changes.push(`nom: "${oldCategory.nom}" → "${category.nom}"`);
-    if (oldCategory.description !== category.description) changes.push(`description: "${oldCategory.description}" → "${category.description}"`);
-    
-    const details = changes.length > 0
-      ? `Modifications: ${changes.join(", ")}`
-      : `Catégorie: ${category.nom}`;
-    
+    if (oldCategory.nom !== category.nom)
+      changes.push(`nom: "${oldCategory.nom}" → "${category.nom}"`);
+    if (oldCategory.description !== category.description)
+      changes.push(
+        `description: "${oldCategory.description}" → "${category.description}"`,
+      );
+
+    const details =
+      changes.length > 0
+        ? `Modifications: ${changes.join(", ")}`
+        : `Catégorie: ${category.nom}`;
+
     logAudit(
       "modifier catégorie",
       "categories",
@@ -1423,7 +1766,7 @@ export function updateCategory(id: number, category: any) {
       category.utilisateur_id,
       category.utilisateur_nom,
     );
-    
+
     return result;
   } catch (error) {
     console.error("Erreur update category:", error);
@@ -1431,9 +1774,15 @@ export function updateCategory(id: number, category: any) {
   }
 }
 
-export function deleteCategory(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deleteCategory(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
-    const category = db.prepare("SELECT * FROM categories WHERE id = ?").get(id) as any;
+    const category = db
+      .prepare("SELECT * FROM categories WHERE id = ?")
+      .get(id) as any;
     const stmt = db.prepare("DELETE FROM categories WHERE id = ?");
     const result = stmt.run(id);
 
@@ -1515,7 +1864,9 @@ export function createSale(sale: any) {
         // La colonne existe déjà, ignorer l'erreur
       }
       try {
-        db.exec("ALTER TABLE ventes ADD COLUMN total_avant_remise REAL DEFAULT NULL");
+        db.exec(
+          "ALTER TABLE ventes ADD COLUMN total_avant_remise REAL DEFAULT NULL",
+        );
       } catch (e) {
         // La colonne existe déjà, ignorer l'erreur
       }
@@ -1584,8 +1935,12 @@ export function createSale(sale: any) {
         updateClientStmt.run(montantRestant, sale.client_id);
       }
 
-      // Enregistrer dans la comptabilité (utiliser sale.total qui est le montant après remise)
-      if (sale.total > 0) {
+      // Enregistrer dans la comptabilité uniquement le montant réellement encaissé
+      // Pour les ventes à crédit, seul le montant payé (acompte) est une entrée de caisse
+      // Le reste sera enregistré lors du paiement de la dette
+      const montantEncaisse =
+        montantRestant > 0 ? sale.montant_paye : sale.total;
+      if (montantEncaisse > 0) {
         const comptaStmt = db.prepare(`
           INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
           VALUES (?, ?, ?, ?, ?, ?)
@@ -1593,8 +1948,8 @@ export function createSale(sale: any) {
         comptaStmt.run(
           "vente",
           venteId,
-          `Vente #${venteId}${sale.remise_valeur ? ` (remise: ${sale.remise_type === 'pourcentage' ? sale.remise_valeur + '%' : sale.remise_valeur + ' FCFA'})` : ''}`,
-          sale.total,
+          `Vente #${venteId}${montantRestant > 0 ? " (à crédit)" : ""}${sale.remise_valeur ? ` (remise: ${sale.remise_type === "pourcentage" ? sale.remise_valeur + "%" : sale.remise_valeur + " FCFA"})` : ""}`,
+          montantEncaisse,
           "entree",
           sale.methode_paiement,
         );
@@ -1637,9 +1992,9 @@ export function getSalesByDate(startDate: string, endDate: string) {
     }
 
     // Optimisation: charger tous les produits et paiements en 2 requêtes au lieu de N*2
-    const saleIds = sales.map(s => s.id);
+    const saleIds = sales.map((s) => s.id);
 
-    const placeholders = saleIds.map(() => '?').join(',');
+    const placeholders = saleIds.map(() => "?").join(",");
     const productsStmt = db.prepare(`
       SELECT vp.*, p.nom as nom_produit
       FROM ventes_produits vp
@@ -1659,7 +2014,7 @@ export function getSalesByDate(startDate: string, endDate: string) {
 
     // Grouper les résultats par vente_id
     const productsBySale: Record<number, any[]> = {};
-    allProducts.forEach(prod => {
+    allProducts.forEach((prod) => {
       if (!productsBySale[prod.vente_id]) {
         productsBySale[prod.vente_id] = [];
       }
@@ -1667,7 +2022,7 @@ export function getSalesByDate(startDate: string, endDate: string) {
     });
 
     const paymentsBySale: Record<number, any[]> = {};
-    allPayments.forEach(payment => {
+    allPayments.forEach((payment) => {
       if (!paymentsBySale[payment.vente_id]) {
         paymentsBySale[payment.vente_id] = [];
       }
@@ -1685,10 +2040,16 @@ export function getSalesByDate(startDate: string, endDate: string) {
   }
 }
 
-export function deleteSale(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deleteSale(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
     return db.transaction(() => {
-      const sale = db.prepare("SELECT * FROM ventes WHERE id = ?").get(id) as any;
+      const sale = db
+        .prepare("SELECT * FROM ventes WHERE id = ?")
+        .get(id) as any;
 
       if (!sale) {
         throw new Error("Vente non trouvée");
@@ -1755,6 +2116,237 @@ export function deleteSale(id: number, utilisateur_id?: number, utilisateur_nom?
     })();
   } catch (error) {
     console.error("Erreur delete sale:", error);
+    throw error;
+  }
+}
+
+export function canModifySale(venteId: number): {
+  canModify: boolean;
+  reason?: string;
+} {
+  try {
+    const sale = db
+      .prepare("SELECT date_vente FROM ventes WHERE id = ?")
+      .get(venteId) as any;
+
+    if (!sale) {
+      return { canModify: false, reason: "Vente non trouvée" };
+    }
+
+    const saleDate = new Date(sale.date_vente);
+    const now = new Date();
+    const diffHours = (now.getTime() - saleDate.getTime()) / (1000 * 60 * 60);
+
+    if (diffHours > 24) {
+      return {
+        canModify: false,
+        reason: `Modification impossible: plus de 24h écoulées (${Math.floor(diffHours)}h)`,
+      };
+    }
+
+    return { canModify: true };
+  } catch (error) {
+    console.error("Erreur canModifySale:", error);
+    return { canModify: false, reason: "Erreur lors de la vérification" };
+  }
+}
+
+export function updateSale(
+  venteId: number,
+  updatedData: any,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
+  try {
+    const checkResult = canModifySale(venteId);
+    if (!checkResult.canModify) {
+      throw new Error(checkResult.reason);
+    }
+
+    return db.transaction(() => {
+      const oldSale = db
+        .prepare(
+          `
+        SELECT v.*, c.nom as client_nom 
+        FROM ventes v 
+        LEFT JOIN clients c ON v.client_id = c.id 
+        WHERE v.id = ?
+      `,
+        )
+        .get(venteId) as any;
+
+      if (!oldSale) {
+        throw new Error("Vente non trouvée");
+      }
+
+      const oldProducts = db
+        .prepare(
+          `
+        SELECT vp.*, p.nom as nom_produit 
+        FROM ventes_produits vp 
+        JOIN produits p ON vp.produit_id = p.id 
+        WHERE vp.vente_id = ?
+      `,
+        )
+        .all(venteId) as any[];
+
+      for (const product of oldProducts) {
+        db.prepare(
+          "UPDATE produits SET quantite_stock = quantite_stock + ? WHERE id = ?",
+        ).run(product.quantite, product.produit_id);
+      }
+
+      if (oldSale.client_id && oldSale.montant_restant > 0) {
+        db.prepare(
+          "UPDATE clients SET solde_du = solde_du - ? WHERE id = ?",
+        ).run(oldSale.montant_restant, oldSale.client_id);
+      }
+
+      db.prepare(
+        "DELETE FROM comptabilite WHERE type = 'vente' AND reference_id = ?",
+      ).run(venteId);
+      db.prepare("DELETE FROM ventes_produits WHERE vente_id = ?").run(venteId);
+
+      const newMontantRestant =
+        updatedData.montant_restant ??
+        updatedData.total - updatedData.montant_paye;
+      const newStatutPaiement =
+        newMontantRestant <= 0
+          ? "paye"
+          : newMontantRestant < updatedData.total
+            ? "partiel"
+            : "impaye";
+
+      db.prepare(
+        `
+        UPDATE ventes 
+        SET client_id = ?, client_nom = ?, serveur_id = ?, total = ?, montant_paye = ?, 
+            montant_restant = ?, monnaie_rendue = ?, statut_paiement = ?, methode_paiement = ?,
+            remise_type = ?, remise_valeur = ?, total_avant_remise = ?
+        WHERE id = ?
+      `,
+      ).run(
+        updatedData.client_id || null,
+        updatedData.client_nom || oldSale.client_nom || "Client comptoir",
+        updatedData.serveur_id || null,
+        updatedData.total,
+        updatedData.montant_paye,
+        newMontantRestant,
+        updatedData.monnaie_rendue || 0,
+        newStatutPaiement,
+        updatedData.methode_paiement,
+        updatedData.remise_type || null,
+        updatedData.remise_valeur || 0,
+        updatedData.total_avant_remise || null,
+        venteId,
+      );
+
+      for (const item of updatedData.produits) {
+        db.prepare(
+          `
+          INSERT INTO ventes_produits (vente_id, produit_id, quantite, prix_unitaire, sous_total)
+          VALUES (?, ?, ?, ?, ?)
+        `,
+        ).run(
+          venteId,
+          item.produit_id,
+          item.quantite,
+          item.prix_unitaire,
+          item.sous_total,
+        );
+
+        db.prepare(
+          "UPDATE produits SET quantite_stock = quantite_stock - ? WHERE id = ?",
+        ).run(item.quantite, item.produit_id);
+      }
+
+      if (updatedData.client_id && newMontantRestant > 0) {
+        db.prepare(
+          "UPDATE clients SET solde_du = solde_du + ? WHERE id = ?",
+        ).run(newMontantRestant, updatedData.client_id);
+      }
+
+      const montantEncaisse =
+        newMontantRestant > 0 ? updatedData.montant_paye : updatedData.total;
+      if (montantEncaisse > 0) {
+        db.prepare(
+          `
+          INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+        ).run(
+          "vente",
+          venteId,
+          `Vente #${venteId} (modifiée)${newMontantRestant > 0 ? " (à crédit)" : ""}`,
+          montantEncaisse,
+          "entree",
+          updatedData.methode_paiement,
+        );
+      }
+
+      const articles = updatedData.produits.map((item: any) => ({
+        designation: item.nom_produit || item.nom,
+        quantite: item.quantite,
+        prixUnitaire: item.prix_unitaire,
+        total: item.sous_total || item.prix_unitaire * item.quantite,
+      }));
+
+      try {
+        db.exec(
+          "ALTER TABLE factures ADD COLUMN montant_restant REAL DEFAULT 0",
+        );
+      } catch (e) {
+        // Column already exists
+      }
+      try {
+        db.exec(
+          "ALTER TABLE factures ADD COLUMN statut_paiement TEXT DEFAULT 'paye'",
+        );
+      } catch (e) {
+        // Column already exists
+      }
+
+      db.prepare(
+        `
+        UPDATE factures 
+        SET client_nom = ?, serveur_nom = ?, total_ttc = ?, methode_paiement = ?,
+            montant_paye = ?, monnaie_rendue = ?, montant_restant = ?, statut_paiement = ?,
+            remise_type = ?, remise_valeur = ?, total_avant_remise = ?, articles = ?
+        WHERE vente_id = ?
+      `,
+      ).run(
+        updatedData.client_nom || "Client comptoir",
+        updatedData.serveur_nom || null,
+        updatedData.total,
+        updatedData.methode_paiement === "especes"
+          ? "Espèces"
+          : updatedData.methode_paiement === "carte"
+            ? "Carte bancaire"
+            : "Mobile Money",
+        updatedData.montant_paye,
+        updatedData.monnaie_rendue || 0,
+        newMontantRestant,
+        newStatutPaiement,
+        updatedData.remise_type || null,
+        updatedData.remise_valeur || 0,
+        updatedData.total_avant_remise || null,
+        JSON.stringify(articles),
+        venteId,
+      );
+
+      logAudit(
+        "modifier vente",
+        "ventes",
+        venteId,
+        `Vente #${venteId} modifiée. Ancien total: ${oldSale.total}, Nouveau total: ${updatedData.total}`,
+        utilisateur_id,
+        utilisateur_nom,
+      );
+
+      return { id: venteId, ...updatedData };
+    })();
+  } catch (error) {
+    console.error("Erreur update sale:", error);
     throw error;
   }
 }
@@ -1912,6 +2504,153 @@ export function getDashboardStats() {
   }
 }
 
+export function getDashboardStatsByDate(startDate: string, endDate: string) {
+  try {
+    // Calculer la période précédente (même durée)
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const duration = end.getTime() - start.getTime();
+    const prevEnd = new Date(start.getTime() - 1); // Jour avant la période
+    const prevStart = new Date(prevEnd.getTime() - duration);
+    const prevStartStr = prevStart.toISOString().split("T")[0];
+    const prevEndStr = prevEnd.toISOString().split("T")[0];
+
+    // Total des ventes pour la période sélectionnée
+    const ventesPeriode = db
+      .prepare(
+        `
+      SELECT COALESCE(SUM(total), 0) as total
+      FROM ventes
+      WHERE DATE(date_vente) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(startDate, endDate) as { total: number };
+
+    // Total des ventes pour la période précédente
+    const ventesPeriodePrecedente = db
+      .prepare(
+        `
+      SELECT COALESCE(SUM(total), 0) as total
+      FROM ventes
+      WHERE DATE(date_vente) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(prevStartStr, prevEndStr) as { total: number };
+
+    // Nombre de ventes pour la période
+    const nbVentesPeriode = db
+      .prepare(
+        `
+      SELECT COUNT(*) as count
+      FROM ventes
+      WHERE DATE(date_vente) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(startDate, endDate) as { count: number };
+
+    // Profit pour la période
+    const profitPeriode = db
+      .prepare(
+        `
+      SELECT COALESCE(SUM((vp.prix_unitaire - p.prix_achat) * vp.quantite), 0) as profit
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(startDate, endDate) as { profit: number };
+
+    // Profit période précédente
+    const profitPeriodePrecedente = db
+      .prepare(
+        `
+      SELECT COALESCE(SUM((vp.prix_unitaire - p.prix_achat) * vp.quantite), 0) as profit
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(prevStartStr, prevEndStr) as { profit: number };
+
+    // Coûts pour la période
+    const coutsPeriode = db
+      .prepare(
+        `
+      SELECT COALESCE(SUM(p.prix_achat * vp.quantite), 0) as couts
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(startDate, endDate) as { couts: number };
+
+    // Coûts période précédente
+    const coutsPeriodePrecedente = db
+      .prepare(
+        `
+      SELECT COALESCE(SUM(p.prix_achat * vp.quantite), 0) as couts
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(prevStartStr, prevEndStr) as { couts: number };
+
+    // Nombre total de produits (inchangé)
+    const totalProduits = db
+      .prepare(`SELECT COUNT(*) as count FROM produits`)
+      .get() as { count: number };
+
+    // Produits en stock faible (inchangé)
+    const stockFaible = db
+      .prepare(
+        `SELECT COUNT(*) as count FROM produits WHERE quantite_stock <= stock_min`,
+      )
+      .get() as { count: number };
+
+    // Valeur totale du stock (inchangé)
+    const valeurStock = db
+      .prepare(
+        `SELECT COALESCE(SUM(prix_achat * quantite_stock), 0) as valeur FROM produits`,
+      )
+      .get() as { valeur: number };
+
+    // Nombre de fournisseurs (inchangé)
+    const nbFournisseurs = db
+      .prepare(`SELECT COUNT(*) as count FROM fournisseurs`)
+      .get() as { count: number };
+
+    // Nombre de clients (inchangé)
+    const nbClients = db
+      .prepare(`SELECT COUNT(*) as count FROM clients`)
+      .get() as { count: number };
+
+    return {
+      ventesPeriode: ventesPeriode.total,
+      ventesPeriodePrecedente: ventesPeriodePrecedente.total,
+      nbVentesPeriode: nbVentesPeriode.count,
+      profitPeriode: profitPeriode.profit,
+      profitPeriodePrecedente: profitPeriodePrecedente.profit,
+      coutsPeriode: coutsPeriode.couts,
+      coutsPeriodePrecedente: coutsPeriodePrecedente.couts,
+      totalProduits: totalProduits.count,
+      stockFaible: stockFaible.count,
+      valeurStock: valeurStock.valeur,
+      nbFournisseurs: nbFournisseurs.count,
+      nbClients: nbClients.count,
+      dateDebut: startDate,
+      dateFin: endDate,
+    };
+  } catch (error) {
+    console.error("Erreur get dashboard stats by date:", error);
+    throw error;
+  }
+}
+
 export function getLowStockProducts() {
   try {
     const stmt = db.prepare(`
@@ -2006,7 +2745,9 @@ export function createUser(user: any) {
 
 export function updateUser(id: number, user: any) {
   try {
-    const oldUser = db.prepare("SELECT * FROM utilisateurs WHERE id = ?").get(id) as any;
+    const oldUser = db
+      .prepare("SELECT * FROM utilisateurs WHERE id = ?")
+      .get(id) as any;
 
     if (!oldUser) {
       throw new Error("Utilisateur non trouvé");
@@ -2045,14 +2786,19 @@ export function updateUser(id: number, user: any) {
     const result = stmt.run(...values);
 
     const changes = [];
-    if (oldUser.nom !== user.nom && user.nom) changes.push(`nom: "${oldUser.nom}" → "${user.nom}"`);
-    if (oldUser.email !== user.email && user.email) changes.push(`email: "${oldUser.email}" → "${user.email}"`);
-    if (oldUser.role !== user.role && user.role) changes.push(`role: "${oldUser.role}" → "${user.role}"`);
-    if (oldUser.actif !== user.actif && user.actif !== undefined) changes.push(`actif: ${oldUser.actif} → ${user.actif}`);
+    if (oldUser.nom !== user.nom && user.nom)
+      changes.push(`nom: "${oldUser.nom}" → "${user.nom}"`);
+    if (oldUser.email !== user.email && user.email)
+      changes.push(`email: "${oldUser.email}" → "${user.email}"`);
+    if (oldUser.role !== user.role && user.role)
+      changes.push(`role: "${oldUser.role}" → "${user.role}"`);
+    if (oldUser.actif !== user.actif && user.actif !== undefined)
+      changes.push(`actif: ${oldUser.actif} → ${user.actif}`);
 
-    const details = changes.length > 0
-      ? `Modifications: ${changes.join(", ")}`
-      : `Utilisateur: ${oldUser.nom}`;
+    const details =
+      changes.length > 0
+        ? `Modifications: ${changes.join(", ")}`
+        : `Utilisateur: ${oldUser.nom}`;
 
     logAudit(
       "modifier utilisateur",
@@ -2070,9 +2816,15 @@ export function updateUser(id: number, user: any) {
   }
 }
 
-export function deleteUser(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deleteUser(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
-    const user = db.prepare("SELECT * FROM utilisateurs WHERE id = ?").get(id) as any;
+    const user = db
+      .prepare("SELECT * FROM utilisateurs WHERE id = ?")
+      .get(id) as any;
     const stmt = db.prepare("DELETE FROM utilisateurs WHERE id = ?");
     const result = stmt.run(id);
 
@@ -2098,7 +2850,9 @@ export function deleteUser(id: number, utilisateur_id?: number, utilisateur_nom?
 
 export function getSuppliers() {
   try {
-    const stmt = db.prepare("SELECT * FROM fournisseurs ORDER BY nom LIMIT 1000");
+    const stmt = db.prepare(
+      "SELECT * FROM fournisseurs ORDER BY nom LIMIT 1000",
+    );
     return stmt.all();
   } catch (error) {
     console.error("Erreur get suppliers:", error);
@@ -2137,7 +2891,7 @@ export function createSupplier(supplier: any) {
       "créer fournisseur",
       "fournisseurs",
       Number(supplierId),
-      `Fournisseur: ${supplier.nom} - Téléphone: ${supplier.telephone || 'N/A'}`,
+      `Fournisseur: ${supplier.nom} - Téléphone: ${supplier.telephone || "N/A"}`,
       supplier.utilisateur_id,
       supplier.utilisateur_nom,
     );
@@ -2151,7 +2905,9 @@ export function createSupplier(supplier: any) {
 
 export function updateSupplier(id: number, supplier: any) {
   try {
-    const oldSupplier = db.prepare("SELECT * FROM fournisseurs WHERE id = ?").get(id) as any;
+    const oldSupplier = db
+      .prepare("SELECT * FROM fournisseurs WHERE id = ?")
+      .get(id) as any;
 
     if (!oldSupplier) {
       throw new Error("Fournisseur non trouvé");
@@ -2175,15 +2931,23 @@ export function updateSupplier(id: number, supplier: any) {
     );
 
     const changes = [];
-    if (oldSupplier.nom !== supplier.nom) changes.push(`nom: "${oldSupplier.nom}" → "${supplier.nom}"`);
-    if (oldSupplier.telephone !== supplier.telephone) changes.push(`telephone: "${oldSupplier.telephone}" → "${supplier.telephone}"`);
-    if (oldSupplier.email !== supplier.email) changes.push(`email: "${oldSupplier.email}" → "${supplier.email}"`);
-    if (oldSupplier.adresse !== supplier.adresse) changes.push(`adresse: "${oldSupplier.adresse}" → "${supplier.adresse}"`);
-    if (oldSupplier.ville !== supplier.ville) changes.push(`ville: "${oldSupplier.ville}" → "${supplier.ville}"`);
+    if (oldSupplier.nom !== supplier.nom)
+      changes.push(`nom: "${oldSupplier.nom}" → "${supplier.nom}"`);
+    if (oldSupplier.telephone !== supplier.telephone)
+      changes.push(
+        `telephone: "${oldSupplier.telephone}" → "${supplier.telephone}"`,
+      );
+    if (oldSupplier.email !== supplier.email)
+      changes.push(`email: "${oldSupplier.email}" → "${supplier.email}"`);
+    if (oldSupplier.adresse !== supplier.adresse)
+      changes.push(`adresse: "${oldSupplier.adresse}" → "${supplier.adresse}"`);
+    if (oldSupplier.ville !== supplier.ville)
+      changes.push(`ville: "${oldSupplier.ville}" → "${supplier.ville}"`);
 
-    const details = changes.length > 0
-      ? `Modifications: ${changes.join(", ")}`
-      : `Fournisseur: ${supplier.nom}`;
+    const details =
+      changes.length > 0
+        ? `Modifications: ${changes.join(", ")}`
+        : `Fournisseur: ${supplier.nom}`;
 
     logAudit(
       "modifier fournisseur",
@@ -2201,9 +2965,15 @@ export function updateSupplier(id: number, supplier: any) {
   }
 }
 
-export function deleteSupplier(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deleteSupplier(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
-    const supplier = db.prepare("SELECT * FROM fournisseurs WHERE id = ?").get(id) as any;
+    const supplier = db
+      .prepare("SELECT * FROM fournisseurs WHERE id = ?")
+      .get(id) as any;
     const stmt = db.prepare("DELETE FROM fournisseurs WHERE id = ?");
     const result = stmt.run(id);
 
@@ -2312,7 +3082,7 @@ export function createPurchase(purchase: any) {
       const comptaStmt = db.prepare(`
         INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
         VALUES (?, ?, ?, ?, ?, ?)
-      `      );
+      `);
       comptaStmt.run(
         "achat",
         achatId,
@@ -2358,9 +3128,9 @@ export function getPurchasesBySupplier(supplierId: number) {
     }
 
     // Optimisation: charger tous les produits en 1 requête au lieu de N
-    const purchaseIds = purchases.map(p => p.id);
+    const purchaseIds = purchases.map((p) => p.id);
 
-    const placeholders = purchaseIds.map(() => '?').join(',');
+    const placeholders = purchaseIds.map(() => "?").join(",");
     const productsStmt = db.prepare(`
       SELECT ap.*, p.nom as nom_produit
       FROM achats_produits ap
@@ -2373,7 +3143,7 @@ export function getPurchasesBySupplier(supplierId: number) {
 
     // Grouper les produits par achat_id
     const productsByPurchase: Record<number, any[]> = {};
-    allProducts.forEach(prod => {
+    allProducts.forEach((prod) => {
       if (!productsByPurchase[prod.achat_id]) {
         productsByPurchase[prod.achat_id] = [];
       }
@@ -2428,8 +3198,8 @@ export function getSupplierUnpaidPurchases(supplierId: number) {
       return [];
     }
 
-    const purchaseIds = purchases.map(p => p.id);
-    const placeholders = purchaseIds.map(() => '?').join(',');
+    const purchaseIds = purchases.map((p) => p.id);
+    const placeholders = purchaseIds.map(() => "?").join(",");
     const productsStmt = db.prepare(`
       SELECT ap.*, p.nom as nom_produit
       FROM achats_produits ap
@@ -2441,7 +3211,7 @@ export function getSupplierUnpaidPurchases(supplierId: number) {
     const allProducts = productsStmt.all(...purchaseIds) as any[];
 
     const productsByPurchase: Record<number, any[]> = {};
-    allProducts.forEach(prod => {
+    allProducts.forEach((prod) => {
       if (!productsByPurchase[prod.achat_id]) {
         productsByPurchase[prod.achat_id] = [];
       }
@@ -2534,7 +3304,7 @@ export function createSupplierPayment(payment: any) {
         "payer dette fournisseur",
         "paiements_fournisseurs",
         Number(result.lastInsertRowid),
-        `Paiement de ${payment.montant} pour achat #${payment.achat_id} - Méthode: ${payment.methode_paiement}${payment.reference ? ` - Réf: ${payment.reference}` : ''}`,
+        `Paiement de ${payment.montant} pour achat #${payment.achat_id} - Méthode: ${payment.methode_paiement}${payment.reference ? ` - Réf: ${payment.reference}` : ""}`,
         payment.utilisateur_id,
         payment.utilisateur_nom,
       );
@@ -2588,7 +3358,7 @@ export function createClient(client: any) {
       "créer client",
       "clients",
       Number(clientId),
-      `Client: ${client.nom} - Téléphone: ${client.telephone || 'N/A'}`,
+      `Client: ${client.nom} - Téléphone: ${client.telephone || "N/A"}`,
       client.utilisateur_id,
       client.utilisateur_nom,
     );
@@ -2602,7 +3372,9 @@ export function createClient(client: any) {
 
 export function updateClient(id: number, client: any) {
   try {
-    const oldClient = db.prepare("SELECT * FROM clients WHERE id = ?").get(id) as any;
+    const oldClient = db
+      .prepare("SELECT * FROM clients WHERE id = ?")
+      .get(id) as any;
 
     if (!oldClient) {
       throw new Error("Client non trouvé");
@@ -2623,15 +3395,23 @@ export function updateClient(id: number, client: any) {
     );
 
     const changes = [];
-    if (oldClient.nom !== client.nom) changes.push(`nom: "${oldClient.nom}" → "${client.nom}"`);
-    if (oldClient.telephone !== client.telephone) changes.push(`telephone: "${oldClient.telephone}" → "${client.telephone}"`);
-    if (oldClient.email !== client.email) changes.push(`email: "${oldClient.email}" → "${client.email}"`);
-    if (oldClient.adresse !== client.adresse) changes.push(`adresse: "${oldClient.adresse}" → "${client.adresse}"`);
-    if (oldClient.ville !== client.ville) changes.push(`ville: "${oldClient.ville}" → "${client.ville}"`);
+    if (oldClient.nom !== client.nom)
+      changes.push(`nom: "${oldClient.nom}" → "${client.nom}"`);
+    if (oldClient.telephone !== client.telephone)
+      changes.push(
+        `telephone: "${oldClient.telephone}" → "${client.telephone}"`,
+      );
+    if (oldClient.email !== client.email)
+      changes.push(`email: "${oldClient.email}" → "${client.email}"`);
+    if (oldClient.adresse !== client.adresse)
+      changes.push(`adresse: "${oldClient.adresse}" → "${client.adresse}"`);
+    if (oldClient.ville !== client.ville)
+      changes.push(`ville: "${oldClient.ville}" → "${client.ville}"`);
 
-    const details = changes.length > 0
-      ? `Modifications: ${changes.join(", ")}`
-      : `Client: ${client.nom}`;
+    const details =
+      changes.length > 0
+        ? `Modifications: ${changes.join(", ")}`
+        : `Client: ${client.nom}`;
 
     logAudit(
       "modifier client",
@@ -2649,9 +3429,15 @@ export function updateClient(id: number, client: any) {
   }
 }
 
-export function deleteClient(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deleteClient(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
-    const client = db.prepare("SELECT * FROM clients WHERE id = ?").get(id) as any;
+    const client = db
+      .prepare("SELECT * FROM clients WHERE id = ?")
+      .get(id) as any;
     const stmt = db.prepare("DELETE FROM clients WHERE id = ?");
     const result = stmt.run(id);
 
@@ -2669,6 +3455,151 @@ export function deleteClient(id: number, utilisateur_id?: number, utilisateur_no
     return result;
   } catch (error) {
     console.error("Erreur delete client:", error);
+    throw error;
+  }
+}
+
+// ===== PRIX PERSONNALISÉS CLIENTS =====
+
+export function getClientPrices(clientId: number) {
+  try {
+    const stmt = db.prepare(`
+      SELECT cp.*, p.nom as produit_nom, p.prix_vente as prix_standard
+      FROM client_prix cp
+      JOIN produits p ON cp.produit_id = p.id
+      WHERE cp.client_id = ?
+      ORDER BY p.nom
+    `);
+    return stmt.all(clientId);
+  } catch (error) {
+    console.error("Erreur get client prices:", error);
+    throw error;
+  }
+}
+
+export function getClientPrice(clientId: number, productId: number) {
+  try {
+    const stmt = db.prepare(`
+      SELECT cp.*, p.nom as produit_nom, p.prix_vente as prix_standard
+      FROM client_prix cp
+      JOIN produits p ON cp.produit_id = p.id
+      WHERE cp.client_id = ? AND cp.produit_id = ?
+    `);
+    return stmt.get(clientId, productId);
+  } catch (error) {
+    console.error("Erreur get client price:", error);
+    throw error;
+  }
+}
+
+export function createClientPrice(clientPrice: any) {
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO client_prix (client_id, produit_id, prix_personnalise)
+      VALUES (?, ?, ?)
+    `);
+    const result = stmt.run(
+      clientPrice.client_id,
+      clientPrice.produit_id,
+      clientPrice.prix_personnalise,
+    );
+
+    logAudit(
+      "créer prix client",
+      "client_prix",
+      Number(result.lastInsertRowid),
+      `Prix personnalisé pour produit #${clientPrice.produit_id}: ${clientPrice.prix_personnalise}`,
+      clientPrice.utilisateur_id,
+      clientPrice.utilisateur_nom,
+    );
+
+    return result;
+  } catch (error) {
+    console.error("Erreur create client price:", error);
+    throw error;
+  }
+}
+
+export function updateClientPrice(id: number, clientPrice: any) {
+  try {
+    const oldPrice = db
+      .prepare("SELECT * FROM client_prix WHERE id = ?")
+      .get(id) as any;
+
+    if (!oldPrice) {
+      throw new Error("Prix client non trouvé");
+    }
+
+    const stmt = db.prepare(`
+      UPDATE client_prix
+      SET prix_personnalise = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    const result = stmt.run(clientPrice.prix_personnalise, id);
+
+    logAudit(
+      "modifier prix client",
+      "client_prix",
+      id,
+      `Prix modifié: ${oldPrice.prix_personnalise} → ${clientPrice.prix_personnalise}`,
+      clientPrice.utilisateur_id,
+      clientPrice.utilisateur_nom,
+    );
+
+    return result;
+  } catch (error) {
+    console.error("Erreur update client price:", error);
+    throw error;
+  }
+}
+
+export function deleteClientPrice(id: number) {
+  try {
+    const price = db
+      .prepare("SELECT * FROM client_prix WHERE id = ?")
+      .get(id) as any;
+    const stmt = db.prepare("DELETE FROM client_prix WHERE id = ?");
+    const result = stmt.run(id);
+
+    if (price) {
+      logAudit(
+        "supprimer prix client",
+        "client_prix",
+        id,
+        `Prix supprimé pour produit #${price.produit_id}`,
+      );
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Erreur delete client price:", error);
+    throw error;
+  }
+}
+
+export function bulkCreateClientPrices(clientId: number, prices: any[]) {
+  try {
+    return db.transaction(() => {
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO client_prix (client_id, produit_id, prix_personnalise)
+        VALUES (?, ?, ?)
+      `);
+
+      for (const price of prices) {
+        stmt.run(clientId, price.produit_id, price.prix_personnalise);
+      }
+
+      logAudit(
+        "importer prix client",
+        "client_prix",
+        clientId,
+        `${prices.length} prix personnalisés importés`,
+      );
+
+      return { success: true, count: prices.length };
+    })();
+  } catch (error) {
+    console.error("Erreur bulk create client prices:", error);
     throw error;
   }
 }
@@ -2697,7 +3628,9 @@ export function getServer(id: number) {
 
 export function getActiveServers() {
   try {
-    const stmt = db.prepare("SELECT * FROM serveurs WHERE actif = 1 ORDER BY nom");
+    const stmt = db.prepare(
+      "SELECT * FROM serveurs WHERE actif = 1 ORDER BY nom",
+    );
     return stmt.all();
   } catch (error) {
     console.error("Erreur get active servers:", error);
@@ -2722,7 +3655,7 @@ export function createServer(server: any) {
       "créer serveur",
       "serveurs",
       Number(serverId),
-      `Serveur: ${server.nom} - Téléphone: ${server.telephone || 'N/A'} - Actif: ${server.actif}`,
+      `Serveur: ${server.nom} - Téléphone: ${server.telephone || "N/A"} - Actif: ${server.actif}`,
       server.utilisateur_id,
       server.utilisateur_nom,
     );
@@ -2736,7 +3669,9 @@ export function createServer(server: any) {
 
 export function updateServer(id: number, server: any) {
   try {
-    const oldServer = db.prepare("SELECT * FROM serveurs WHERE id = ?").get(id) as any;
+    const oldServer = db
+      .prepare("SELECT * FROM serveurs WHERE id = ?")
+      .get(id) as any;
 
     if (!oldServer) {
       throw new Error("Serveur non trouvé");
@@ -2755,13 +3690,19 @@ export function updateServer(id: number, server: any) {
     );
 
     const changes = [];
-    if (oldServer.nom !== server.nom) changes.push(`nom: "${oldServer.nom}" → "${server.nom}"`);
-    if (oldServer.telephone !== server.telephone) changes.push(`telephone: "${oldServer.telephone}" → "${server.telephone}"`);
-    if (oldServer.actif !== server.actif) changes.push(`actif: ${oldServer.actif} → ${server.actif}`);
+    if (oldServer.nom !== server.nom)
+      changes.push(`nom: "${oldServer.nom}" → "${server.nom}"`);
+    if (oldServer.telephone !== server.telephone)
+      changes.push(
+        `telephone: "${oldServer.telephone}" → "${server.telephone}"`,
+      );
+    if (oldServer.actif !== server.actif)
+      changes.push(`actif: ${oldServer.actif} → ${server.actif}`);
 
-    const details = changes.length > 0
-      ? `Modifications: ${changes.join(", ")}`
-      : `Serveur: ${server.nom}`;
+    const details =
+      changes.length > 0
+        ? `Modifications: ${changes.join(", ")}`
+        : `Serveur: ${server.nom}`;
 
     logAudit(
       "modifier serveur",
@@ -2779,9 +3720,15 @@ export function updateServer(id: number, server: any) {
   }
 }
 
-export function deleteServer(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deleteServer(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
-    const server = db.prepare("SELECT * FROM serveurs WHERE id = ?").get(id) as any;
+    const server = db
+      .prepare("SELECT * FROM serveurs WHERE id = ?")
+      .get(id) as any;
     const stmt = db.prepare("DELETE FROM serveurs WHERE id = ?");
     const result = stmt.run(id);
 
@@ -2799,6 +3746,76 @@ export function deleteServer(id: number, utilisateur_id?: number, utilisateur_no
     return result;
   } catch (error) {
     console.error("Erreur delete server:", error);
+    throw error;
+  }
+}
+
+// ===== DETTES CLIENTS =====
+
+export function getCustomerDebts() {
+  try {
+    const stmt = db.prepare(`
+      SELECT
+        c.id as client_id,
+        c.nom as client_nom,
+        c.telephone,
+        c.solde_du,
+        COUNT(v.id) as nb_ventes_impayees,
+        SUM(v.montant_restant) as total_restant
+      FROM clients c
+      LEFT JOIN ventes v ON c.id = v.client_id AND v.montant_restant > 0
+      WHERE c.solde_du > 0
+      GROUP BY c.id
+      ORDER BY c.solde_du DESC
+    `);
+    return stmt.all();
+  } catch (error) {
+    console.error("Erreur get customer debts:", error);
+    throw error;
+  }
+}
+
+export function getCustomerUnpaidSales(clientId: number) {
+  try {
+    const stmt = db.prepare(`
+      SELECT v.*, c.nom as client_nom
+      FROM ventes v
+      JOIN clients c ON v.client_id = c.id
+      WHERE v.client_id = ? AND v.montant_restant > 0
+      ORDER BY v.date_vente DESC
+    `);
+    const sales = stmt.all(clientId) as any[];
+
+    if (sales.length === 0) {
+      return [];
+    }
+
+    const saleIds = sales.map((s) => s.id);
+    const placeholders = saleIds.map(() => "?").join(",");
+    const productsStmt = db.prepare(`
+      SELECT vp.*, p.nom as nom_produit
+      FROM ventes_produits vp
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE vp.vente_id IN (${placeholders})
+      ORDER BY vp.vente_id, vp.id
+    `);
+
+    const allProducts = productsStmt.all(...saleIds) as any[];
+
+    const productsBySale: Record<number, any[]> = {};
+    allProducts.forEach((prod) => {
+      if (!productsBySale[prod.vente_id]) {
+        productsBySale[prod.vente_id] = [];
+      }
+      productsBySale[prod.vente_id].push(prod);
+    });
+
+    return sales.map((sale) => ({
+      ...sale,
+      produits: productsBySale[sale.id] || [],
+    }));
+  } catch (error) {
+    console.error("Erreur get customer unpaid sales:", error);
     throw error;
   }
 }
@@ -2870,13 +3887,71 @@ export function createCustomerPayment(payment: any) {
       comptaStmt.run(
         "paiement_client",
         result.lastInsertRowid,
-        `Paiement client pour vente #${payment.vente_id}`,
+        `Paiement dette client pour vente #${payment.vente_id}`,
         payment.montant,
         "entree",
         payment.methode_paiement,
       );
 
-      return result;
+      // Mettre à jour la facture liée à la vente
+      const venteUpdated = db
+        .prepare(
+          `
+        SELECT montant_paye, montant_restant, statut_paiement FROM ventes WHERE id = ?
+      `,
+        )
+        .get(payment.vente_id) as any;
+
+      if (venteUpdated) {
+        const updateFactureStmt = db.prepare(`
+          UPDATE factures
+          SET montant_paye = ?,
+              methode_paiement = CASE
+                WHEN ? != methode_paiement THEN methode_paiement || ' + ' || ?
+                ELSE methode_paiement
+              END
+          WHERE vente_id = ?
+        `);
+        updateFactureStmt.run(
+          venteUpdated.montant_paye,
+          payment.methode_paiement,
+          payment.methode_paiement,
+          payment.vente_id,
+        );
+      }
+
+      // Récupérer la facture mise à jour pour le reçu
+      const invoice = db
+        .prepare(
+          `
+        SELECT f.*, v.montant_restant, v.statut_paiement
+        FROM factures f
+        LEFT JOIN ventes v ON f.vente_id = v.id
+        WHERE f.vente_id = ?
+      `,
+        )
+        .get(payment.vente_id) as any;
+
+      if (invoice && invoice.articles) {
+        invoice.articles = JSON.parse(invoice.articles);
+      }
+
+      // Enregistrer dans les audits
+      logAudit(
+        "payer dette client",
+        "paiements_clients",
+        Number(result.lastInsertRowid),
+        `Paiement de ${payment.montant} pour vente #${payment.vente_id} - Méthode: ${payment.methode_paiement}${payment.reference ? ` - Réf: ${payment.reference}` : ""}`,
+        payment.utilisateur_id,
+        payment.utilisateur_nom,
+      );
+
+      return {
+        ...result,
+        payment_id: result.lastInsertRowid,
+        montant: payment.montant,
+        invoice,
+      };
     })();
   } catch (error) {
     console.error("Erreur create customer payment:", error);
@@ -2906,20 +3981,29 @@ export function getAccountingEntries(startDate?: string, endDate?: string) {
   }
 }
 
-export function getAccountingEntriesPaginated(page: number = 1, limit: number = 20, startDate?: string, endDate?: string) {
+export function getAccountingEntriesPaginated(
+  page: number = 1,
+  limit: number = 20,
+  startDate?: string,
+  endDate?: string,
+) {
   try {
     const offset = (page - 1) * limit;
-    let whereClause = '';
+    let whereClause = "";
     let params: any[] = [];
 
     if (startDate && endDate) {
-      whereClause = 'WHERE DATE(created_at) BETWEEN DATE(?) AND DATE(?)';
+      whereClause = "WHERE DATE(created_at) BETWEEN DATE(?) AND DATE(?)";
       params.push(startDate, endDate);
     }
 
     // Count total
-    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM comptabilite ${whereClause}`);
-    const { total } = (params.length > 0 ? countStmt.get(...params) : countStmt.get()) as { total: number };
+    const countStmt = db.prepare(
+      `SELECT COUNT(*) as total FROM comptabilite ${whereClause}`,
+    );
+    const { total } = (
+      params.length > 0 ? countStmt.get(...params) : countStmt.get()
+    ) as { total: number };
 
     // Get paginated data
     const dataStmt = db.prepare(`
@@ -2928,9 +4012,10 @@ export function getAccountingEntriesPaginated(page: number = 1, limit: number = 
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
     `);
-    const data = params.length > 0
-      ? dataStmt.all(...params, limit, offset)
-      : dataStmt.all(limit, offset);
+    const data =
+      params.length > 0
+        ? dataStmt.all(...params, limit, offset)
+        : dataStmt.all(limit, offset);
 
     // Calculate totals for the filtered period (not just the page)
     const totalsStmt = db.prepare(`
@@ -2940,7 +4025,9 @@ export function getAccountingEntriesPaginated(page: number = 1, limit: number = 
       FROM comptabilite
       ${whereClause}
     `);
-    const totals = (params.length > 0 ? totalsStmt.get(...params) : totalsStmt.get()) as { totalEntrees: number; totalSorties: number };
+    const totals = (
+      params.length > 0 ? totalsStmt.get(...params) : totalsStmt.get()
+    ) as { totalEntrees: number; totalSorties: number };
 
     return {
       data,
@@ -2949,7 +4036,7 @@ export function getAccountingEntriesPaginated(page: number = 1, limit: number = 
       limit,
       totalPages: Math.ceil(total / limit),
       totalEntrees: totals.totalEntrees,
-      totalSorties: totals.totalSorties
+      totalSorties: totals.totalSorties,
     };
   } catch (error) {
     console.error("Erreur get accounting entries paginated:", error);
@@ -2999,13 +4086,112 @@ export function getTreasury() {
   }
 }
 
+// Statistiques de profit réelles (basées sur les ventes et coûts des produits)
+export function getProfitStats(startDate?: string, endDate?: string) {
+  try {
+    const params: any[] = [];
+    let venteWhereClause = "";
+    let achatWhereClause = "";
+
+    if (startDate && endDate) {
+      venteWhereClause = "WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)";
+      achatWhereClause = "WHERE DATE(date_achat) BETWEEN DATE(?) AND DATE(?)";
+      params.push(startDate, endDate);
+    }
+
+    // Chiffre d'affaires = Total des ventes (ce que le client paie, APRÈS remise)
+    const caQuery = db.prepare(`
+      SELECT COALESCE(SUM(v.total), 0) as chiffre_affaires
+      FROM ventes v
+      ${venteWhereClause}
+    `);
+    const caResult = (
+      params.length > 0 ? caQuery.get(...params) : caQuery.get()
+    ) as { chiffre_affaires: number };
+
+    // Coût des marchandises vendues = Prix d'achat des produits vendus
+    const coutQuery = db.prepare(`
+      SELECT COALESCE(SUM(p.prix_achat * vp.quantite), 0) as cout_marchandises
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      ${venteWhereClause}
+    `);
+    const coutResult = (
+      params.length > 0 ? coutQuery.get(...params) : coutQuery.get()
+    ) as { cout_marchandises: number };
+
+    // Nombre de ventes
+    const nbVentesQuery = db.prepare(`
+      SELECT COUNT(*) as nb_ventes
+      FROM ventes v
+      ${venteWhereClause}
+    `);
+    const nbVentesResult = (
+      params.length > 0 ? nbVentesQuery.get(...params) : nbVentesQuery.get()
+    ) as { nb_ventes: number };
+
+    // Nombre de produits vendus
+    const nbProduitsQuery = db.prepare(`
+      SELECT COALESCE(SUM(vp.quantite), 0) as nb_produits
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      ${venteWhereClause}
+    `);
+    const nbProduitsResult = (
+      params.length > 0 ? nbProduitsQuery.get(...params) : nbProduitsQuery.get()
+    ) as { nb_produits: number };
+
+    // Total des achats fournisseurs (argent sorti pour approvisionnement)
+    const achatsQuery = db.prepare(`
+      SELECT COALESCE(SUM(total), 0) as total_achats
+      FROM achats
+      ${achatWhereClause}
+    `);
+    const achatsResult = (
+      params.length > 0 ? achatsQuery.get(...params) : achatsQuery.get()
+    ) as { total_achats: number };
+
+    const chiffreAffaires = caResult.chiffre_affaires;
+    const coutMarchandises = coutResult.cout_marchandises;
+    const beneficeBrut = chiffreAffaires - coutMarchandises;
+    const margePercent =
+      chiffreAffaires > 0 ? (beneficeBrut / chiffreAffaires) * 100 : 0;
+
+    return {
+      chiffreAffaires, // Total des ventes (après remise)
+      coutMarchandises, // Prix d'achat des produits vendus
+      beneficeBrut, // CA - Coût marchandises
+      margePercent, // Bénéfice / CA × 100
+      nbVentes: nbVentesResult.nb_ventes,
+      nbProduitsVendus: nbProduitsResult.nb_produits,
+      totalAchats: achatsResult.total_achats, // Achats fournisseurs
+    };
+  } catch (error) {
+    console.error("Erreur get profit stats:", error);
+    throw error;
+  }
+}
+
 // ===== FACTURES =====
 
 export function createInvoice(invoice: any) {
   try {
+    // Add missing columns if they don't exist
+    try {
+      db.exec("ALTER TABLE factures ADD COLUMN client_telephone TEXT");
+    } catch (e) {
+      // Column already exists
+    }
+    try {
+      db.exec("ALTER TABLE factures ADD COLUMN client_email TEXT");
+    } catch (e) {
+      // Column already exists
+    }
+
     const stmt = db.prepare(`
-      INSERT INTO factures (numero, vente_id, date_facture, heure_facture, vendeur, client_nom, serveur_nom, total_ttc, methode_paiement, montant_paye, monnaie_rendue, remise_type, remise_valeur, total_avant_remise, articles)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO factures (numero, vente_id, date_facture, heure_facture, vendeur, client_nom, client_telephone, client_email, serveur_nom, total_ttc, methode_paiement, montant_paye, monnaie_rendue, remise_type, remise_valeur, total_avant_remise, articles)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -3015,6 +4201,8 @@ export function createInvoice(invoice: any) {
       invoice.heure_facture,
       invoice.vendeur,
       invoice.client_nom || "Client comptoir",
+      invoice.client_telephone || null,
+      invoice.client_email || null,
       invoice.serveur_nom || null,
       invoice.total_ttc,
       invoice.methode_paiement,
@@ -3036,7 +4224,7 @@ export function createInvoice(invoice: any) {
 export function getInvoices() {
   try {
     const stmt = db.prepare(`
-      SELECT f.*, v.client_id
+      SELECT f.*, v.client_id, v.montant_restant, v.statut_paiement
       FROM factures f
       LEFT JOIN ventes v ON f.vente_id = v.id
       ORDER BY f.created_at DESC
@@ -3057,7 +4245,7 @@ export function getInvoices() {
 export function getInvoice(id: number) {
   try {
     const stmt = db.prepare(`
-      SELECT f.*, v.client_id
+      SELECT f.*, v.client_id, v.montant_restant, v.statut_paiement
       FROM factures f
       LEFT JOIN ventes v ON f.vente_id = v.id
       WHERE f.id = ?
@@ -3078,7 +4266,10 @@ export function getInvoice(id: number) {
 export function getInvoiceByVenteId(venteId: number) {
   try {
     const stmt = db.prepare(`
-      SELECT * FROM factures WHERE vente_id = ?
+      SELECT f.*, v.montant_restant, v.statut_paiement
+      FROM factures f
+      LEFT JOIN ventes v ON f.vente_id = v.id
+      WHERE f.vente_id = ?
     `);
     const invoice = stmt.get(venteId) as any;
 
@@ -3170,11 +4361,12 @@ export function updateConfiguration(config: any) {
     if (exists) {
       const stmt = db.prepare(`
         UPDATE configuration
-        SET nom_entreprise = ?, logo_url = ?, adresse = ?, telephone = ?, telephone2 = ?, email = ?, nif = ?, ville = ?, pays = ?, devise = ?, message_pied = ?, support_text = ?, format_facture = ?
+        SET nom_entreprise = ?, description_entreprise = ?, logo_url = ?, adresse = ?, telephone = ?, telephone2 = ?, email = ?, nif = ?, ville = ?, pays = ?, devise = ?, message_pied = ?, support_text = ?, format_facture = ?
         WHERE id = 1
       `);
       stmt.run(
         config.nom_entreprise,
+        config.description_entreprise || "",
         config.logo_url || null,
         config.adresse || "",
         config.telephone || "",
@@ -3190,11 +4382,12 @@ export function updateConfiguration(config: any) {
       );
     } else {
       const stmt = db.prepare(`
-        INSERT INTO configuration (id, nom_entreprise, logo_url, adresse, telephone, telephone2, email, nif, ville, pays, devise, message_pied, support_text, format_facture)
-        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO configuration (id, nom_entreprise, description_entreprise, logo_url, adresse, telephone, telephone2, email, nif, ville, pays, devise, message_pied, support_text, format_facture)
+        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       stmt.run(
         config.nom_entreprise,
+        config.description_entreprise || "",
         config.logo_url || null,
         config.adresse || "",
         config.telephone || "",
@@ -3213,46 +4406,6 @@ export function updateConfiguration(config: any) {
     return getConfiguration();
   } catch (error) {
     console.error("Erreur update configuration:", error);
-    throw error;
-  }
-}
-
-export function updateSale(id: number, sale: any) {
-  try {
-    db.transaction(() => {
-      const venteStmt = db.prepare(`
-        UPDATE ventes
-        SET client_id = ?, serveur_id = ?, total = ?, montant_paye = ?, montant_restant = ?, monnaie_rendue = ?, statut_paiement = ?, methode_paiement = ?
-        WHERE id = ?
-      `);
-      venteStmt.run(
-        sale.client_id || null,
-        sale.serveur_id || null,
-        sale.total,
-        sale.montant_paye,
-        sale.montant_restant || 0,
-        sale.monnaie_rendue || 0,
-        sale.statut_paiement || "paye",
-        sale.methode_paiement,
-        id,
-      );
-
-      const deleteStmt = db.prepare("DELETE FROM ventes_produits WHERE vente_id = ?");
-      deleteStmt.run(id);
-
-      const insertStmt = db.prepare(`
-        INSERT INTO ventes_produits (vente_id, produit_id, quantite, prix_unitaire, sous_total)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-
-      for (const item of sale.produits) {
-        insertStmt.run(id, item.produit_id, item.quantite, item.prix_unitaire, item.sous_total);
-      }
-    })();
-
-    return { id, ...sale };
-  } catch (error) {
-    console.error("Erreur update sale:", error);
     throw error;
   }
 }
@@ -3282,7 +4435,14 @@ export function createAuditLog(log: any) {
   }
 }
 
-export function logAudit(action: string, table: string, recordId?: number, details?: string, userId?: number, userName?: string) {
+export function logAudit(
+  action: string,
+  table: string,
+  recordId?: number,
+  details?: string,
+  userId?: number,
+  userName?: string,
+) {
   try {
     createAuditLog({
       utilisateur_id: userId,
@@ -3441,9 +4601,10 @@ export function getBackups() {
       return [];
     }
 
-    const files = fs.readdirSync(backupsDir)
-      .filter(file => file.startsWith("backup-") && file.endsWith(".db"))
-      .map(file => {
+    const files = fs
+      .readdirSync(backupsDir)
+      .filter((file) => file.startsWith("backup-") && file.endsWith(".db"))
+      .map((file) => {
         const filePath = path.join(backupsDir, file);
         const stats = fs.statSync(filePath);
         return {
@@ -3514,9 +4675,15 @@ export function getPurchase(id: number) {
   }
 }
 
-export function deletePurchase(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deletePurchase(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
-    const purchase = db.prepare("SELECT * FROM achats WHERE id = ?").get(id) as any;
+    const purchase = db
+      .prepare("SELECT * FROM achats WHERE id = ?")
+      .get(id) as any;
 
     if (!purchase) {
       throw new Error("Achat introuvable");
@@ -3543,7 +4710,9 @@ export function deletePurchase(id: number, utilisateur_id?: number, utilisateur_
 
 export function updateInvoice(id: number, invoice: any) {
   try {
-    const oldInvoice = db.prepare("SELECT * FROM factures WHERE id = ?").get(id) as any;
+    const oldInvoice = db
+      .prepare("SELECT * FROM factures WHERE id = ?")
+      .get(id) as any;
 
     if (!oldInvoice) {
       throw new Error("Facture introuvable");
@@ -3581,9 +4750,15 @@ export function updateInvoice(id: number, invoice: any) {
   }
 }
 
-export function deleteInvoice(id: number, utilisateur_id?: number, utilisateur_nom?: string) {
+export function deleteInvoice(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
   try {
-    const invoice = db.prepare("SELECT * FROM factures WHERE id = ?").get(id) as any;
+    const invoice = db
+      .prepare("SELECT * FROM factures WHERE id = ?")
+      .get(id) as any;
 
     if (!invoice) {
       throw new Error("Facture introuvable");
@@ -3608,6 +4783,280 @@ export function deleteInvoice(id: number, utilisateur_id?: number, utilisateur_n
   }
 }
 
+// ===== FACTURES PROFORMA =====
+
+export function createProformaInvoice(
+  proforma: any,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
+  try {
+    return db.transaction(() => {
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const countStmt = db.prepare(`
+        SELECT COUNT(*) as count FROM factures_proforma 
+        WHERE strftime('%Y-%m', created_at) = ?
+      `);
+      const count = (countStmt.get(`${year}-${month}`) as any)?.count || 0;
+      const numero = `PRO-${year}${month}-${String(count + 1).padStart(4, "0")}`;
+
+      const stmt = db.prepare(`
+        INSERT INTO factures_proforma (
+          numero, client_id, client_nom, client_telephone, client_email,
+          date_proforma, date_validite, total_ht, total_ttc,
+          remise_type, remise_valeur, total_avant_remise, articles, notes, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const result = stmt.run(
+        numero,
+        proforma.client_id || null,
+        proforma.client_nom || "Client comptoir",
+        proforma.client_telephone || null,
+        proforma.client_email || null,
+        date.toISOString().split("T")[0],
+        proforma.date_validite || null,
+        proforma.total_ht || 0,
+        proforma.total_ttc,
+        proforma.remise_type || null,
+        proforma.remise_valeur || 0,
+        proforma.total_avant_remise || null,
+        JSON.stringify(proforma.articles),
+        proforma.notes || null,
+        utilisateur_id || null,
+      );
+
+      const proformaId = result.lastInsertRowid;
+
+      logAudit(
+        "créer facture proforma",
+        "factures_proforma",
+        Number(proformaId),
+        `Facture proforma ${numero} créée pour ${proforma.client_nom || "Client comptoir"} - Total: ${proforma.total_ttc}`,
+        utilisateur_id,
+        utilisateur_nom,
+      );
+
+      return { id: proformaId, numero, ...proforma };
+    })();
+  } catch (error) {
+    console.error("Erreur création facture proforma:", error);
+    throw error;
+  }
+}
+
+export function getProformaInvoices() {
+  try {
+    const stmt = db.prepare(`
+      SELECT fp.*, c.nom as client_nom_full
+      FROM factures_proforma fp
+      LEFT JOIN clients c ON fp.client_id = c.id
+      ORDER BY fp.created_at DESC
+      LIMIT 500
+    `);
+    const invoices = stmt.all() as any[];
+    return invoices.map((inv) => ({
+      ...inv,
+      articles: JSON.parse(inv.articles || "[]"),
+    }));
+  } catch (error) {
+    console.error("Erreur get proforma invoices:", error);
+    throw error;
+  }
+}
+
+export function getProformaInvoice(id: number) {
+  try {
+    const stmt = db.prepare(`
+      SELECT fp.*, c.nom as client_nom_full, c.telephone as client_tel, c.email as client_mail
+      FROM factures_proforma fp
+      LEFT JOIN clients c ON fp.client_id = c.id
+      WHERE fp.id = ?
+    `);
+    const invoice = stmt.get(id) as any;
+    if (invoice) {
+      return {
+        ...invoice,
+        articles: JSON.parse(invoice.articles || "[]"),
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Erreur get proforma invoice:", error);
+    throw error;
+  }
+}
+
+export function updateProformaInvoice(
+  id: number,
+  proforma: any,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
+  try {
+    return db.transaction(() => {
+      const stmt = db.prepare(`
+        UPDATE factures_proforma 
+        SET client_id = ?, client_nom = ?, client_telephone = ?, client_email = ?,
+            date_validite = ?, total_ht = ?, total_ttc = ?,
+            remise_type = ?, remise_valeur = ?, total_avant_remise = ?, articles = ?, 
+            notes = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
+
+      stmt.run(
+        proforma.client_id || null,
+        proforma.client_nom || "Client comptoir",
+        proforma.client_telephone || null,
+        proforma.client_email || null,
+        proforma.date_validite || null,
+        proforma.total_ht || 0,
+        proforma.total_ttc,
+        proforma.remise_type || null,
+        proforma.remise_valeur || 0,
+        proforma.total_avant_remise || null,
+        JSON.stringify(proforma.articles),
+        proforma.notes || null,
+        id,
+      );
+
+      logAudit(
+        "modifier facture proforma",
+        "factures_proforma",
+        id,
+        `Facture proforma modifiée - Total: ${proforma.total_ttc}`,
+        utilisateur_id,
+        utilisateur_nom,
+      );
+
+      return { id, ...proforma };
+    })();
+  } catch (error) {
+    console.error("Erreur update proforma invoice:", error);
+    throw error;
+  }
+}
+
+export function updateProformaStatus(
+  id: number,
+  statut: string,
+  vente_id?: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
+  try {
+    const stmt = db.prepare(`
+      UPDATE factures_proforma 
+      SET statut = ?, vente_id = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    stmt.run(statut, vente_id || null, id);
+
+    logAudit(
+      "changer statut proforma",
+      "factures_proforma",
+      id,
+      `Statut changé à: ${statut}${vente_id ? ` - Vente #${vente_id}` : ""}`,
+      utilisateur_id,
+      utilisateur_nom,
+    );
+
+    return { id, statut, vente_id };
+  } catch (error) {
+    console.error("Erreur update proforma status:", error);
+    throw error;
+  }
+}
+
+export function deleteProformaInvoice(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
+  try {
+    const invoice = db
+      .prepare("SELECT numero, total_ttc FROM factures_proforma WHERE id = ?")
+      .get(id) as any;
+
+    const stmt = db.prepare("DELETE FROM factures_proforma WHERE id = ?");
+    const result = stmt.run(id);
+
+    if (invoice) {
+      logAudit(
+        "supprimer facture proforma",
+        "factures_proforma",
+        id,
+        `Facture proforma ${invoice.numero} supprimée - Total: ${invoice.total_ttc}`,
+        utilisateur_id,
+        utilisateur_nom,
+      );
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Erreur delete proforma invoice:", error);
+    throw error;
+  }
+}
+
+export function getProformaInvoicesPaginated(
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+  statut?: string,
+) {
+  try {
+    const offset = (page - 1) * limit;
+    let whereClause = "1=1";
+    const params: any[] = [];
+
+    if (search) {
+      whereClause +=
+        " AND (fp.numero LIKE ? OR fp.client_nom LIKE ? OR c.nom LIKE ?)";
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    if (statut && statut !== "tous") {
+      whereClause += " AND fp.statut = ?";
+      params.push(statut);
+    }
+
+    const countStmt = db.prepare(`
+      SELECT COUNT(*) as total FROM factures_proforma fp
+      LEFT JOIN clients c ON fp.client_id = c.id
+      WHERE ${whereClause}
+    `);
+    const { total } = countStmt.get(...params) as { total: number };
+
+    const dataStmt = db.prepare(`
+      SELECT fp.*, c.nom as client_nom_full
+      FROM factures_proforma fp
+      LEFT JOIN clients c ON fp.client_id = c.id
+      WHERE ${whereClause}
+      ORDER BY fp.created_at DESC
+      LIMIT ? OFFSET ?
+    `);
+    const data = dataStmt.all(...params, limit, offset) as any[];
+
+    return {
+      data: data.map((inv) => ({
+        ...inv,
+        articles: JSON.parse(inv.articles || "[]"),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  } catch (error) {
+    console.error("Erreur get proforma paginated:", error);
+    throw error;
+  }
+}
+
 // ===== SERVER-SIDE PAGINATION FUNCTIONS =====
 
 // Recherche FTS5 ultra-rapide (pour autocomplete/dropdowns)
@@ -3621,6 +5070,11 @@ export function searchProductsFTS(query: string, limit: number = 50): any[] {
 
     // Essayer FTS5 en premier (ultra-rapide)
     try {
+      // Ajouter * pour matcher les préfixes (ex: "sav" → "savon")
+      const ftsQuery = searchTerm
+        .split(/\s+/)
+        .map((t) => `${t}*`)
+        .join(" ");
       const ftsStmt = db.prepare(`
         SELECT p.*, c.nom as categorie_nom
         FROM produits_fts pf
@@ -3630,7 +5084,7 @@ export function searchProductsFTS(query: string, limit: number = 50): any[] {
         ORDER BY rank
         LIMIT ?
       `);
-      const results = ftsStmt.all(searchTerm, limit);
+      const results = ftsStmt.all(ftsQuery, limit);
       return results;
     } catch (ftsError) {
       // Fallback vers LIKE si FTS5 non disponible
@@ -3653,12 +5107,18 @@ export function searchProductsFTS(query: string, limit: number = 50): any[] {
 }
 
 // Helper pour obtenir le COUNT ultra-rapide depuis la table metadata
-function getFastCount(tableName: string, whereClause: string = '', params: any[] = []): number {
+function getFastCount(
+  tableName: string,
+  whereClause: string = "",
+  params: any[] = [],
+): number {
   if (!whereClause) {
     // COUNT simple : utiliser la table metadata (O(1))
     try {
       const key = `${tableName}_count`;
-      const result = db.prepare('SELECT value FROM metadata WHERE key = ?').get(key) as { value: number } | undefined;
+      const result = db
+        .prepare("SELECT value FROM metadata WHERE key = ?")
+        .get(key) as { value: number } | undefined;
       if (result) {
         return result.value;
       }
@@ -3668,15 +5128,21 @@ function getFastCount(tableName: string, whereClause: string = '', params: any[]
   }
 
   // COUNT avec filtres ou fallback : utiliser COUNT(*) classique
-  const countStmt = db.prepare(`SELECT COUNT(*) as total FROM ${tableName} ${whereClause}`);
+  const countStmt = db.prepare(
+    `SELECT COUNT(*) as total FROM ${tableName} ${whereClause}`,
+  );
   const { total } = countStmt.get(...params) as { total: number };
   return total;
 }
 
-export function getProductsPaginated(page: number = 1, limit: number = 10, search?: string) {
+export function getProductsPaginated(
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+) {
   try {
     const offset = (page - 1) * limit;
-    let whereClause = '';
+    let whereClause = "";
     let params: any[] = [];
 
     // Optimisation FTS5 pour recherche rapide
@@ -3696,7 +5162,7 @@ export function getProductsPaginated(page: number = 1, limit: number = 10, searc
 
         if (ftsData.length > 0) {
           const ids = ftsData.map((row: any) => row.id);
-          const idList = ids.join(',');
+          const idList = ids.join(",");
 
           const fullDataStmt = db.prepare(`
             SELECT p.*, c.nom as categorie_nom
@@ -3712,7 +5178,7 @@ export function getProductsPaginated(page: number = 1, limit: number = 10, searc
             total: data.length,
             page,
             limit,
-            totalPages: Math.ceil(data.length / limit)
+            totalPages: Math.ceil(data.length / limit),
           };
         }
       } catch (ftsError) {
@@ -3720,7 +5186,7 @@ export function getProductsPaginated(page: number = 1, limit: number = 10, searc
       }
 
       const searchTerm = `%${searchQuery}%`;
-      whereClause = 'WHERE (p.nom LIKE ? OR p.code_barre = ?)';
+      whereClause = "WHERE (p.nom LIKE ? OR p.code_barre = ?)";
       params = [searchTerm, searchQuery];
     }
 
@@ -3746,7 +5212,7 @@ export function getProductsPaginated(page: number = 1, limit: number = 10, searc
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get products paginated:", error);
@@ -3754,22 +5220,27 @@ export function getProductsPaginated(page: number = 1, limit: number = 10, searc
   }
 }
 
-export function getInvoicesPaginated(page: number = 1, limit: number = 10, search?: string) {
+export function getInvoicesPaginated(
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+) {
   try {
     const offset = (page - 1) * limit;
 
     if (search && search.trim()) {
       const searchQuery = search.trim();
       const searchTerm = `%${searchQuery}%`;
-      const whereClause = 'WHERE f.numero LIKE ? OR f.client_nom LIKE ?';
+      const whereClause = "WHERE f.numero LIKE ? OR f.client_nom LIKE ?";
       const params = [searchTerm, searchTerm];
 
-      const total = getFastCount('factures f', whereClause, params);
+      const total = getFastCount("factures f", whereClause, params);
 
       const dataStmt = db.prepare(`
-        SELECT f.* FROM factures f
+        SELECT f.*, v.montant_restant, v.statut_paiement FROM factures f
+        LEFT JOIN ventes v ON f.vente_id = v.id
         ${whereClause}
-        ORDER BY f.date_facture DESC, f.id DESC
+        ORDER BY f.created_at DESC, f.id DESC
         LIMIT ? OFFSET ?
       `);
       const data = dataStmt.all(...params, limit, offset) as any[];
@@ -3782,15 +5253,16 @@ export function getInvoicesPaginated(page: number = 1, limit: number = 10, searc
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
       };
     }
 
-    const total = getFastCount('factures');
+    const total = getFastCount("factures");
 
     const dataStmt = db.prepare(`
-      SELECT f.* FROM factures f
-      ORDER BY f.date_facture DESC, f.id DESC
+      SELECT f.*, v.montant_restant, v.statut_paiement FROM factures f
+      LEFT JOIN ventes v ON f.vente_id = v.id
+      ORDER BY f.created_at DESC, f.id DESC
       LIMIT ? OFFSET ?
     `);
     const data = dataStmt.all(limit, offset) as any[];
@@ -3803,7 +5275,7 @@ export function getInvoicesPaginated(page: number = 1, limit: number = 10, searc
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get invoices paginated:", error);
@@ -3811,14 +5283,19 @@ export function getInvoicesPaginated(page: number = 1, limit: number = 10, searc
   }
 }
 
-export function getSalesPaginated(page: number = 1, limit: number = 10, startDate?: string, endDate?: string) {
+export function getSalesPaginated(
+  page: number = 1,
+  limit: number = 10,
+  startDate?: string,
+  endDate?: string,
+) {
   try {
     const offset = (page - 1) * limit;
-    let whereClause = '';
+    let whereClause = "";
     let params: any[] = [];
 
     if (startDate && endDate) {
-      whereClause = 'WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)';
+      whereClause = "WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)";
       params = [startDate, endDate];
     }
 
@@ -3842,18 +5319,18 @@ export function getSalesPaginated(page: number = 1, limit: number = 10, startDat
     const sales = dataStmt.all(...params, limit, offset) as any[];
 
     // Optimisation: charger tous les produits et paiements en 2 requêtes au lieu de N*2
-    const saleIds = sales.map(s => s.id);
+    const saleIds = sales.map((s) => s.id);
     if (saleIds.length === 0) {
       return {
         data: [],
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
       };
     }
 
-    const placeholders = saleIds.map(() => '?').join(',');
+    const placeholders = saleIds.map(() => "?").join(",");
     const productsStmt = db.prepare(`
       SELECT vp.*, p.nom as nom_produit
       FROM ventes_produits vp
@@ -3873,7 +5350,7 @@ export function getSalesPaginated(page: number = 1, limit: number = 10, startDat
 
     // Grouper les résultats par vente_id
     const productsBySale: Record<number, any[]> = {};
-    allProducts.forEach(prod => {
+    allProducts.forEach((prod) => {
       if (!productsBySale[prod.vente_id]) {
         productsBySale[prod.vente_id] = [];
       }
@@ -3881,7 +5358,7 @@ export function getSalesPaginated(page: number = 1, limit: number = 10, startDat
     });
 
     const paymentsBySale: Record<number, any[]> = {};
-    allPayments.forEach(payment => {
+    allPayments.forEach((payment) => {
       if (!paymentsBySale[payment.vente_id]) {
         paymentsBySale[payment.vente_id] = [];
       }
@@ -3897,7 +5374,7 @@ export function getSalesPaginated(page: number = 1, limit: number = 10, startDat
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get sales paginated:", error);
@@ -3905,7 +5382,11 @@ export function getSalesPaginated(page: number = 1, limit: number = 10, startDat
   }
 }
 
-export function getClientsPaginated(page: number = 1, limit: number = 10, search?: string) {
+export function getClientsPaginated(
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+) {
   try {
     const offset = (page - 1) * limit;
 
@@ -3924,7 +5405,7 @@ export function getClientsPaginated(page: number = 1, limit: number = 10, search
 
         if (ftsData.length > 0) {
           const ids = ftsData.map((row: any) => row.id);
-          const idList = ids.join(',');
+          const idList = ids.join(",");
 
           const fullDataStmt = db.prepare(`
             SELECT * FROM clients
@@ -3938,7 +5419,7 @@ export function getClientsPaginated(page: number = 1, limit: number = 10, search
             total: data.length,
             page,
             limit,
-            totalPages: Math.ceil(data.length / limit)
+            totalPages: Math.ceil(data.length / limit),
           };
         }
       } catch (ftsError) {
@@ -3946,10 +5427,13 @@ export function getClientsPaginated(page: number = 1, limit: number = 10, search
       }
 
       const searchTerm = `%${searchQuery}%`;
-      const whereClause = 'WHERE nom LIKE ? OR telephone LIKE ? OR email LIKE ?';
+      const whereClause =
+        "WHERE nom LIKE ? OR telephone LIKE ? OR email LIKE ?";
       const params = [searchTerm, searchTerm, searchTerm];
 
-      const countStmt = db.prepare(`SELECT COUNT(*) as total FROM clients ${whereClause}`);
+      const countStmt = db.prepare(
+        `SELECT COUNT(*) as total FROM clients ${whereClause}`,
+      );
       const { total } = countStmt.get(...params) as { total: number };
 
       const dataStmt = db.prepare(`
@@ -3965,11 +5449,11 @@ export function getClientsPaginated(page: number = 1, limit: number = 10, search
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
       };
     }
 
-    const countStmt = db.prepare('SELECT COUNT(*) as total FROM clients');
+    const countStmt = db.prepare("SELECT COUNT(*) as total FROM clients");
     const { total } = countStmt.get() as { total: number };
 
     const dataStmt = db.prepare(`
@@ -3984,7 +5468,7 @@ export function getClientsPaginated(page: number = 1, limit: number = 10, search
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get clients paginated:", error);
@@ -3992,7 +5476,11 @@ export function getClientsPaginated(page: number = 1, limit: number = 10, search
   }
 }
 
-export function getUsersPaginated(page: number = 1, limit: number = 10, search?: string) {
+export function getUsersPaginated(
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+) {
   try {
     const offset = (page - 1) * limit;
 
@@ -4011,7 +5499,7 @@ export function getUsersPaginated(page: number = 1, limit: number = 10, search?:
 
         if (ftsData.length > 0) {
           const ids = ftsData.map((row: any) => row.id);
-          const idList = ids.join(',');
+          const idList = ids.join(",");
 
           const fullDataStmt = db.prepare(`
             SELECT id, nom, email, role, actif, created_at, updated_at, last_login
@@ -4026,7 +5514,7 @@ export function getUsersPaginated(page: number = 1, limit: number = 10, search?:
             total: data.length,
             page,
             limit,
-            totalPages: Math.ceil(data.length / limit)
+            totalPages: Math.ceil(data.length / limit),
           };
         }
       } catch (ftsError) {
@@ -4034,10 +5522,10 @@ export function getUsersPaginated(page: number = 1, limit: number = 10, search?:
       }
 
       const searchTerm = `%${searchQuery}%`;
-      const whereClause = 'WHERE nom LIKE ? OR email LIKE ? OR role LIKE ?';
+      const whereClause = "WHERE nom LIKE ? OR email LIKE ? OR role LIKE ?";
       const params = [searchTerm, searchTerm, searchTerm];
 
-      const total = getFastCount('utilisateurs', whereClause, params);
+      const total = getFastCount("utilisateurs", whereClause, params);
 
       const dataStmt = db.prepare(`
         SELECT id, nom, email, role, actif, created_at, updated_at, last_login
@@ -4053,11 +5541,11 @@ export function getUsersPaginated(page: number = 1, limit: number = 10, search?:
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
       };
     }
 
-    const total = getFastCount('utilisateurs');
+    const total = getFastCount("utilisateurs");
 
     const dataStmt = db.prepare(`
       SELECT id, nom, email, role, actif, created_at, updated_at, last_login
@@ -4072,7 +5560,7 @@ export function getUsersPaginated(page: number = 1, limit: number = 10, search?:
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get users paginated:", error);
@@ -4080,30 +5568,42 @@ export function getUsersPaginated(page: number = 1, limit: number = 10, search?:
   }
 }
 
-export function getAuditLogsPaginated(page: number = 1, limit: number = 20, filters?: { startDate?: string; endDate?: string; table?: string; search?: string }) {
+export function getAuditLogsPaginated(
+  page: number = 1,
+  limit: number = 20,
+  filters?: {
+    startDate?: string;
+    endDate?: string;
+    table?: string;
+    search?: string;
+  },
+) {
   try {
     const offset = (page - 1) * limit;
     let whereClauses: string[] = [];
     let params: any[] = [];
 
     if (filters?.startDate && filters?.endDate) {
-      whereClauses.push('DATE(al.created_at) BETWEEN DATE(?) AND DATE(?)');
+      whereClauses.push("DATE(al.created_at) BETWEEN DATE(?) AND DATE(?)");
       params.push(filters.startDate, filters.endDate);
     }
 
     if (filters?.table) {
-      whereClauses.push('al.table_cible = ?');
+      whereClauses.push("al.table_cible = ?");
       params.push(filters.table);
     }
 
     if (filters?.search && filters.search.trim()) {
       const searchTerm = `%${filters.search.trim()}%`;
-      whereClauses.push('(al.utilisateur_nom LIKE ? OR al.action LIKE ? OR al.table_cible LIKE ?)');
+      whereClauses.push(
+        "(al.utilisateur_nom LIKE ? OR al.action LIKE ? OR al.table_cible LIKE ?)",
+      );
       params.push(searchTerm, searchTerm, searchTerm);
     }
 
-    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-    const total = getFastCount('audit_logs al', whereClause, params);
+    const whereClause =
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+    const total = getFastCount("audit_logs al", whereClause, params);
 
     const dataStmt = db.prepare(`
       SELECT al.*,
@@ -4122,7 +5622,7 @@ export function getAuditLogsPaginated(page: number = 1, limit: number = 20, filt
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get audit logs paginated:", error);
@@ -4130,7 +5630,11 @@ export function getAuditLogsPaginated(page: number = 1, limit: number = 20, filt
   }
 }
 
-export function getSuppliersPaginated(page: number = 1, limit: number = 10, search?: string) {
+export function getSuppliersPaginated(
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+) {
   try {
     const offset = (page - 1) * limit;
 
@@ -4149,7 +5653,7 @@ export function getSuppliersPaginated(page: number = 1, limit: number = 10, sear
 
         if (ftsData.length > 0) {
           const ids = ftsData.map((row: any) => row.id);
-          const idList = ids.join(',');
+          const idList = ids.join(",");
 
           const fullDataStmt = db.prepare(`
             SELECT * FROM fournisseurs
@@ -4163,7 +5667,7 @@ export function getSuppliersPaginated(page: number = 1, limit: number = 10, sear
             total: data.length,
             page,
             limit,
-            totalPages: Math.ceil(data.length / limit)
+            totalPages: Math.ceil(data.length / limit),
           };
         }
       } catch (ftsError) {
@@ -4171,10 +5675,11 @@ export function getSuppliersPaginated(page: number = 1, limit: number = 10, sear
       }
 
       const searchTerm = `%${searchQuery}%`;
-      const whereClause = 'WHERE nom LIKE ? OR telephone LIKE ? OR email LIKE ?';
+      const whereClause =
+        "WHERE nom LIKE ? OR telephone LIKE ? OR email LIKE ?";
       const params = [searchTerm, searchTerm, searchTerm];
 
-      const total = getFastCount('fournisseurs', whereClause, params);
+      const total = getFastCount("fournisseurs", whereClause, params);
 
       const dataStmt = db.prepare(`
         SELECT * FROM fournisseurs
@@ -4189,11 +5694,11 @@ export function getSuppliersPaginated(page: number = 1, limit: number = 10, sear
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
       };
     }
 
-    const total = getFastCount('fournisseurs');
+    const total = getFastCount("fournisseurs");
 
     const dataStmt = db.prepare(`
       SELECT * FROM fournisseurs
@@ -4207,7 +5712,7 @@ export function getSuppliersPaginated(page: number = 1, limit: number = 10, sear
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get suppliers paginated:", error);
@@ -4219,7 +5724,7 @@ export function getPurchasesPaginated(page: number = 1, limit: number = 10) {
   try {
     const offset = (page - 1) * limit;
 
-    const total = getFastCount('achats');
+    const total = getFastCount("achats");
 
     // Charger les achats avec pagination
     const dataStmt = db.prepare(`
@@ -4232,18 +5737,18 @@ export function getPurchasesPaginated(page: number = 1, limit: number = 10) {
     const purchases = dataStmt.all(limit, offset) as any[];
 
     // Optimisation: charger tous les produits en 1 requête au lieu de N
-    const purchaseIds = purchases.map(p => p.id);
+    const purchaseIds = purchases.map((p) => p.id);
     if (purchaseIds.length === 0) {
       return {
         data: [],
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
       };
     }
 
-    const placeholders = purchaseIds.map(() => '?').join(',');
+    const placeholders = purchaseIds.map(() => "?").join(",");
     const productsStmt = db.prepare(`
       SELECT ap.*, p.nom as nom_produit
       FROM achats_produits ap
@@ -4256,7 +5761,7 @@ export function getPurchasesPaginated(page: number = 1, limit: number = 10) {
 
     // Grouper les produits par achat_id
     const productsByPurchase: Record<number, any[]> = {};
-    allProducts.forEach(prod => {
+    allProducts.forEach((prod) => {
       if (!productsByPurchase[prod.achat_id]) {
         productsByPurchase[prod.achat_id] = [];
       }
@@ -4271,7 +5776,7 @@ export function getPurchasesPaginated(page: number = 1, limit: number = 10) {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get purchases paginated:", error);
@@ -4283,7 +5788,7 @@ export function getServersPaginated(page: number = 1, limit: number = 10) {
   try {
     const offset = (page - 1) * limit;
 
-    const total = getFastCount('serveurs');
+    const total = getFastCount("serveurs");
 
     const dataStmt = db.prepare(`
       SELECT * FROM serveurs
@@ -4297,7 +5802,7 @@ export function getServersPaginated(page: number = 1, limit: number = 10) {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     };
   } catch (error) {
     console.error("Erreur get servers paginated:", error);
@@ -4321,7 +5826,11 @@ const defaultPurgeConfig: PurgeConfig = {
   enabled: true,
 };
 
-export function purgeOldData(config: Partial<PurgeConfig> = {}): { success: boolean; message: string; stats: any } {
+export function purgeOldData(config: Partial<PurgeConfig> = {}): {
+  success: boolean;
+  message: string;
+  stats: any;
+} {
   const purgeConfig = { ...defaultPurgeConfig, ...config };
 
   if (!purgeConfig.enabled) {
@@ -4333,33 +5842,49 @@ export function purgeOldData(config: Partial<PurgeConfig> = {}): { success: bool
 
     // Purger les vieux audit_logs (> X jours)
     const auditLogsCutoff = new Date();
-    auditLogsCutoff.setDate(auditLogsCutoff.getDate() - purgeConfig.auditLogsRetentionDays);
+    auditLogsCutoff.setDate(
+      auditLogsCutoff.getDate() - purgeConfig.auditLogsRetentionDays,
+    );
 
-    const deletedAuditLogs = db.prepare(`
+    const deletedAuditLogs = db
+      .prepare(
+        `
       DELETE FROM audit_logs
       WHERE created_at < ?
-    `).run(auditLogsCutoff.toISOString()).changes;
+    `,
+      )
+      .run(auditLogsCutoff.toISOString()).changes;
 
     stats.deletedAuditLogs = deletedAuditLogs;
 
     // Purger les ventes archivées (statut = 'archivée' AND > X jours)
-    const deletedArchivedSales = db.prepare(`
+    const deletedArchivedSales = db
+      .prepare(
+        `
       DELETE FROM ventes
-      WHERE created_at < ?
+      WHERE date_vente < ?
       AND id IN (SELECT vente_id FROM factures WHERE date_facture < ?)
-    `).run(auditLogsCutoff.toISOString(), auditLogsCutoff.toISOString()).changes;
+    `,
+      )
+      .run(
+        auditLogsCutoff.toISOString(),
+        auditLogsCutoff.toISOString(),
+      ).changes;
 
     stats.deletedArchivedSales = deletedArchivedSales;
 
     // Mettre à jour les compteurs dans metadata
     const updateMetadataCount = (key: string, deleted: number) => {
       if (deleted > 0) {
-        db.prepare('UPDATE metadata SET value = value - ? WHERE key = ?').run(deleted, key);
+        db.prepare("UPDATE metadata SET value = value - ? WHERE key = ?").run(
+          deleted,
+          key,
+        );
       }
     };
 
-    updateMetadataCount('audit_logs_count', deletedAuditLogs);
-    updateMetadataCount('ventes_count', deletedArchivedSales);
+    updateMetadataCount("audit_logs_count", deletedAuditLogs);
+    updateMetadataCount("ventes_count", deletedArchivedSales);
 
     return {
       success: true,
@@ -4371,6 +5896,126 @@ export function purgeOldData(config: Partial<PurgeConfig> = {}): { success: bool
     return {
       success: false,
       message: "Erreur lors de la purge",
+      stats: {},
+    };
+  }
+}
+
+// ============================================
+// SUPPRESSION DE TOUTES LES DONNÉES (RESET)
+// ============================================
+
+export function clearAllData(
+  options: {
+    produits?: boolean;
+    ventes?: boolean;
+    factures?: boolean;
+    proforma?: boolean;
+  } = {},
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+): { success: boolean; message: string; stats: any } {
+  const defaultOptions = {
+    produits: true,
+    ventes: true,
+    factures: true,
+    proforma: true,
+  };
+
+  const opts = { ...defaultOptions, ...options };
+
+  try {
+    const stats: any = {};
+
+    db.transaction(() => {
+      // Supprimer les factures proforma
+      if (opts.proforma) {
+        const deletedProforma = db
+          .prepare("DELETE FROM factures_proforma")
+          .run().changes;
+        stats.deletedProforma = deletedProforma;
+        console.log(`✓ ${deletedProforma} factures proforma supprimées`);
+      }
+
+      // Supprimer les factures (doit être avant ventes à cause de la FK)
+      if (opts.factures) {
+        const deletedFactures = db
+          .prepare("DELETE FROM factures")
+          .run().changes;
+        stats.deletedFactures = deletedFactures;
+        console.log(`✓ ${deletedFactures} factures supprimées`);
+      }
+
+      // Supprimer les ventes (CASCADE supprimera ventes_produits et paiements_clients)
+      if (opts.ventes) {
+        // D'abord supprimer ventes_produits et paiements_clients manuellement pour être sûr
+        db.prepare("DELETE FROM ventes_produits").run();
+        db.prepare("DELETE FROM paiements_clients").run();
+        const deletedVentes = db.prepare("DELETE FROM ventes").run().changes;
+        stats.deletedVentes = deletedVentes;
+        console.log(`✓ ${deletedVentes} ventes supprimées`);
+      }
+
+      // Supprimer les produits
+      if (opts.produits) {
+        const deletedProduits = db
+          .prepare("DELETE FROM produits")
+          .run().changes;
+        stats.deletedProduits = deletedProduits;
+        console.log(`✓ ${deletedProduits} produits supprimés`);
+
+        // Vider aussi la table FTS des produits
+        try {
+          db.prepare("DELETE FROM produits_fts").run();
+        } catch (e) {
+          // Table FTS peut ne pas exister
+        }
+      }
+
+      // Mettre à jour les compteurs dans metadata
+      if (opts.produits) {
+        db.prepare(
+          "UPDATE metadata SET value = 0 WHERE key = 'produits_count'",
+        ).run();
+      }
+      if (opts.ventes) {
+        db.prepare(
+          "UPDATE metadata SET value = 0 WHERE key = 'ventes_count'",
+        ).run();
+      }
+      if (opts.factures) {
+        db.prepare(
+          "UPDATE metadata SET value = 0 WHERE key = 'factures_count'",
+        ).run();
+      }
+
+      // Log dans l'audit
+      const details = [];
+      if (opts.produits) details.push(`produits: ${stats.deletedProduits}`);
+      if (opts.ventes) details.push(`ventes: ${stats.deletedVentes}`);
+      if (opts.factures) details.push(`factures: ${stats.deletedFactures}`);
+      if (opts.proforma) details.push(`proforma: ${stats.deletedProforma}`);
+
+      logAudit(
+        "suppression massive",
+        "système",
+        undefined,
+        `Données supprimées: ${details.join(", ")}`,
+        utilisateur_id,
+        utilisateur_nom,
+      );
+    })();
+
+    return {
+      success: true,
+      message: "Toutes les données sélectionnées ont été supprimées",
+      stats,
+    };
+  } catch (error) {
+    console.error("Erreur clearAllData:", error);
+    return {
+      success: false,
+      message: `Erreur lors de la suppression: ${(error as Error).message}`,
       stats: {},
     };
   }
@@ -4415,7 +6060,9 @@ function getEstimatedCount(tableName: string): number {
   // D'abord essayer metadata (O(1))
   try {
     const key = `${tableName}_count`;
-    const result = db.prepare('SELECT value FROM metadata WHERE key = ?').get(key) as { value: number } | undefined;
+    const result = db
+      .prepare("SELECT value FROM metadata WHERE key = ?")
+      .get(key) as { value: number } | undefined;
     if (result) {
       return result.value;
     }
@@ -4425,13 +6072,17 @@ function getEstimatedCount(tableName: string): number {
 
   // Sinon, utiliser sqlite_stat1 pour estimation (si ANALYZE a été exécuté)
   try {
-    const stat = db.prepare(`
+    const stat = db
+      .prepare(
+        `
       SELECT stat FROM sqlite_stat1
       WHERE tbl = ? AND idx IS NULL
-    `).get(tableName) as { stat: string } | undefined;
+    `,
+      )
+      .get(tableName) as { stat: string } | undefined;
 
     if (stat) {
-      const count = parseInt(stat.stat.split(' ')[0]);
+      const count = parseInt(stat.stat.split(" ")[0]);
       if (!isNaN(count)) return count;
     }
   } catch (error) {
@@ -4439,7 +6090,9 @@ function getEstimatedCount(tableName: string): number {
   }
 
   // Fallback: COUNT(*) classique
-  const { total } = db.prepare(`SELECT COUNT(*) as total FROM ${tableName}`).get() as { total: number };
+  const { total } = db
+    .prepare(`SELECT COUNT(*) as total FROM ${tableName}`)
+    .get() as { total: number };
   return total;
 }
 
@@ -4447,13 +6100,13 @@ function getEstimatedCount(tableName: string): number {
 export function getProductsKeyset(
   limit: number = 10,
   cursor?: KeysetCursor,
-  direction: 'next' | 'prev' = 'next',
-  search?: string
+  direction: "next" | "prev" = "next",
+  search?: string,
 ): KeysetPaginationResult<any> {
   try {
-    let whereClause = '';
+    let whereClause = "";
     let params: any[] = [];
-    let orderDirection = direction === 'next' ? 'DESC' : 'ASC';
+    let orderDirection = direction === "next" ? "DESC" : "ASC";
 
     // Recherche FTS5 si disponible
     if (search && search.trim()) {
@@ -4469,24 +6122,25 @@ export function getProductsKeyset(
         const ftsIds = ftsStmt.all(searchQuery).map((row: any) => row.id);
 
         if (ftsIds.length > 0) {
-          whereClause = `WHERE p.id IN (${ftsIds.join(',')})`;
+          whereClause = `WHERE p.id IN (${ftsIds.join(",")})`;
         } else {
           const searchTerm = `%${searchQuery}%`;
-          whereClause = 'WHERE (p.nom LIKE ? OR p.code_barre = ?)';
+          whereClause = "WHERE (p.nom LIKE ? OR p.code_barre = ?)";
           params = [searchTerm, searchQuery];
         }
       } catch (ftsError) {
         const searchTerm = `%${search.trim()}%`;
-        whereClause = 'WHERE (p.nom LIKE ? OR p.code_barre = ?)';
+        whereClause = "WHERE (p.nom LIKE ? OR p.code_barre = ?)";
         params = [searchTerm, search.trim()];
       }
     }
 
     // Ajouter condition de cursor pour keyset
     if (cursor?.created_at && cursor?.id) {
-      const cursorCondition = direction === 'next'
-        ? '(p.created_at < ? OR (p.created_at = ? AND p.id < ?))'
-        : '(p.created_at > ? OR (p.created_at = ? AND p.id > ?))';
+      const cursorCondition =
+        direction === "next"
+          ? "(p.created_at < ? OR (p.created_at = ? AND p.id < ?))"
+          : "(p.created_at > ? OR (p.created_at = ? AND p.id > ?))";
 
       if (whereClause) {
         whereClause += ` AND ${cursorCondition}`;
@@ -4515,23 +6169,29 @@ export function getProductsKeyset(
     }
 
     // Inverser si on navigue en arrière
-    if (direction === 'prev') {
+    if (direction === "prev") {
       data.reverse();
     }
 
     // Calculer les cursors
-    const nextCursor = data.length > 0 ? {
-      created_at: data[data.length - 1].created_at,
-      id: data[data.length - 1].id
-    } : null;
+    const nextCursor =
+      data.length > 0
+        ? {
+            created_at: data[data.length - 1].created_at,
+            id: data[data.length - 1].id,
+          }
+        : null;
 
-    const prevCursor = data.length > 0 ? {
-      created_at: data[0].created_at,
-      id: data[0].id
-    } : null;
+    const prevCursor =
+      data.length > 0
+        ? {
+            created_at: data[0].created_at,
+            id: data[0].id,
+          }
+        : null;
 
     // Total estimé
-    const total = search ? data.length : getEstimatedCount('produits');
+    const total = search ? data.length : getEstimatedCount("produits");
 
     return {
       data,
@@ -4539,7 +6199,7 @@ export function getProductsKeyset(
       hasMore,
       nextCursor,
       prevCursor,
-      limit
+      limit,
     };
   } catch (error) {
     console.error("Erreur getProductsKeyset:", error);
@@ -4551,31 +6211,33 @@ export function getProductsKeyset(
 export function getSalesKeyset(
   limit: number = 10,
   cursor?: KeysetCursor,
-  direction: 'next' | 'prev' = 'next',
+  direction: "next" | "prev" = "next",
   startDate?: string,
-  endDate?: string
+  endDate?: string,
 ): KeysetPaginationResult<any> {
   try {
     let whereClauses: string[] = [];
     let params: any[] = [];
-    let orderDirection = direction === 'next' ? 'DESC' : 'ASC';
+    let orderDirection = direction === "next" ? "DESC" : "ASC";
 
     // Filtre par date
     if (startDate && endDate) {
-      whereClauses.push('DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)');
+      whereClauses.push("DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)");
       params.push(startDate, endDate);
     }
 
     // Condition de cursor
     if (cursor?.date_vente && cursor?.id) {
-      const cursorCondition = direction === 'next'
-        ? '(v.date_vente < ? OR (v.date_vente = ? AND v.id < ?))'
-        : '(v.date_vente > ? OR (v.date_vente = ? AND v.id > ?))';
+      const cursorCondition =
+        direction === "next"
+          ? "(v.date_vente < ? OR (v.date_vente = ? AND v.id < ?))"
+          : "(v.date_vente > ? OR (v.date_vente = ? AND v.id > ?))";
       whereClauses.push(cursorCondition);
       params.push(cursor.date_vente, cursor.date_vente, cursor.id);
     }
 
-    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const whereClause =
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     // Charger les ventes
     const dataStmt = db.prepare(`
@@ -4594,57 +6256,72 @@ export function getSalesKeyset(
       sales = sales.slice(0, limit);
     }
 
-    if (direction === 'prev') {
+    if (direction === "prev") {
       sales.reverse();
     }
 
     // Batch loading des produits et paiements
     if (sales.length > 0) {
-      const saleIds = sales.map(s => s.id);
-      const placeholders = saleIds.map(() => '?').join(',');
+      const saleIds = sales.map((s) => s.id);
+      const placeholders = saleIds.map(() => "?").join(",");
 
-      const allProducts = db.prepare(`
+      const allProducts = db
+        .prepare(
+          `
         SELECT vp.*, p.nom as nom_produit
         FROM ventes_produits vp
         JOIN produits p ON vp.produit_id = p.id
         WHERE vp.vente_id IN (${placeholders})
-      `).all(...saleIds) as any[];
+      `,
+        )
+        .all(...saleIds) as any[];
 
-      const allPayments = db.prepare(`
+      const allPayments = db
+        .prepare(
+          `
         SELECT * FROM paiements_clients
         WHERE vente_id IN (${placeholders})
-      `).all(...saleIds) as any[];
+      `,
+        )
+        .all(...saleIds) as any[];
 
       const productsBySale: Record<number, any[]> = {};
-      allProducts.forEach(prod => {
+      allProducts.forEach((prod) => {
         if (!productsBySale[prod.vente_id]) productsBySale[prod.vente_id] = [];
         productsBySale[prod.vente_id].push(prod);
       });
 
       const paymentsBySale: Record<number, any[]> = {};
-      allPayments.forEach(payment => {
-        if (!paymentsBySale[payment.vente_id]) paymentsBySale[payment.vente_id] = [];
+      allPayments.forEach((payment) => {
+        if (!paymentsBySale[payment.vente_id])
+          paymentsBySale[payment.vente_id] = [];
         paymentsBySale[payment.vente_id].push(payment);
       });
 
-      sales = sales.map(sale => ({
+      sales = sales.map((sale) => ({
         ...sale,
         produits: productsBySale[sale.id] || [],
         paiements: paymentsBySale[sale.id] || [],
       }));
     }
 
-    const nextCursor = sales.length > 0 ? {
-      date_vente: sales[sales.length - 1].date_vente,
-      id: sales[sales.length - 1].id
-    } : null;
+    const nextCursor =
+      sales.length > 0
+        ? {
+            date_vente: sales[sales.length - 1].date_vente,
+            id: sales[sales.length - 1].id,
+          }
+        : null;
 
-    const prevCursor = sales.length > 0 ? {
-      date_vente: sales[0].date_vente,
-      id: sales[0].id
-    } : null;
+    const prevCursor =
+      sales.length > 0
+        ? {
+            date_vente: sales[0].date_vente,
+            id: sales[0].id,
+          }
+        : null;
 
-    const total = getEstimatedCount('ventes');
+    const total = getEstimatedCount("ventes");
 
     return {
       data: sales,
@@ -4652,7 +6329,7 @@ export function getSalesKeyset(
       hasMore,
       nextCursor,
       prevCursor,
-      limit
+      limit,
     };
   } catch (error) {
     console.error("Erreur getSalesKeyset:", error);
@@ -4664,40 +6341,49 @@ export function getSalesKeyset(
 export function getAuditLogsKeyset(
   limit: number = 20,
   cursor?: KeysetCursor,
-  direction: 'next' | 'prev' = 'next',
-  filters?: { startDate?: string; endDate?: string; table?: string; search?: string }
+  direction: "next" | "prev" = "next",
+  filters?: {
+    startDate?: string;
+    endDate?: string;
+    table?: string;
+    search?: string;
+  },
 ): KeysetPaginationResult<any> {
   try {
     let whereClauses: string[] = [];
     let params: any[] = [];
-    let orderDirection = direction === 'next' ? 'DESC' : 'ASC';
+    let orderDirection = direction === "next" ? "DESC" : "ASC";
 
     if (filters?.startDate && filters?.endDate) {
-      whereClauses.push('DATE(al.created_at) BETWEEN DATE(?) AND DATE(?)');
+      whereClauses.push("DATE(al.created_at) BETWEEN DATE(?) AND DATE(?)");
       params.push(filters.startDate, filters.endDate);
     }
 
     if (filters?.table) {
-      whereClauses.push('al.table_cible = ?');
+      whereClauses.push("al.table_cible = ?");
       params.push(filters.table);
     }
 
     if (filters?.search && filters.search.trim()) {
       const searchTerm = `%${filters.search.trim()}%`;
-      whereClauses.push('(al.utilisateur_nom LIKE ? OR al.action LIKE ? OR al.table_cible LIKE ?)');
+      whereClauses.push(
+        "(al.utilisateur_nom LIKE ? OR al.action LIKE ? OR al.table_cible LIKE ?)",
+      );
       params.push(searchTerm, searchTerm, searchTerm);
     }
 
     // Condition de cursor
     if (cursor?.created_at && cursor?.id) {
-      const cursorCondition = direction === 'next'
-        ? '(al.created_at < ? OR (al.created_at = ? AND al.id < ?))'
-        : '(al.created_at > ? OR (al.created_at = ? AND al.id > ?))';
+      const cursorCondition =
+        direction === "next"
+          ? "(al.created_at < ? OR (al.created_at = ? AND al.id < ?))"
+          : "(al.created_at > ? OR (al.created_at = ? AND al.id > ?))";
       whereClauses.push(cursorCondition);
       params.push(cursor.created_at, cursor.created_at, cursor.id);
     }
 
-    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const whereClause =
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     const dataStmt = db.prepare(`
       SELECT al.*,
@@ -4716,21 +6402,27 @@ export function getAuditLogsKeyset(
       data = data.slice(0, limit);
     }
 
-    if (direction === 'prev') {
+    if (direction === "prev") {
       data.reverse();
     }
 
-    const nextCursor = data.length > 0 ? {
-      created_at: data[data.length - 1].created_at,
-      id: data[data.length - 1].id
-    } : null;
+    const nextCursor =
+      data.length > 0
+        ? {
+            created_at: data[data.length - 1].created_at,
+            id: data[data.length - 1].id,
+          }
+        : null;
 
-    const prevCursor = data.length > 0 ? {
-      created_at: data[0].created_at,
-      id: data[0].id
-    } : null;
+    const prevCursor =
+      data.length > 0
+        ? {
+            created_at: data[0].created_at,
+            id: data[0].id,
+          }
+        : null;
 
-    const total = getEstimatedCount('audit_logs');
+    const total = getEstimatedCount("audit_logs");
 
     return {
       data,
@@ -4738,7 +6430,7 @@ export function getAuditLogsKeyset(
       hasMore,
       nextCursor,
       prevCursor,
-      limit
+      limit,
     };
   } catch (error) {
     console.error("Erreur getAuditLogsKeyset:", error);
@@ -4750,29 +6442,31 @@ export function getAuditLogsKeyset(
 export function getInvoicesKeyset(
   limit: number = 10,
   cursor?: KeysetCursor,
-  direction: 'next' | 'prev' = 'next',
-  search?: string
+  direction: "next" | "prev" = "next",
+  search?: string,
 ): KeysetPaginationResult<any> {
   try {
     let whereClauses: string[] = [];
     let params: any[] = [];
-    let orderDirection = direction === 'next' ? 'DESC' : 'ASC';
+    let orderDirection = direction === "next" ? "DESC" : "ASC";
 
     if (search && search.trim()) {
       const searchTerm = `%${search.trim()}%`;
-      whereClauses.push('(f.numero LIKE ? OR f.client_nom LIKE ?)');
+      whereClauses.push("(f.numero LIKE ? OR f.client_nom LIKE ?)");
       params.push(searchTerm, searchTerm);
     }
 
     if (cursor?.date_facture && cursor?.id) {
-      const cursorCondition = direction === 'next'
-        ? '(f.date_facture < ? OR (f.date_facture = ? AND f.id < ?))'
-        : '(f.date_facture > ? OR (f.date_facture = ? AND f.id > ?))';
+      const cursorCondition =
+        direction === "next"
+          ? "(f.date_facture < ? OR (f.date_facture = ? AND f.id < ?))"
+          : "(f.date_facture > ? OR (f.date_facture = ? AND f.id > ?))";
       whereClauses.push(cursorCondition);
       params.push(cursor.date_facture, cursor.date_facture, cursor.id);
     }
 
-    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const whereClause =
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     const dataStmt = db.prepare(`
       SELECT f.* FROM factures f
@@ -4787,7 +6481,7 @@ export function getInvoicesKeyset(
       data = data.slice(0, limit);
     }
 
-    if (direction === 'prev') {
+    if (direction === "prev") {
       data.reverse();
     }
 
@@ -4797,17 +6491,23 @@ export function getInvoicesKeyset(
       articles: JSON.parse(invoice.articles),
     }));
 
-    const nextCursor = data.length > 0 ? {
-      date_facture: data[data.length - 1].date_facture,
-      id: data[data.length - 1].id
-    } : null;
+    const nextCursor =
+      data.length > 0
+        ? {
+            date_facture: data[data.length - 1].date_facture,
+            id: data[data.length - 1].id,
+          }
+        : null;
 
-    const prevCursor = data.length > 0 ? {
-      date_facture: data[0].date_facture,
-      id: data[0].id
-    } : null;
+    const prevCursor =
+      data.length > 0
+        ? {
+            date_facture: data[0].date_facture,
+            id: data[0].id,
+          }
+        : null;
 
-    const total = search ? data.length : getEstimatedCount('factures');
+    const total = search ? data.length : getEstimatedCount("factures");
 
     return {
       data,
@@ -4815,7 +6515,7 @@ export function getInvoicesKeyset(
       hasMore,
       nextCursor,
       prevCursor,
-      limit
+      limit,
     };
   } catch (error) {
     console.error("Erreur getInvoicesKeyset:", error);
@@ -4827,17 +6527,18 @@ export function getInvoicesKeyset(
 export function getPurchasesKeyset(
   limit: number = 10,
   cursor?: KeysetCursor,
-  direction: 'next' | 'prev' = 'next'
+  direction: "next" | "prev" = "next",
 ): KeysetPaginationResult<any> {
   try {
-    let whereClause = '';
+    let whereClause = "";
     let params: any[] = [];
-    let orderDirection = direction === 'next' ? 'DESC' : 'ASC';
+    let orderDirection = direction === "next" ? "DESC" : "ASC";
 
     if (cursor?.date_achat && cursor?.id) {
-      const cursorCondition = direction === 'next'
-        ? '(a.date_achat < ? OR (a.date_achat = ? AND a.id < ?))'
-        : '(a.date_achat > ? OR (a.date_achat = ? AND a.id > ?))';
+      const cursorCondition =
+        direction === "next"
+          ? "(a.date_achat < ? OR (a.date_achat = ? AND a.id < ?))"
+          : "(a.date_achat > ? OR (a.date_achat = ? AND a.id > ?))";
       whereClause = `WHERE ${cursorCondition}`;
       params.push(cursor.date_achat, cursor.date_achat, cursor.id);
     }
@@ -4857,57 +6558,73 @@ export function getPurchasesKeyset(
       purchases = purchases.slice(0, limit);
     }
 
-    if (direction === 'prev') {
+    if (direction === "prev") {
       purchases.reverse();
     }
 
     // Batch loading des produits et paiements
     if (purchases.length > 0) {
-      const purchaseIds = purchases.map(p => p.id);
-      const placeholders = purchaseIds.map(() => '?').join(',');
+      const purchaseIds = purchases.map((p) => p.id);
+      const placeholders = purchaseIds.map(() => "?").join(",");
 
-      const allProducts = db.prepare(`
+      const allProducts = db
+        .prepare(
+          `
         SELECT ap.*, p.nom as nom_produit
         FROM achats_produits ap
         JOIN produits p ON ap.produit_id = p.id
         WHERE ap.achat_id IN (${placeholders})
-      `).all(...purchaseIds) as any[];
+      `,
+        )
+        .all(...purchaseIds) as any[];
 
-      const allPayments = db.prepare(`
+      const allPayments = db
+        .prepare(
+          `
         SELECT * FROM paiements_fournisseurs
         WHERE achat_id IN (${placeholders})
-      `).all(...purchaseIds) as any[];
+      `,
+        )
+        .all(...purchaseIds) as any[];
 
       const productsByPurchase: Record<number, any[]> = {};
-      allProducts.forEach(prod => {
-        if (!productsByPurchase[prod.achat_id]) productsByPurchase[prod.achat_id] = [];
+      allProducts.forEach((prod) => {
+        if (!productsByPurchase[prod.achat_id])
+          productsByPurchase[prod.achat_id] = [];
         productsByPurchase[prod.achat_id].push(prod);
       });
 
       const paymentsByPurchase: Record<number, any[]> = {};
-      allPayments.forEach(payment => {
-        if (!paymentsByPurchase[payment.achat_id]) paymentsByPurchase[payment.achat_id] = [];
+      allPayments.forEach((payment) => {
+        if (!paymentsByPurchase[payment.achat_id])
+          paymentsByPurchase[payment.achat_id] = [];
         paymentsByPurchase[payment.achat_id].push(payment);
       });
 
-      purchases = purchases.map(purchase => ({
+      purchases = purchases.map((purchase) => ({
         ...purchase,
         produits: productsByPurchase[purchase.id] || [],
         paiements: paymentsByPurchase[purchase.id] || [],
       }));
     }
 
-    const nextCursor = purchases.length > 0 ? {
-      date_achat: purchases[purchases.length - 1].date_achat,
-      id: purchases[purchases.length - 1].id
-    } : null;
+    const nextCursor =
+      purchases.length > 0
+        ? {
+            date_achat: purchases[purchases.length - 1].date_achat,
+            id: purchases[purchases.length - 1].id,
+          }
+        : null;
 
-    const prevCursor = purchases.length > 0 ? {
-      date_achat: purchases[0].date_achat,
-      id: purchases[0].id
-    } : null;
+    const prevCursor =
+      purchases.length > 0
+        ? {
+            date_achat: purchases[0].date_achat,
+            id: purchases[0].id,
+          }
+        : null;
 
-    const total = getEstimatedCount('achats');
+    const total = getEstimatedCount("achats");
 
     return {
       data: purchases,
@@ -4915,7 +6632,7 @@ export function getPurchasesKeyset(
       hasMore,
       nextCursor,
       prevCursor,
-      limit
+      limit,
     };
   } catch (error) {
     console.error("Erreur getPurchasesKeyset:", error);
@@ -4924,17 +6641,22 @@ export function getPurchasesKeyset(
 }
 
 // Fonction hybride: utilise keyset si > KEYSET_THRESHOLD, sinon OFFSET classique
-export function getProductsPaginatedOptimized(page: number = 1, limit: number = 10, search?: string, cursor?: KeysetCursor) {
-  const total = search ? 0 : getEstimatedCount('produits');
+export function getProductsPaginatedOptimized(
+  page: number = 1,
+  limit: number = 10,
+  search?: string,
+  cursor?: KeysetCursor,
+) {
+  const total = search ? 0 : getEstimatedCount("produits");
 
   // Si keyset cursor fourni ou si très grande table sans recherche, utiliser keyset
   if (cursor || (total > KEYSET_THRESHOLD && !search)) {
-    const result = getProductsKeyset(limit, cursor, 'next', search);
+    const result = getProductsKeyset(limit, cursor, "next", search);
     return {
       ...result,
       page,
       totalPages: Math.ceil(result.total / limit),
-      useKeyset: true
+      useKeyset: true,
     };
   }
 
@@ -4942,32 +6664,51 @@ export function getProductsPaginatedOptimized(page: number = 1, limit: number = 
   return { ...getProductsPaginated(page, limit, search), useKeyset: false };
 }
 
-export function getSalesPaginatedOptimized(page: number = 1, limit: number = 10, startDate?: string, endDate?: string, cursor?: KeysetCursor) {
-  const total = getEstimatedCount('ventes');
+export function getSalesPaginatedOptimized(
+  page: number = 1,
+  limit: number = 10,
+  startDate?: string,
+  endDate?: string,
+  cursor?: KeysetCursor,
+) {
+  const total = getEstimatedCount("ventes");
 
   if (cursor || total > KEYSET_THRESHOLD) {
-    const result = getSalesKeyset(limit, cursor, 'next', startDate, endDate);
+    const result = getSalesKeyset(limit, cursor, "next", startDate, endDate);
     return {
       ...result,
       page,
       totalPages: Math.ceil(result.total / limit),
-      useKeyset: true
+      useKeyset: true,
     };
   }
 
-  return { ...getSalesPaginated(page, limit, startDate, endDate), useKeyset: false };
+  return {
+    ...getSalesPaginated(page, limit, startDate, endDate),
+    useKeyset: false,
+  };
 }
 
-export function getAuditLogsPaginatedOptimized(page: number = 1, limit: number = 20, filters?: { startDate?: string; endDate?: string; table?: string; search?: string }, cursor?: KeysetCursor) {
-  const total = getEstimatedCount('audit_logs');
+export function getAuditLogsPaginatedOptimized(
+  page: number = 1,
+  limit: number = 20,
+  filters?: {
+    startDate?: string;
+    endDate?: string;
+    table?: string;
+    search?: string;
+  },
+  cursor?: KeysetCursor,
+) {
+  const total = getEstimatedCount("audit_logs");
 
   if (cursor || total > KEYSET_THRESHOLD) {
-    const result = getAuditLogsKeyset(limit, cursor, 'next', filters);
+    const result = getAuditLogsKeyset(limit, cursor, "next", filters);
     return {
       ...result,
       page,
       totalPages: Math.ceil(result.total / limit),
-      useKeyset: true
+      useKeyset: true,
     };
   }
 
@@ -4978,7 +6719,11 @@ export function getAuditLogsPaginatedOptimized(page: number = 1, limit: number =
 export function getSchemaInfo(): {
   currentVersion: number;
   targetVersion: number;
-  appliedMigrations: Array<{ version: number; description: string; applied_at: string }>;
+  appliedMigrations: Array<{
+    version: number;
+    description: string;
+    applied_at: string;
+  }>;
   pendingMigrations: number;
 } {
   try {
@@ -4986,8 +6731,14 @@ export function getSchemaInfo(): {
 
     const currentVersion = getCurrentSchemaVersion();
     const appliedMigrations = db
-      .prepare("SELECT version, description, applied_at FROM schema_versions ORDER BY version ASC")
-      .all() as Array<{ version: number; description: string; applied_at: string }>;
+      .prepare(
+        "SELECT version, description, applied_at FROM schema_versions ORDER BY version ASC",
+      )
+      .all() as Array<{
+      version: number;
+      description: string;
+      applied_at: string;
+    }>;
 
     return {
       currentVersion,
@@ -5020,31 +6771,45 @@ export function getDatabaseStats(): {
       totalSize = stats.size;
     }
 
-    const tables = db.prepare(`
+    const tables = db
+      .prepare(
+        `
       SELECT name as tableName, sql
       FROM sqlite_master
       WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%'
-    `).all();
+    `,
+      )
+      .all();
 
     const tablesWithCounts = tables.map((table: any) => {
-      const { count } = db.prepare(`SELECT COUNT(*) as count FROM ${table.tableName}`).get() as { count: number };
+      const { count } = db
+        .prepare(`SELECT COUNT(*) as count FROM ${table.tableName}`)
+        .get() as { count: number };
       return {
         name: table.tableName,
         count,
       };
     });
 
-    const oldestAudit = db.prepare(`
+    const oldestAudit = db
+      .prepare(
+        `
       SELECT created_at FROM audit_logs
       ORDER BY created_at ASC
       LIMIT 1
-    `).get() as { created_at: string } | undefined;
+    `,
+      )
+      .get() as { created_at: string } | undefined;
 
-    const oldestSale = db.prepare(`
+    const oldestSale = db
+      .prepare(
+        `
       SELECT date_vente FROM ventes
       ORDER BY date_vente ASC
       LIMIT 1
-    `).get() as { date_vente: string } | undefined;
+    `,
+      )
+      .get() as { date_vente: string } | undefined;
 
     return {
       totalSize,
@@ -5060,6 +6825,358 @@ export function getDatabaseStats(): {
       totalSize: 0,
       tables: [],
       oldestData: {},
+    };
+  }
+}
+
+// ===== INVENTAIRE =====
+
+export function getInventoryData(
+  page: number = 1,
+  limit: number = 10,
+  startDate?: string,
+  endDate?: string,
+  search?: string,
+  categorieId?: number,
+) {
+  try {
+    const offset = (page - 1) * limit;
+    const countParams: any[] = [];
+
+    // Build date conditions for subqueries
+    let achatsDateCondition = "";
+    let ventesDateCondition = "";
+    if (startDate && endDate) {
+      achatsDateCondition = " AND a.date_achat BETWEEN ? AND ?";
+      ventesDateCondition = " AND v.date_vente BETWEEN ? AND ?";
+    }
+
+    // Build WHERE clause for main query
+    let whereConditions: string[] = [];
+    if (search && search.trim()) {
+      whereConditions.push("(p.nom LIKE ? OR p.code_barre LIKE ?)");
+      const searchParam = `%${search.trim()}%`;
+      countParams.push(searchParam, searchParam);
+    }
+    if (categorieId) {
+      whereConditions.push("p.categorie_id = ?");
+      countParams.push(categorieId);
+    }
+    const whereClause =
+      whereConditions.length > 0
+        ? "WHERE " + whereConditions.join(" AND ")
+        : "";
+
+    // Count query
+    const countStmt = db.prepare(`
+      SELECT COUNT(*) as total FROM produits p
+      ${whereClause}
+    `);
+    const { total } = countStmt.get(...countParams) as { total: number };
+
+    // Build main query params
+    // Entrees subquery
+    const entreesSubquery = `
+      SELECT COALESCE(SUM(ap.quantite), 0)
+      FROM achats_produits ap
+      INNER JOIN achats a ON ap.achat_id = a.id
+      WHERE ap.produit_id = p.id${achatsDateCondition}
+    `;
+
+    // Sorties subquery
+    const sortiesSubquery = `
+      SELECT COALESCE(SUM(vp.quantite), 0)
+      FROM ventes_produits vp
+      INNER JOIN ventes v ON vp.vente_id = v.id
+      WHERE vp.produit_id = p.id${ventesDateCondition}
+    `;
+
+    const mainQuery = `
+      SELECT
+        p.id, p.nom, p.code_barre, p.quantite_stock, p.stock_min,
+        p.prix_achat, p.prix_vente,
+        c.nom as categorie_nom,
+        (${entreesSubquery}) as total_entrees,
+        (${sortiesSubquery}) as total_sorties
+      FROM produits p
+      LEFT JOIN categories c ON p.categorie_id = c.id
+      ${whereClause}
+      ORDER BY p.nom
+      LIMIT ? OFFSET ?
+    `;
+
+    // Build params for main query
+    const mainParams: any[] = [];
+    // Params for entrees subquery dates
+    if (startDate && endDate) {
+      mainParams.push(startDate, endDate);
+    }
+    // Params for sorties subquery dates
+    if (startDate && endDate) {
+      mainParams.push(startDate, endDate);
+    }
+    // Params for WHERE clause
+    if (search && search.trim()) {
+      const searchParam = `%${search.trim()}%`;
+      mainParams.push(searchParam, searchParam);
+    }
+    if (categorieId) {
+      mainParams.push(categorieId);
+    }
+    // Pagination
+    mainParams.push(limit, offset);
+
+    const dataStmt = db.prepare(mainQuery);
+    const data = dataStmt.all(...mainParams);
+
+    // Stats globales (sur tous les produits filtrés, pas seulement la page)
+    const statsQuery = `
+      SELECT
+        COALESCE(SUM(p.quantite_stock * p.prix_achat), 0) as valeur_stock_achat,
+        COALESCE(SUM(p.quantite_stock * p.prix_vente), 0) as valeur_stock_vente,
+        COALESCE(SUM(CASE WHEN p.quantite_stock = 0 THEN 1 ELSE 0 END), 0) as produits_rupture,
+        COALESCE(SUM(CASE WHEN p.quantite_stock > 0 AND p.quantite_stock <= p.stock_min THEN 1 ELSE 0 END), 0) as produits_stock_bas
+      FROM produits p
+      ${whereClause}
+    `;
+    const statsStmt = db.prepare(statsQuery);
+    const stats = statsStmt.get(...countParams) as {
+      valeur_stock_achat: number;
+      valeur_stock_vente: number;
+      produits_rupture: number;
+      produits_stock_bas: number;
+    };
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      stats,
+    };
+  } catch (error) {
+    console.error("Erreur get inventory data:", error);
+    return {
+      data: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+      stats: {
+        valeur_stock_achat: 0,
+        valeur_stock_vente: 0,
+        produits_rupture: 0,
+        produits_stock_bas: 0,
+      },
+    };
+  }
+}
+
+// ============================================
+// IMPORT CSV PRODUITS
+// ============================================
+
+export function importProductsFromCSV(csvContent: string): {
+  success: boolean;
+  message: string;
+  stats: {
+    categoriesCreated: number;
+    productsCreated: number;
+    productsUpdated: number;
+    productsSkipped: number;
+  };
+} {
+  try {
+    const lines = csvContent.split("\n").filter((line) => line.trim());
+
+    if (lines.length < 2) {
+      return {
+        success: false,
+        message: "Le fichier CSV est vide ou invalide",
+        stats: {
+          categoriesCreated: 0,
+          productsCreated: 0,
+          productsUpdated: 0,
+          productsSkipped: 0,
+        },
+      };
+    }
+
+    // Parser les produits (ignorer l'en-tête)
+    const products: Array<{
+      categorie: string;
+      description: string | null;
+      nom: string;
+      code_barre: string | null;
+      stock_min: number;
+      prix_achat: number;
+      prix_vente: number;
+      quantite_stock: number;
+    }> = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(",");
+      if (values.length >= 8 && values[0].trim() !== "categorie") {
+        products.push({
+          categorie: values[0].trim(),
+          description: values[1].trim() || null,
+          nom: values[2].trim(),
+          code_barre: values[3].trim() || null,
+          stock_min: parseInt(values[4]) || 5,
+          prix_achat: parseFloat(values[5]) || 0,
+          prix_vente: parseFloat(values[6]) || 0,
+          quantite_stock: parseInt(values[7]) || 0,
+        });
+      }
+    }
+
+    if (products.length === 0) {
+      return {
+        success: false,
+        message: "Aucun produit valide trouvé dans le CSV",
+        stats: {
+          categoriesCreated: 0,
+          productsCreated: 0,
+          productsUpdated: 0,
+          productsSkipped: 0,
+        },
+      };
+    }
+
+    // Extraire les catégories uniques
+    const categories = Array.from(
+      new Set(products.map((p) => p.categorie)),
+    ).filter((c) => c);
+
+    let categoriesCreated = 0;
+    let productsCreated = 0;
+    let productsUpdated = 0;
+    let productsSkipped = 0;
+
+    // Transaction pour l'import
+    db.transaction(() => {
+      // 1. Créer les catégories
+      const insertCategory = db.prepare(
+        "INSERT OR IGNORE INTO categories (nom, description) VALUES (?, ?)",
+      );
+
+      const categoryMap: Record<string, number> = {};
+
+      for (const cat of categories) {
+        const result = insertCategory.run(cat, null);
+        if (result.changes > 0) {
+          categoriesCreated++;
+        }
+
+        // Récupérer l'ID de la catégorie
+        const row = db
+          .prepare("SELECT id FROM categories WHERE nom = ?")
+          .get(cat) as { id: number } | undefined;
+        if (row) {
+          categoryMap[cat] = row.id;
+        }
+      }
+
+      // 2. Créer ou mettre à jour les produits
+      const insertProduct = db.prepare(`
+        INSERT OR IGNORE INTO produits (nom, description, code_barre, prix_achat, prix_vente, quantite_stock, stock_min, categorie_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const updateProductByBarcode = db.prepare(`
+        UPDATE produits SET nom = ?, description = ?, prix_achat = ?, prix_vente = ?, quantite_stock = ?, stock_min = ?, categorie_id = ?
+        WHERE code_barre = ?
+      `);
+
+      const findByBarcode = db.prepare(
+        "SELECT id FROM produits WHERE code_barre = ?",
+      );
+
+      for (const product of products) {
+        if (!product.nom) {
+          productsSkipped++;
+          continue;
+        }
+
+        const categorieId = categoryMap[product.categorie] || null;
+
+        try {
+          // Si le produit a un code_barre, vérifier s'il existe déjà
+          if (product.code_barre) {
+            const existing = findByBarcode.get(product.code_barre) as
+              | { id: number }
+              | undefined;
+            if (existing) {
+              updateProductByBarcode.run(
+                product.nom,
+                product.description,
+                product.prix_achat,
+                product.prix_vente,
+                product.quantite_stock,
+                product.stock_min,
+                categorieId,
+                product.code_barre,
+              );
+              productsUpdated++;
+              continue;
+            }
+          }
+
+          insertProduct.run(
+            product.nom,
+            product.description,
+            product.code_barre,
+            product.prix_achat,
+            product.prix_vente,
+            product.quantite_stock,
+            product.stock_min,
+            categorieId,
+          );
+          productsCreated++;
+        } catch (e) {
+          console.error(`Erreur produit "${product.nom}":`, e);
+          productsSkipped++;
+        }
+      }
+
+      // 3. Mettre à jour les compteurs dans metadata
+      const productCount = (
+        db.prepare("SELECT COUNT(*) as count FROM produits").get() as {
+          count: number;
+        }
+      ).count;
+      db.prepare("UPDATE metadata SET value = ? WHERE key = ?").run(
+        productCount,
+        "produits_count",
+      );
+    })();
+
+    console.log(
+      `✅ Import terminé: ${categoriesCreated} catégories, ${productsCreated} produits créés, ${productsUpdated} mis à jour, ${productsSkipped} ignorés`,
+    );
+
+    return {
+      success: true,
+      message: `Import réussi: ${categoriesCreated} catégories, ${productsCreated} produits créés, ${productsUpdated} mis à jour`,
+      stats: {
+        categoriesCreated,
+        productsCreated,
+        productsUpdated,
+        productsSkipped,
+      },
+    };
+  } catch (error) {
+    console.error("Erreur import CSV:", error);
+    return {
+      success: false,
+      message: `Erreur lors de l'import: ${(error as Error).message}`,
+      stats: {
+        categoriesCreated: 0,
+        productsCreated: 0,
+        productsUpdated: 0,
+        productsSkipped: 0,
+      },
     };
   }
 }

@@ -1,11 +1,27 @@
-import React, { useEffect, useState } from "react";
-import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Package,
+  Download,
+  FileSpreadsheet,
+  Upload,
+} from "lucide-react";
 import { Product, Category } from "../types";
 import ProductModal from "../components/ProductModal";
 import Pagination from "../components/Pagination";
 import { formatCurrency } from "../utils/formatters";
-import { showDeleteToast, showErrorToast } from "../utils/toast";
+import {
+  showDeleteToast,
+  showErrorToast,
+  showSuccessToast,
+} from "../utils/toast";
 import { useAuthStore } from "../store/useAuthStore";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 const Products: React.FC = () => {
   const { user } = useAuthStore();
@@ -19,6 +35,10 @@ const Products: React.FC = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [imageCache, setImageCache] = useState<Map<number, string>>(new Map());
+  const [exporting, setExporting] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadCategories();
@@ -46,12 +66,16 @@ const Products: React.FC = () => {
     }
   };
 
-  const loadData = async (page: number = currentPage, limit: number = itemsPerPage, search: string = searchQuery) => {
+  const loadData = async (
+    page: number = currentPage,
+    limit: number = itemsPerPage,
+    search: string = searchQuery,
+  ) => {
     try {
       const result = await window.electronAPI.getProductsPaginated(
         page,
         limit,
-        search
+        search,
       );
       setProducts(result.data);
       setTotalItems(result.total);
@@ -60,7 +84,9 @@ const Products: React.FC = () => {
       const productsWithImages = result.data.filter((p: any) => p.image_url);
       const imagePromises = productsWithImages.map(async (product: any) => {
         try {
-          const imageBase64 = await window.electronAPI.getProductImage(product.image_url);
+          const imageBase64 = await window.electronAPI.getProductImage(
+            product.image_url,
+          );
           return { id: product.id, image: imageBase64 };
         } catch {
           return { id: product.id, image: null };
@@ -125,6 +151,204 @@ const Products: React.FC = () => {
     loadData();
   };
 
+  const exportToPDF = async () => {
+    setExporting(true);
+    try {
+      // Récupérer tous les produits
+      const allProducts = await window.electronAPI.getProducts();
+
+      // Créer le document PDF
+      const doc = new jsPDF();
+
+      // Fonction de formatage pour PDF (évite les espaces insécables)
+      const formatPrixPDF = (amount: number): string => {
+        const formatted = amount.toFixed(2).replace(".", ",");
+        const parts = formatted.split(",");
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+        return `${parts.join(",")} FCFA`;
+      };
+
+      // Titre
+      doc.setFontSize(18);
+      doc.text("Liste des Produits", 14, 22);
+
+      // Date d'export
+      doc.setFontSize(10);
+      doc.text(
+        `Export du ${new Date().toLocaleDateString("fr-FR")} a ${new Date().toLocaleTimeString("fr-FR")}`,
+        14,
+        30,
+      );
+      doc.text(`Total: ${allProducts.length} produit(s)`, 14, 36);
+
+      // Préparer les données pour le tableau
+      const tableData = allProducts.map((product: Product) => {
+        const status =
+          product.quantite_stock === 0
+            ? "Epuise"
+            : product.quantite_stock <= product.stock_min
+              ? "Stock faible"
+              : "En stock";
+
+        return [
+          product.nom,
+          product.code_barre || "N/A",
+          product.categorie_nom || "Sans categorie",
+          formatPrixPDF(product.prix_achat || 0),
+          formatPrixPDF(product.prix_vente || 0),
+          product.quantite_stock.toString(),
+          status,
+        ];
+      });
+
+      // Générer le tableau
+      autoTable(doc, {
+        head: [
+          [
+            "Produit",
+            "Code-barre",
+            "Catégorie",
+            "Prix Achat",
+            "Prix Vente",
+            "Stock",
+            "Statut",
+          ],
+        ],
+        body: tableData,
+        startY: 42,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: 255,
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: [245, 247, 250],
+        },
+        columnStyles: {
+          0: { cellWidth: 40 },
+          3: { halign: "right" },
+          4: { halign: "right" },
+          5: { halign: "center" },
+          6: { halign: "center" },
+        },
+      });
+
+      // Sauvegarder le PDF
+      doc.save(`produits_${new Date().toISOString().split("T")[0]}.pdf`);
+      showSuccessToast("Export PDF réussi");
+    } catch (error) {
+      console.error("Erreur export PDF:", error);
+      showErrorToast("Erreur lors de l'export PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const exportToExcel = async () => {
+    setExportingExcel(true);
+    try {
+      // Récupérer tous les produits
+      const allProducts = await window.electronAPI.getProducts();
+
+      // Préparer les données pour Excel
+      const excelData = allProducts.map((product: Product) => {
+        const status =
+          product.quantite_stock === 0
+            ? "Épuisé"
+            : product.quantite_stock <= product.stock_min
+              ? "Stock faible"
+              : "En stock";
+
+        return {
+          Produit: product.nom,
+          Description: product.description || "",
+          "Code-barre": product.code_barre || "N/A",
+          Catégorie: product.categorie_nom || "Sans catégorie",
+          "Prix Achat": product.prix_achat || 0,
+          "Prix Vente": product.prix_vente || 0,
+          Stock: product.quantite_stock,
+          "Stock Min": product.stock_min,
+          Statut: status,
+        };
+      });
+
+      // Créer le workbook et la feuille
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Produits");
+
+      // Ajuster la largeur des colonnes
+      worksheet["!cols"] = [
+        { wch: 30 }, // Produit
+        { wch: 40 }, // Description
+        { wch: 15 }, // Code-barre
+        { wch: 20 }, // Catégorie
+        { wch: 12 }, // Prix Achat
+        { wch: 12 }, // Prix Vente
+        { wch: 8 }, // Stock
+        { wch: 10 }, // Stock Min
+        { wch: 12 }, // Statut
+      ];
+
+      // Sauvegarder le fichier Excel
+      XLSX.writeFile(
+        workbook,
+        `produits_${new Date().toISOString().split("T")[0]}.xlsx`,
+      );
+      showSuccessToast("Export Excel réussi");
+    } catch (error) {
+      console.error("Erreur export Excel:", error);
+      showErrorToast("Erreur lors de l'export Excel");
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  const handleImportCSV = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".csv")) {
+      showErrorToast("Veuillez sélectionner un fichier CSV");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const content = await file.text();
+      const result = await window.electronAPI.importProductsCSV(content);
+
+      if (result.success) {
+        showSuccessToast(
+          `Import réussi: ${result.stats.categoriesCreated} catégories, ${result.stats.productsCreated} créés, ${result.stats.productsUpdated} mis à jour`,
+        );
+        loadCategories();
+        loadData();
+      } else {
+        showErrorToast(result.message);
+      }
+    } catch (error) {
+      console.error("Erreur import CSV:", error);
+      showErrorToast("Erreur lors de l'import du fichier CSV");
+    } finally {
+      setImporting(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -141,14 +365,57 @@ const Products: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">
             Gestion des Produits
           </h1>
-          <p className="text-gray-600 mt-1">
-            {totalItems} produit(s) au total
-          </p>
+          <p className="text-gray-600 mt-1">{totalItems} produit(s) au total</p>
         </div>
-        <button onClick={handleAdd} className="btn-primary">
-          <Plus className="w-5 h-5" />
-          Nouveau Produit
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={exportToPDF}
+            disabled={exporting || totalItems === 0}
+            className="btn-secondary"
+          >
+            {exporting ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            ) : (
+              <Download className="w-5 h-5" />
+            )}
+            {exporting ? "Export..." : "Exporter PDF"}
+          </button>
+          <button
+            onClick={exportToExcel}
+            disabled={exportingExcel || totalItems === 0}
+            className="btn-secondary"
+          >
+            {exportingExcel ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+            ) : (
+              <FileSpreadsheet className="w-5 h-5" />
+            )}
+            {exportingExcel ? "Export..." : "Exporter Excel"}
+          </button>
+          <button
+            onClick={handleImportCSV}
+            disabled={importing}
+            className="btn-secondary"
+          >
+            {importing ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            ) : (
+              <Upload className="w-5 h-5" />
+            )}
+            {importing ? "Import..." : "Importer CSV"}
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".csv"
+            className="hidden"
+          />
+          <button onClick={handleAdd} className="btn-primary">
+            <Plus className="w-5 h-5" />
+            Nouveau Produit
+          </button>
+        </div>
       </div>
 
       {/* Search */}

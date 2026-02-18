@@ -23,6 +23,8 @@ import {
   Printer,
   Receipt,
   User,
+  LayoutGrid,
+  LayoutList,
 } from "lucide-react";
 import { Product, Sale, Server, Configuration } from "../types";
 import { useStore } from "../store/useStore";
@@ -30,7 +32,9 @@ import { useAuthStore } from "../store/useAuthStore";
 import { SidebarContext } from "../components/Layout";
 import Pagination from "../components/Pagination";
 import { formatCurrency } from "../utils/formatters";
+import { montantEnLettres } from "../utils/numberToWords";
 import { showSaleToast, showErrorToast } from "../utils/toast";
+import { generateInvoiceQR } from "../utils/qrcode";
 
 // Interface pour le ticket
 interface ReceiptData {
@@ -40,6 +44,8 @@ interface ReceiptData {
   caissier: string;
   serveur?: string;
   client_nom?: string;
+  client_telephone?: string;
+  client_email?: string;
   articles: Array<{
     designation: string;
     quantite: number;
@@ -50,229 +56,271 @@ interface ReceiptData {
   methodePaiement: string;
   montantPaye: number;
   monnaieRendue: number;
+  montantRestant?: number;
   remiseType?: "pourcentage" | "montant";
   remiseValeur?: number;
   totalAvantRemise?: number;
 }
 
-// Composant de prévisualisation du ticket 80mm
+// Composant de prévisualisation du ticket/facture
 const ReceiptPreview: React.FC<{
   receipt: ReceiptData;
   onClose: () => void;
   onPrint: () => void;
   config: Configuration | null;
-}> = ({ receipt, onClose, onPrint, config }) => {
+  logoBase64: string | null;
+}> = ({ receipt, onClose, onPrint, config, logoBase64 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const isA4 = config?.format_facture === "A4";
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
 
-  const handlePrint = () => {
-    if (receiptRef.current) {
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Ticket - ${receipt.numero}</title>
-              <style>
-                * {
-                  margin: 0;
-                  padding: 0;
-                  box-sizing: border-box;
-                }
+  // Générer le QR code
+  useEffect(() => {
+    const remise = receipt.totalAvantRemise
+      ? receipt.totalAvantRemise - receipt.totalTTC
+      : 0;
+    generateInvoiceQR({
+      numero: receipt.numero,
+      date: receipt.date,
+      client: receipt.client_nom || "Client comptoir",
+      totalAchat: receipt.totalAvantRemise || receipt.totalTTC,
+      remise,
+      tva: 0,
+      totalTTC: receipt.totalTTC,
+      devise: config?.devise,
+    })
+      .then(setQrCodeUrl)
+      .catch(() => setQrCodeUrl(null));
+  }, [receipt, config?.devise]);
 
-                @page {
-                  size: 80mm auto;
-                  margin: 2mm;
-                }
+  const handlePrint = async () => {
+    if (!receiptRef.current) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
 
-                body {
-                  font-family: 'Courier New', 'Lucida Console', monospace;
-                  font-size: 12px;
-                  line-height: 1.4;
-                  color: #000;
-                  background: white;
-                  width: 76mm;
-                  margin: 0 auto;
-                }
+    if (isA4) {
+      // Format A4 - Facture professionnelle compacte
+      const remiseAmount =
+        receipt.remiseValeur && receipt.remiseValeur > 0
+          ? receipt.remiseType === "pourcentage"
+            ? ((receipt.totalAvantRemise || 0) * receipt.remiseValeur) / 100
+            : receipt.remiseValeur
+          : 0;
 
-                .ticket {
-                  width: 76mm;
-                  padding: 2mm;
-                  background: white;
-                }
-
-                .ticket-header {
-                  text-align: center;
-                  padding-bottom: 3mm;
-                  border-bottom: 1px dashed #000;
-                  margin-bottom: 3mm;
-                }
-
-                .ticket-header h1 {
-                  font-size: 14px;
-                  font-weight: bold;
-                  margin-bottom: 2mm;
-                  text-transform: uppercase;
-                }
-
-                .ticket-header p {
-                  font-size: 10px;
-                  margin: 1mm 0;
-                }
-
-                .ticket-title {
-                  text-align: center;
-                  font-size: 16px;
-                  font-weight: bold;
-                  margin: 3mm 0;
-                  padding: 2mm 0;
-                  border-top: 1px dashed #000;
-                  border-bottom: 1px dashed #000;
-                }
-
-                .ticket-info {
-                  margin-bottom: 3mm;
-                  padding-bottom: 3mm;
-                  border-bottom: 1px dashed #000;
-                }
-
-                .ticket-info-row {
-                  display: flex;
-                  justify-content: space-between;
-                  font-size: 11px;
-                  margin: 1mm 0;
-                }
-
-                .ticket-articles {
-                  margin-bottom: 3mm;
-                  padding-bottom: 3mm;
-                  border-bottom: 1px dashed #000;
-                }
-
-                .ticket-article {
-                  margin: 2mm 0;
-                  font-size: 11px;
-                }
-
-                .ticket-article-name {
-                  font-weight: bold;
-                }
-
-                .ticket-article-details {
-                  display: flex;
-                  justify-content: space-between;
-                  padding-left: 2mm;
-                  font-size: 10px;
-                }
-
-                .ticket-totals {
-                  margin-bottom: 3mm;
-                  padding-bottom: 3mm;
-                  border-bottom: 1px dashed #000;
-                }
-
-                .ticket-total-row {
-                  display: flex;
-                  justify-content: space-between;
-                  font-size: 11px;
-                  margin: 1mm 0;
-                }
-
-                .ticket-total-row.grand-total {
-                  font-size: 14px;
-                  font-weight: bold;
-                  margin-top: 2mm;
-                  padding-top: 2mm;
-                  border-top: 1px solid #000;
-                }
-
-                .ticket-total-row.discount {
-                  color: #059669;
-                }
-
-                .ticket-payment {
-                  margin-bottom: 3mm;
-                  padding-bottom: 3mm;
-                  border-bottom: 1px dashed #000;
-                }
-
-                .ticket-payment-row {
-                  display: flex;
-                  justify-content: space-between;
-                  font-size: 11px;
-                  margin: 1mm 0;
-                }
-
-                .ticket-payment-row.change {
-                  font-weight: bold;
-                  font-size: 12px;
-                }
-
-                .ticket-footer {
-                  text-align: center;
-                  padding-top: 3mm;
-                }
-
-                .ticket-footer p {
-                  font-size: 10px;
-                  margin: 1mm 0;
-                }
-
-                .ticket-footer .thank-you {
-                  font-size: 12px;
-                  font-weight: bold;
-                  margin-bottom: 2mm;
-                }
-
-                .ticket-footer .ticket-ref {
-                  font-size: 9px;
-                  margin-top: 3mm;
-                  padding-top: 2mm;
-                  border-top: 1px dashed #000;
-                }
-
-                @media print {
-                  body {
-                    width: 76mm;
-                  }
-                  .ticket {
-                    width: 76mm;
-                  }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="ticket">
-                <div class="ticket-header">
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Facture - ${receipt.numero}</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              @page { size: A4; margin: 8mm; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
+              .invoice { max-width: 194mm; margin: 0 auto; }
+              .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 2px solid #2563eb; margin-bottom: 10px; }
+              .company-info h1 { font-size: 16px; color: #1e40af; margin-bottom: 2px; }
+              .company-info p { font-size: 9px; color: #555; margin: 1px 0; }
+              .invoice-badge { background: #2563eb; color: white; padding: 6px 14px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; }
+              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
+              .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
+              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 2px 0; font-size: 10px; }
+              .info-box strong { color: #1e293b; }
+              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
+              thead th:first-child { border-radius: 4px 0 0 0; }
+              thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
+              thead th.text-right { text-align: right; }
+              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+              tbody tr:nth-child(even) { background: #f8fafc; }
+              tbody td.text-right { text-align: right; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
+              .totals-box { width: 280px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
+              .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
+              .totals-row.discount { color: #dc2626; }
+              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 4px; }
+              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 4px; font-size: 9px; }
+              .totals-row.remaining { color: #dc2626; font-weight: bold; }
+              .amount-words { margin-top: 8px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 9px; color: #92400e; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
+              .qr-code { text-align: center; }
+              .qr-code img { width: 80px; height: 80px; }
+              .qr-code p { font-size: 8px; color: #64748b; margin-top: 2px; }
+              .stamp-area { width: 150px; height: 80px; border: 1px dashed #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+              .stamp-area p { font-size: 9px; color: #94a3b8; text-align: center; }
+              .footer { margin-top: 15px; text-align: center; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+              .footer .message { font-size: 11px; font-weight: 500; color: #1e40af; margin-bottom: 2px; }
+              .footer .sub { font-size: 8px; color: #94a3b8; }
+              @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            </style>
+          </head>
+          <body>
+            <div class="invoice">
+              <div class="header">
+                <div class="company-info">
+                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="max-height: 50px; max-width: 120px; margin-bottom: 4px; object-fit: contain;" />` : ""}
                   <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-                  ${config?.telephone ? `<p>Tel: ${config.telephone}</p>` : ""}
-                  ${config?.telephone2 ? `<p>${config.telephone2}</p>` : ""}
-                  ${config?.adresse ? `<p>${config.adresse}</p>` : ""}
+                  ${config?.description_entreprise ? `<p style="font-size: 14px; color: #666; font-style: italic;">${config.description_entreprise}</p>` : ""}
+                  ${config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
+                  ${config?.telephone ? `<p>Tel: ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}${config?.nif ? " | NIF: " + config.nif : ""}</p>` : ""}
+                  ${config?.email && !config?.telephone ? `<p>${config.email}</p>` : ""}
                 </div>
-                ${receiptRef.current.innerHTML}
+                <div class="invoice-badge">
+                  FACTURE
+                  <div class="numero">N° ${receipt.numero}</div>
+                </div>
               </div>
-              <script>
-                window.onload = function() {
-                  setTimeout(function() {
-                    window.print();
-                    setTimeout(function() {
-                      window.close();
-                    }, 100);
-                  }, 500);
-                };
-              </script>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-        onPrint();
-      }
+
+              <div class="info-grid">
+                <div class="info-box">
+                  <h3>Client</h3>
+                  <p><strong>${receipt.client_nom}</strong></p>
+                  ${receipt.client_telephone ? `<p>Tel: ${receipt.client_telephone}</p>` : ""}
+                  ${receipt.client_email ? `<p>${receipt.client_email}</p>` : ""}
+                </div>
+                <div class="info-box">
+                  <h3>Facture</h3>
+                  <p><strong>Date:</strong> ${receipt.date} | <strong>Heure:</strong> ${receipt.heure}</p>
+                  <p><strong>Caissier:</strong> ${receipt.caissier}${receipt.serveur ? " | <strong>Serveur:</strong> " + receipt.serveur : ""}</p>
+                </div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Designation</th>
+                    <th class="text-right" style="width: 40px;">Qte</th>
+                    <th class="text-right" style="width: 80px;">P.U.</th>
+                    <th class="text-right" style="width: 80px;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${receipt.articles
+                    .map(
+                      (a) => `
+                    <tr>
+                      <td>${a.designation}</td>
+                      <td class="text-right">${a.quantite}</td>
+                      <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
+                      <td class="text-right">${formatCurrency(a.total)}</td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+
+              <div class="totals-section">
+                <div class="totals-box">
+                  ${
+                    receipt.remiseValeur != null && receipt.remiseValeur > 0
+                      ? `
+                    <div class="totals-row subtotal">
+                      <span>Sous-total:</span>
+                      <span>${formatCurrency(receipt.totalAvantRemise || 0)}</span>
+                    </div>
+                    <div class="totals-row discount">
+                      <span>Remise (${receipt.remiseType === "pourcentage" ? receipt.remiseValeur + "%" : "fixe"}):</span>
+                      <span>-${formatCurrency(remiseAmount)}</span>
+                    </div>
+                  `
+                      : ""
+                  }
+                  <div class="totals-row grand-total">
+                    <span>Total TTC:</span>
+                    <span>${formatCurrency(receipt.totalTTC)}</span>
+                  </div>
+                  <div class="totals-row payment-info">
+                    <span>Reglement: ${receipt.methodePaiement} | Recu: ${formatCurrency(receipt.montantPaye)}</span>
+                  </div>
+                  ${
+                    receipt.monnaieRendue > 0
+                      ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(receipt.monnaieRendue)}</span></div>`
+                      : ""
+                  }
+                  ${
+                    receipt.montantRestant != null && receipt.montantRestant > 0
+                      ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(receipt.montantRestant)}</span></div>`
+                      : ""
+                  }
+                </div>
+              </div>
+
+              <div >
+                Arrete la presente facture a la somme de : <strong>${montantEnLettres(receipt.totalTTC, "francs CFA")}</strong>
+              </div>
+
+              <div class="qr-stamp-section">
+                <div class="qr-code">
+                  ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
+                </div>
+                <div >
+                </div>
+              </div>
+
+              <div class="footer">
+                <p class="message">${config?.message_pied || "Merci de votre confiance !"}</p>
+                ${config?.support_text ? `<p class="sub">${config.support_text}</p>` : ""}
+              </div>
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+    } else {
+      // Format ticket 80mm
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Ticket - ${receipt.numero}</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              @page { size: 80mm auto; margin: 2mm; }
+              body { font-family: 'Courier New', 'Lucida Console', monospace; font-size: 12px; line-height: 1.4; color: #000; background: white; width: 76mm; margin: 0 auto; }
+              .ticket { width: 76mm; padding: 2mm; background: white; }
+              .ticket-header { text-align: center; padding-bottom: 3mm; border-bottom: 1px dashed #000; margin-bottom: 3mm; }
+              .ticket-header h1 { font-size: 14px; font-weight: bold; margin-bottom: 2mm; text-transform: uppercase; }
+              .ticket-header p { font-size: 10px; margin: 1mm 0; }
+              @media print { body { width: 76mm; } .ticket { width: 76mm; } }
+            </style>
+          </head>
+          <body>
+            <div class="ticket">
+              <div class="ticket-header">
+                ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="max-height: 40px; max-width: 60mm; margin-bottom: 2mm; object-fit: contain;" />` : ""}
+                <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
+                ${config?.telephone ? `<p>Tel: ${config.telephone}</p>` : ""}
+                ${config?.telephone2 ? `<p>${config.telephone2}</p>` : ""}
+                ${config?.adresse ? `<p>${config.adresse}</p>` : ""}
+                ${config?.nif ? `<p>NIF: ${config.nif}</p>` : ""}
+              </div>
+              ${receiptRef.current.innerHTML}
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
     }
+    printWindow.document.close();
+    onPrint();
   };
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[95vh] flex flex-col animate-scaleIn">
+      <div
+        className={`bg-white rounded-2xl shadow-2xl ${isA4 ? "max-w-4xl" : "max-w-md"} w-full max-h-[95vh] flex flex-col animate-scaleIn`}
+      >
         {/* En-tete du modal */}
         <div className="relative bg-blue-600 text-white px-8 py-5 rounded-t-2xl shrink-0">
           <button
@@ -286,333 +334,942 @@ const ReceiptPreview: React.FC<{
               <Receipt className="w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold">Ticket de caisse</h2>
+              <h2 className="text-2xl font-bold">
+                {isA4 ? "Facture" : "Ticket de caisse"}
+              </h2>
               <p className="text-white/80 text-sm">
-                Apercu avant impression - Format 80mm
+                Apercu avant impression - Format {isA4 ? "A4" : "80mm"}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Contenu du ticket - Format 80mm */}
+        {/* Contenu */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-100 flex justify-center">
-          <div
-            ref={receiptRef}
-            className="ticket bg-white shadow-xl"
-            style={{
-              width: "80mm",
-              padding: "3mm",
-              fontFamily: "'Courier New', 'Lucida Console', monospace",
-              fontSize: "12px",
-              lineHeight: "1.4",
-              color: "#000",
-            }}
-          >
-            {/* En-tete du ticket */}
+          {isA4 ? (
+            /* Format A4 - Facture professionnelle */
             <div
+              ref={receiptRef}
+              className="bg-white shadow-xl"
               style={{
-                textAlign: "center",
-                paddingBottom: "3mm",
-                borderBottom: "1px dashed #000",
-                marginBottom: "3mm",
+                width: "210mm",
+                minHeight: "297mm",
+                padding: "15mm",
+                fontFamily: "'Segoe UI', Arial, sans-serif",
+                fontSize: "12px",
+                lineHeight: "1.5",
+                color: "#333",
               }}
             >
-              <h1
-                style={{
-                  fontSize: "14px",
-                  fontWeight: "bold",
-                  marginBottom: "2mm",
-                  textTransform: "uppercase",
-                }}
-              >
-                {config?.nom_entreprise || "Mon Entreprise"}
-              </h1>
-              {config?.telephone && (
-                <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                  Tel: {config.telephone}
-                </p>
-              )}
-              {config?.telephone2 && (
-                <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                  {config.telephone2}
-                </p>
-              )}
-              {config?.adresse && (
-                <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                  {config.adresse}
-                </p>
-              )}
-            </div>
-
-            {/* Titre TICKET */}
-            <div
-              style={{
-                textAlign: "center",
-                fontSize: "16px",
-                fontWeight: "bold",
-                margin: "3mm 0",
-                padding: "2mm 0",
-              }}
-            >
-              TICKET N° {receipt.numero}
-            </div>
-
-            {/* Informations */}
-            <div
-              style={{
-                marginBottom: "3mm",
-                paddingBottom: "3mm",
-              }}
-            >
+              {/* Header */}
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  fontSize: "11px",
-                  margin: "1mm 0",
+                  alignItems: "flex-start",
+                  paddingBottom: "20px",
+                  borderBottom: "3px solid #2563eb",
+                  marginBottom: "25px",
                 }}
               >
-                <span>Date:</span>
-                <span>{receipt.date}</span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "11px",
-                  margin: "1mm 0",
-                }}
-              >
-                <span>Heure:</span>
-                <span>{receipt.heure}</span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "11px",
-                  margin: "1mm 0",
-                }}
-              >
-                <span>Caissier:</span>
-                <span>{receipt.caissier}</span>
-              </div>
-              {receipt.serveur && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "11px",
-                    margin: "1mm 0",
-                  }}
-                >
-                  <span>Serveur:</span>
-                  <span>{receipt.serveur}</span>
-                </div>
-              )}
-              {receipt.client_nom && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "11px",
-                    margin: "1mm 0",
-                  }}
-                >
-                  <span>Client:</span>
-                  <span>{receipt.client_nom}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Articles */}
-            <div
-              style={{
-                marginBottom: "3mm",
-                paddingBottom: "3mm",
-              }}
-            >
-              {receipt.articles.map((article, index) => (
-                <div key={index} style={{ margin: "2mm 0" }}>
-                  <div
+                <div>
+                  {logoBase64 && (
+                    <img
+                      src={logoBase64}
+                      alt="Logo"
+                      style={{
+                        maxHeight: "80px",
+                        maxWidth: "160px",
+                        marginBottom: "8px",
+                        objectFit: "contain",
+                      }}
+                    />
+                  )}
+                  <h1
                     style={{
-                      fontSize: "11px",
+                      fontSize: "22px",
+                      color: "#1e40af",
+                      marginBottom: "5px",
                       fontWeight: "bold",
                     }}
                   >
-                    {article.designation}
+                    {config?.nom_entreprise || "Mon Entreprise"}
+                  </h1>
+                  {config?.description_entreprise && (
+                    <p
+                      style={{
+                        fontSize: "10px",
+                        color: "#666",
+                        fontStyle: "italic",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      {config.description_entreprise}
+                    </p>
+                  )}
+                  {config?.adresse && (
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#555",
+                        margin: "2px 0",
+                      }}
+                    >
+                      {config.adresse}
+                      {config?.ville ? ", " + config.ville : ""}
+                    </p>
+                  )}
+                  {config?.telephone && (
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#555",
+                        margin: "2px 0",
+                      }}
+                    >
+                      Tel: {config.telephone}
+                      {config?.telephone2 ? " / " + config.telephone2 : ""}
+                    </p>
+                  )}
+                  {config?.email && (
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#555",
+                        margin: "2px 0",
+                      }}
+                    >
+                      {config.email}
+                    </p>
+                  )}
+                  {config?.nif && (
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#555",
+                        margin: "2px 0",
+                      }}
+                    >
+                      NIF: {config.nif}
+                    </p>
+                  )}
+                </div>
+                <div
+                  style={{
+                    background: "#2563eb",
+                    color: "white",
+                    padding: "8px 20px",
+                    borderRadius: "6px",
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{ fontSize: "18px", fontWeight: "bold" }}>
+                    FACTURE
+                  </div>
+                  <div style={{ fontSize: "12px" }}>N° {receipt.numero}</div>
+                </div>
+              </div>
+
+              {/* Info grid */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "25px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "48%",
+                    background: "#f8fafc",
+                    padding: "15px",
+                    borderRadius: "8px",
+                    border: "1px solid #e2e8f0",
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      color: "#64748b",
+                      letterSpacing: "0.5px",
+                      marginBottom: "8px",
+                      paddingBottom: "5px",
+                      borderBottom: "1px solid #e2e8f0",
+                    }}
+                  >
+                    Informations Client
+                  </h3>
+                  <p
+                    style={{
+                      margin: "3px 0",
+                      fontWeight: "bold",
+                      color: "#1e293b",
+                    }}
+                  >
+                    {receipt.client_nom || "Client comptoir"}
+                  </p>
+                  {receipt.client_telephone && (
+                    <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                      Tel: {receipt.client_telephone}
+                    </p>
+                  )}
+                  {receipt.client_email && (
+                    <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                      Email: {receipt.client_email}
+                    </p>
+                  )}
+                </div>
+                <div
+                  style={{
+                    width: "48%",
+                    background: "#f8fafc",
+                    padding: "15px",
+                    borderRadius: "8px",
+                    border: "1px solid #e2e8f0",
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      color: "#64748b",
+                      letterSpacing: "0.5px",
+                      marginBottom: "8px",
+                      paddingBottom: "5px",
+                      borderBottom: "1px solid #e2e8f0",
+                    }}
+                  >
+                    Details Facture
+                  </h3>
+                  <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                    <strong>Date:</strong> {receipt.date}
+                  </p>
+                  <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                    <strong>Heure:</strong> {receipt.heure}
+                  </p>
+                  <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                    <strong>Caissier:</strong> {receipt.caissier}
+                  </p>
+                  {receipt.serveur && (
+                    <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                      <strong>Serveur:</strong> {receipt.serveur}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Table des articles */}
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  margin: "20px 0",
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th
+                      style={{
+                        background: "#1e40af",
+                        color: "white",
+                        padding: "10px 12px",
+                        textAlign: "left",
+                        fontSize: "11px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.3px",
+                        borderRadius: "6px 0 0 0",
+                      }}
+                    >
+                      Designation
+                    </th>
+                    <th
+                      style={{
+                        background: "#1e40af",
+                        color: "white",
+                        padding: "10px 12px",
+                        textAlign: "right",
+                        fontSize: "11px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.3px",
+                      }}
+                    >
+                      Qte
+                    </th>
+                    <th
+                      style={{
+                        background: "#1e40af",
+                        color: "white",
+                        padding: "10px 12px",
+                        textAlign: "right",
+                        fontSize: "11px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.3px",
+                      }}
+                    >
+                      Prix Unitaire
+                    </th>
+                    <th
+                      style={{
+                        background: "#1e40af",
+                        color: "white",
+                        padding: "10px 12px",
+                        textAlign: "right",
+                        fontSize: "11px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.3px",
+                        borderRadius: "0 6px 0 0",
+                      }}
+                    >
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receipt.articles.map((article, index) => (
+                    <tr
+                      key={index}
+                      style={{
+                        background: index % 2 === 0 ? "white" : "#f8fafc",
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          borderBottom: "1px solid #e2e8f0",
+                          fontSize: "12px",
+                        }}
+                      >
+                        {article.designation}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          borderBottom: "1px solid #e2e8f0",
+                          fontSize: "12px",
+                          textAlign: "right",
+                        }}
+                      >
+                        {article.quantite}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          borderBottom: "1px solid #e2e8f0",
+                          fontSize: "12px",
+                          textAlign: "right",
+                        }}
+                      >
+                        {formatCurrency(article.prixUnitaire)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          borderBottom: "1px solid #e2e8f0",
+                          fontSize: "12px",
+                          textAlign: "right",
+                          fontWeight: "500",
+                        }}
+                      >
+                        {formatCurrency(article.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Totaux */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: "15px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "320px",
+                    background: "#f0f9ff",
+                    borderRadius: "8px",
+                    border: "1px solid #bae6fd",
+                    padding: "12px 15px",
+                  }}
+                >
+                  {receipt.remiseValeur != null && receipt.remiseValeur > 0 && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "6px 0",
+                          fontSize: "12px",
+                          borderBottom: "1px solid #e2e8f0",
+                        }}
+                      >
+                        <span>Sous-total:</span>
+                        <span>
+                          {formatCurrency(receipt.totalAvantRemise || 0)}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "6px 0",
+                          fontSize: "12px",
+                          color: "#dc2626",
+                        }}
+                      >
+                        <span>
+                          Remise (
+                          {receipt.remiseType === "pourcentage"
+                            ? `${receipt.remiseValeur}%`
+                            : "fixe"}
+                          ):
+                        </span>
+                        <span>
+                          -
+                          {formatCurrency(
+                            receipt.remiseType === "pourcentage"
+                              ? ((receipt.totalAvantRemise || 0) *
+                                  receipt.remiseValeur) /
+                                  100
+                              : receipt.remiseValeur,
+                          )}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "10px 0 6px 0",
+                      fontSize: "16px",
+                      fontWeight: "bold",
+                      color: "#1e40af",
+                      borderTop: "2px solid #1e40af",
+                      marginTop: "5px",
+                    }}
+                  >
+                    <span>Total TTC:</span>
+                    <span>{formatCurrency(receipt.totalTTC)}</span>
                   </div>
                   <div
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
-                      paddingLeft: "2mm",
-                      fontSize: "10px",
+                      fontSize: "12px",
+                      padding: "8px 0 4px 0",
+                      marginTop: "6px",
+                      borderTop: "1px dashed #bae6fd",
                     }}
                   >
-                    <span>
-                      {article.quantite} x{" "}
-                      {formatCurrency(article.prixUnitaire)}
-                    </span>
-                    <span style={{ fontWeight: "bold" }}>
-                      {formatCurrency(article.total)}
-                    </span>
+                    <span>Mode de paiement:</span>
+                    <span>{receipt.methodePaiement}</span>
                   </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "12px",
+                      margin: "4px 0",
+                    }}
+                  >
+                    <span>Montant recu:</span>
+                    <span>{formatCurrency(receipt.montantPaye)}</span>
+                  </div>
+                  {receipt.monnaieRendue > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "12px",
+                        margin: "4px 0",
+                      }}
+                    >
+                      <span>Monnaie rendue:</span>
+                      <span>{formatCurrency(receipt.monnaieRendue)}</span>
+                    </div>
+                  )}
+                  {receipt.montantRestant != null &&
+                    receipt.montantRestant > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "12px",
+                          margin: "4px 0",
+                          color: "#dc2626",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        <span>Reste a payer:</span>
+                        <span>{formatCurrency(receipt.montantRestant)}</span>
+                      </div>
+                    )}
                 </div>
-              ))}
-            </div>
+              </div>
 
-            {/* Totaux */}
+              {/* Arrêté la présente facture */}
+              <div
+                style={{
+                  marginTop: "20px",
+                  padding: "10px 15px",
+                  borderRadius: "6px",
+                  fontStyle: "italic",
+                  fontSize: "11px",
+                }}
+              >
+                Arrêté la présente facture à la somme de :{" "}
+                <strong>
+                  {montantEnLettres(receipt.totalTTC, "francs CFA")}
+                </strong>
+              </div>
+
+              {/* QR Code et Cachet */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  marginTop: "30px",
+                  padding: "20px 0",
+                }}
+              >
+                <div style={{ textAlign: "center" }}>
+                  {qrCodeUrl && (
+                    <>
+                      <img
+                        src={qrCodeUrl}
+                        alt="QR Code"
+                        style={{ width: "120px", height: "120px" }}
+                      />
+                      <p
+                        style={{
+                          fontSize: "9px",
+                          color: "#64748b",
+                          marginTop: "4px",
+                        }}
+                      >
+                        Scanner pour vérifier
+                      </p>
+                    </>
+                  )}
+                </div>
+                <div
+                  style={{
+                    width: "200px",
+                    height: "120px",
+                    border: "2px dashed #cbd5e1",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: "#94a3b8",
+                      textAlign: "center",
+                    }}
+                  >
+                    Cachet et signature
+                    <br />
+                    du gérant
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div
+                style={{
+                  marginTop: "40px",
+                  textAlign: "center",
+                  paddingTop: "15px",
+                  borderTop: "1px solid #e2e8f0",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: "500",
+                    color: "#1e40af",
+                    marginBottom: "5px",
+                  }}
+                >
+                  {config?.message_pied || "Merci de votre confiance !"}
+                </p>
+                {config?.support_text && (
+                  <p style={{ fontSize: "10px", color: "#94a3b8" }}>
+                    {config.support_text}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Format ticket 80mm */
             <div
+              ref={receiptRef}
+              className="ticket bg-white shadow-xl"
               style={{
-                marginBottom: "3mm",
-                paddingBottom: "3mm",
-                borderBottom: "1px dashed #000",
+                width: "80mm",
+                padding: "3mm",
+                fontFamily: "'Courier New', 'Lucida Console', monospace",
+                fontSize: "12px",
+                lineHeight: "1.4",
+                color: "#000",
               }}
             >
-              {/* Sous-total si remise */}
-              {receipt.remiseValeur && receipt.remiseValeur > 0 && (
-                <>
-                  <div
+              {/* En-tete du ticket */}
+              <div
+                style={{
+                  textAlign: "center",
+                  paddingBottom: "3mm",
+                  borderBottom: "1px dashed #000",
+                  marginBottom: "3mm",
+                }}
+              >
+                {logoBase64 && (
+                  <img
+                    src={logoBase64}
+                    alt="Logo"
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "11px",
-                      marginTop: "2mm",
-                      paddingTop: "2mm",
-                      borderTop: "1px solid #000",
+                      maxHeight: "40px",
+                      maxWidth: "60mm",
+                      marginBottom: "2mm",
+                      objectFit: "contain",
                     }}
-                  >
-                    <span>Sous-total:</span>
-                    <span>{formatCurrency(receipt.totalAvantRemise || 0)}</span>
-                  </div>
+                  />
+                )}
+                <h1
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    marginBottom: "2mm",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {config?.nom_entreprise || "Mon Entreprise"}
+                </h1>
+                {config?.telephone && (
+                  <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                    Tel: {config.telephone}
+                  </p>
+                )}
+                {config?.telephone2 && (
+                  <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                    {config.telephone2}
+                  </p>
+                )}
+                {config?.adresse && (
+                  <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                    {config.adresse}
+                  </p>
+                )}
+                {config?.nif && (
+                  <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                    NIF: {config.nif}
+                  </p>
+                )}
+              </div>
+
+              {/* Titre TICKET */}
+              <div
+                style={{
+                  textAlign: "center",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                  margin: "3mm 0",
+                  padding: "2mm 0",
+                }}
+              >
+                TICKET N° {receipt.numero}
+              </div>
+
+              {/* Informations */}
+              <div
+                style={{
+                  marginBottom: "3mm",
+                  paddingBottom: "3mm",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
+                    margin: "1mm 0",
+                  }}
+                >
+                  <span>Date:</span>
+                  <span>{receipt.date}</span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
+                    margin: "1mm 0",
+                  }}
+                >
+                  <span>Heure:</span>
+                  <span>{receipt.heure}</span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
+                    margin: "1mm 0",
+                  }}
+                >
+                  <span>Caissier:</span>
+                  <span>{receipt.caissier}</span>
+                </div>
+                {receipt.serveur && (
                   <div
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
                       fontSize: "11px",
                       margin: "1mm 0",
-                      color: "#059669",
                     }}
                   >
-                    <span>
-                      Remise (
-                      {receipt.remiseType === "pourcentage"
-                        ? `${receipt.remiseValeur}%`
-                        : "fixe"}
-                      ):
-                    </span>
-                    <span>
-                      -
-                      {formatCurrency(
-                        receipt.remiseType === "pourcentage"
-                          ? ((receipt.totalAvantRemise || 0) *
-                              receipt.remiseValeur) /
-                              100
-                          : receipt.remiseValeur,
-                      )}
-                    </span>
+                    <span>Serveur:</span>
+                    <span>{receipt.serveur}</span>
                   </div>
-                </>
-              )}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "14px",
-                  fontWeight: "bold",
-                  marginTop:
-                    receipt.remiseValeur && receipt.remiseValeur > 0
-                      ? "1mm"
-                      : "2mm",
-                  paddingTop:
-                    receipt.remiseValeur && receipt.remiseValeur > 0
-                      ? "1mm"
-                      : "2mm",
-                  borderTop:
-                    receipt.remiseValeur && receipt.remiseValeur > 0
-                      ? "none"
-                      : "1px solid #000",
-                }}
-              >
-                <span>TOTAL:</span>
-                <span>{formatCurrency(receipt.totalTTC)}</span>
+                )}
+                {receipt.client_nom && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "11px",
+                      margin: "1mm 0",
+                    }}
+                  >
+                    <span>Client:</span>
+                    <span>{receipt.client_nom}</span>
+                  </div>
+                )}
+                {receipt.client_telephone && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "11px",
+                      margin: "1mm 0",
+                    }}
+                  >
+                    <span>Tel:</span>
+                    <span>{receipt.client_telephone}</span>
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* Paiement */}
-            <div
-              style={{
-                marginBottom: "3mm",
-                paddingBottom: "3mm",
-                borderBottom: "1px dashed #000",
-              }}
-            >
+              {/* Articles */}
+              <div style={{ marginBottom: "3mm", paddingBottom: "3mm" }}>
+                {receipt.articles.map((article, index) => (
+                  <div key={index} style={{ margin: "2mm 0" }}>
+                    <div style={{ fontSize: "11px", fontWeight: "bold" }}>
+                      {article.designation}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        paddingLeft: "2mm",
+                        fontSize: "10px",
+                      }}
+                    >
+                      <span>
+                        {article.quantite} x{" "}
+                        {formatCurrency(article.prixUnitaire)}
+                      </span>
+                      <span style={{ fontWeight: "bold" }}>
+                        {formatCurrency(article.total)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Totaux */}
               <div
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "11px",
-                  margin: "1mm 0",
+                  marginBottom: "3mm",
+                  paddingBottom: "3mm",
+                  borderBottom: "1px dashed #000",
                 }}
               >
-                <span>Mode:</span>
-                <span>{receipt.methodePaiement}</span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "11px",
-                  margin: "1mm 0",
-                }}
-              >
-                <span>Recu:</span>
-                <span>{formatCurrency(receipt.montantPaye)}</span>
-              </div>
-              {receipt.monnaieRendue > 0 && (
+                {receipt.remiseValeur != null && receipt.remiseValeur > 0 && (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "11px",
+                        marginTop: "2mm",
+                        paddingTop: "2mm",
+                        borderTop: "1px solid #000",
+                      }}
+                    >
+                      <span>Sous-total:</span>
+                      <span>
+                        {formatCurrency(receipt.totalAvantRemise || 0)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "11px",
+                        margin: "1mm 0",
+                        color: "#059669",
+                      }}
+                    >
+                      <span>
+                        Remise (
+                        {receipt.remiseType === "pourcentage"
+                          ? `${receipt.remiseValeur}%`
+                          : "fixe"}
+                        ):
+                      </span>
+                      <span>
+                        -
+                        {formatCurrency(
+                          receipt.remiseType === "pourcentage"
+                            ? ((receipt.totalAvantRemise || 0) *
+                                receipt.remiseValeur) /
+                                100
+                            : receipt.remiseValeur,
+                        )}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    fontSize: "12px",
+                    fontSize: "14px",
                     fontWeight: "bold",
+                    marginTop:
+                      receipt.remiseValeur && receipt.remiseValeur > 0
+                        ? "1mm"
+                        : "2mm",
+                    paddingTop:
+                      receipt.remiseValeur && receipt.remiseValeur > 0
+                        ? "1mm"
+                        : "2mm",
+                    borderTop:
+                      receipt.remiseValeur && receipt.remiseValeur > 0
+                        ? "none"
+                        : "1px solid #000",
+                  }}
+                >
+                  <span>TOTAL:</span>
+                  <span>{formatCurrency(receipt.totalTTC)}</span>
+                </div>
+              </div>
+
+              {/* Paiement */}
+              <div
+                style={{
+                  marginBottom: "3mm",
+                  paddingBottom: "3mm",
+                  borderBottom: "1px dashed #000",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
                     margin: "1mm 0",
                   }}
                 >
-                  <span>Monnaie:</span>
-                  <span>{formatCurrency(receipt.monnaieRendue)}</span>
+                  <span>Mode:</span>
+                  <span>{receipt.methodePaiement}</span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
+                    margin: "1mm 0",
+                  }}
+                >
+                  <span>Recu:</span>
+                  <span>{formatCurrency(receipt.montantPaye)}</span>
+                </div>
+                {receipt.monnaieRendue > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      margin: "1mm 0",
+                    }}
+                  >
+                    <span>Monnaie:</span>
+                    <span>{formatCurrency(receipt.monnaieRendue)}</span>
+                  </div>
+                )}
+                {receipt.montantRestant != null &&
+                  receipt.montantRestant > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        margin: "1mm 0",
+                        color: "red",
+                      }}
+                    >
+                      <span>Reste à payer:</span>
+                      <span>{formatCurrency(receipt.montantRestant)}</span>
+                    </div>
+                  )}
+              </div>
+
+              {/* QR Code */}
+              {qrCodeUrl && (
+                <div style={{ textAlign: "center", paddingTop: "3mm" }}>
+                  <img
+                    src={qrCodeUrl}
+                    alt="QR Code"
+                    style={{ width: "25mm", height: "25mm", margin: "0 auto" }}
+                  />
                 </div>
               )}
-            </div>
 
-            {/* Footer */}
-            <div style={{ textAlign: "center", paddingTop: "3mm" }}>
-              <p
-                style={{
-                  fontSize: "12px",
-                  fontWeight: "bold",
-                  marginBottom: "2mm",
-                }}
-              >
-                {config?.message_pied}
-              </p>
-
-              <p style={{ fontSize: "9px", margin: "1mm 0" }}>
-                --------------------------------
-              </p>
-              {config?.support_text && (
-                <p style={{ fontSize: "9px", margin: "1mm 0" }}>
-                  {config.support_text}
+              {/* Footer */}
+              <div style={{ textAlign: "center", paddingTop: "3mm" }}>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    marginBottom: "2mm",
+                  }}
+                >
+                  {config?.message_pied}
                 </p>
-              )}
-              {config?.nif && (
                 <p style={{ fontSize: "9px", margin: "1mm 0" }}>
-                  NIF: {config.nif}
+                  --------------------------------
                 </p>
-              )}
+                {config?.support_text && (
+                  <p style={{ fontSize: "9px", margin: "1mm 0" }}>
+                    {config.support_text}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Boutons d'action */}
@@ -629,7 +1286,7 @@ const ReceiptPreview: React.FC<{
             className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2"
           >
             <Printer className="w-5 h-5" />
-            Imprimer le ticket
+            {isA4 ? "Imprimer la facture" : "Imprimer le ticket"}
           </button>
         </div>
       </div>
@@ -735,12 +1392,99 @@ const ProductCard = React.memo<{
 
 ProductCard.displayName = "ProductCard";
 
+const ProductRow = React.memo<{
+  product: Product;
+  onAddToCart: (product: Product) => void;
+  onViewDetails: (product: Product) => void;
+  imageCache: Map<number, string>;
+}>(({ product, onAddToCart, onViewDetails, imageCache }) => {
+  const isOutOfStock = product.quantite_stock === 0;
+  const isAtAlertThreshold = product.quantite_stock <= product.stock_min;
+  const isDisabled = isOutOfStock || isAtAlertThreshold;
+
+  return (
+    <div
+      className={`flex items-center gap-4 p-3 rounded-xl border transition-all duration-200 ${
+        isDisabled
+          ? "opacity-50 bg-gray-50 border-gray-200"
+          : "bg-white border-gray-200 hover:border-blue-400 hover:shadow-md"
+      }`}
+    >
+      <div
+        onClick={() => onViewDetails(product)}
+        className="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
+      >
+        {product.image_url && imageCache.get(product.id!) ? (
+          <img
+            src={imageCache.get(product.id!)}
+            alt={product.nom}
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <Package className="w-6 h-6 text-gray-400" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-gray-900 truncate">
+            {product.nom}
+          </h3>
+          {isOutOfStock && (
+            <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+              Rupture
+            </span>
+          )}
+          {!isOutOfStock && isAtAlertThreshold && (
+            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
+              Stock bas
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 truncate">
+          {product.categorie_nom || "Sans catégorie"} • Code:{" "}
+          {product.code_barre || "N/A"}
+        </p>
+      </div>
+
+      <div className="text-right flex-shrink-0">
+        <p className="font-bold text-blue-600">
+          {formatCurrency(product.prix_vente || 0)}
+        </p>
+        <p
+          className={`text-xs ${
+            isOutOfStock
+              ? "text-red-600"
+              : isAtAlertThreshold
+                ? "text-orange-600"
+                : "text-green-600"
+          }`}
+        >
+          Stock: {product.quantite_stock}
+        </p>
+      </div>
+
+      {!isDisabled && (
+        <button
+          onClick={() => onAddToCart(product)}
+          className="flex-shrink-0 w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-700 transition-colors shadow-md"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  );
+});
+
+ProductRow.displayName = "ProductRow";
+
 const PointOfSale: React.FC = () => {
   const {
     cart,
     addToCart,
     removeFromCart,
     updateCartQuantity,
+    updateAllCartPrices,
     clearCart,
     getCartTotal,
   } = useStore();
@@ -765,12 +1509,25 @@ const PointOfSale: React.FC = () => {
   const [servers, setServers] = useState<Server[]>([]);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [clientName, setClientName] = useState("");
+  const [venteACredit, setVenteACredit] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [clients, setClients] = useState<any[]>([]);
   const [config, setConfig] = useState<Configuration | null>(null);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
   // États pour la remise
   const [remiseType, setRemiseType] = useState<"pourcentage" | "montant">(
     "pourcentage",
   );
   const [remiseValeur, setRemiseValeur] = useState<string>("");
+  const [productViewMode, setProductViewMode] = useState<"list" | "card">(
+    "list",
+  );
+  const [cartViewMode, setCartViewMode] = useState<"list" | "card">("list");
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [clientPrices, setClientPrices] = useState<Map<number, number>>(
+    new Map(),
+  );
 
   const handleViewProductDetails = (product: Product) => {
     setSelectedProduct(product);
@@ -784,6 +1541,7 @@ const PointOfSale: React.FC = () => {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const paymentInputRef = useRef<HTMLInputElement>(null);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
 
   const loadServers = async () => {
     try {
@@ -798,8 +1556,19 @@ const PointOfSale: React.FC = () => {
     try {
       const data = await window.electronAPI.getConfiguration();
       setConfig(data);
+      const logo = await window.electronAPI.getCompanyLogo();
+      setLogoBase64(logo);
     } catch (error) {
       console.error("Erreur chargement configuration:", error);
+    }
+  };
+
+  const loadClients = async () => {
+    try {
+      const data = await window.electronAPI.getClients();
+      setClients(data);
+    } catch (error) {
+      console.error("Erreur chargement clients:", error);
     }
   };
 
@@ -807,6 +1576,7 @@ const PointOfSale: React.FC = () => {
     loadProducts();
     loadServers();
     loadConfig();
+    loadClients();
   }, [currentPage, itemsPerPage]);
 
   // Raccourcis clavier globaux
@@ -837,6 +1607,62 @@ const PointOfSale: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showPayment, cart.length]);
+
+  // Fermer le dropdown client si on clique à l'extérieur
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        clientDropdownRef.current &&
+        !clientDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowClientDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const loadClientPrices = async () => {
+      if (selectedClientId) {
+        try {
+          const prices =
+            await window.electronAPI.getClientPrices(selectedClientId);
+          const priceMap = new Map<number, number>();
+          (prices as any[]).forEach((p) => {
+            priceMap.set(p.produit_id, p.prix_personnalise);
+          });
+          setClientPrices(priceMap);
+          updateAllCartPrices(priceMap);
+        } catch (error) {
+          console.error("Erreur chargement prix client:", error);
+          setClientPrices(new Map());
+          updateAllCartPrices(new Map());
+        }
+      } else {
+        setClientPrices(new Map());
+        updateAllCartPrices(new Map());
+      }
+    };
+    loadClientPrices();
+  }, [selectedClientId]);
+
+  const handleAddToCart = (product: Product) => {
+    const customPrice = clientPrices.get(product.id!);
+    addToCart(product, customPrice);
+  };
+
+  // Filtrer les clients selon la recherche
+  const filteredClients = useMemo(() => {
+    if (!clientSearchQuery.trim()) return clients;
+    const query = clientSearchQuery.toLowerCase();
+    return clients.filter(
+      (client) =>
+        client.nom?.toLowerCase().includes(query) ||
+        client.telephone?.toLowerCase().includes(query) ||
+        client.email?.toLowerCase().includes(query),
+    );
+  }, [clients, clientSearchQuery]);
 
   // Focus auto sur l'input de paiement
   useEffect(() => {
@@ -1001,12 +1827,22 @@ const PointOfSale: React.FC = () => {
       caissier: user?.nom || "Caissier",
       serveur: selectedServer?.nom,
       client_nom: clientName || undefined,
-      articles: cart.map((item) => ({
-        designation: item.nom,
-        quantite: item.quantity,
-        prixUnitaire: item.prix_vente,
-        total: item.prix_vente * item.quantity,
-      })),
+      client_telephone: selectedClientId
+        ? clients.find((c) => c.id === selectedClientId)?.telephone
+        : undefined,
+      client_email: selectedClientId
+        ? clients.find((c) => c.id === selectedClientId)?.email
+        : undefined,
+      articles: cart.map((item) => {
+        const effectivePrice =
+          item.customPrice !== undefined ? item.customPrice : item.prix_vente;
+        return {
+          designation: item.nom,
+          quantite: item.quantity,
+          prixUnitaire: effectivePrice,
+          total: effectivePrice * item.quantity,
+        };
+      }),
       totalTTC: total,
       methodePaiement:
         methodePaiement === "especes"
@@ -1014,9 +1850,16 @@ const PointOfSale: React.FC = () => {
           : methodePaiement === "carte"
             ? "Carte bancaire"
             : "Mobile Money",
-      montantPaye:
-        methodePaiement === "especes" ? parseFloat(montantPaye) : total,
-      monnaieRendue: methodePaiement === "especes" ? monnaieRendue : 0,
+      montantPaye: venteACredit
+        ? parseFloat(montantPaye) || 0
+        : methodePaiement === "especes"
+          ? parseFloat(montantPaye)
+          : total,
+      monnaieRendue:
+        !venteACredit && methodePaiement === "especes" ? monnaieRendue : 0,
+      montantRestant: venteACredit
+        ? total - (parseFloat(montantPaye) || 0)
+        : undefined,
       // Informations de remise
       remiseType: montantRemise > 0 ? remiseType : undefined,
       remiseValeur: montantRemise > 0 ? parseFloat(remiseValeur) : undefined,
@@ -1035,6 +1878,9 @@ const PointOfSale: React.FC = () => {
     user,
     selectedServer,
     clientName,
+    venteACredit,
+    selectedClientId,
+    clients,
   ]);
 
   const handlePayment = useCallback(async () => {
@@ -1044,7 +1890,20 @@ const PointOfSale: React.FC = () => {
     }
 
     const montant = parseFloat(montantPaye) || 0;
-    if (methodePaiement === "especes" && montant < total) {
+
+    if (venteACredit && !selectedClientId) {
+      showErrorToast("Sélectionnez un client pour une vente à crédit");
+      return;
+    }
+
+    if (venteACredit && montant > total) {
+      showErrorToast(
+        "Le montant payé ne peut pas dépasser le total de la vente",
+      );
+      return;
+    }
+
+    if (!venteACredit && methodePaiement === "especes" && montant < total) {
       showErrorToast("Le montant payé est insuffisant");
       return;
     }
@@ -1052,28 +1911,48 @@ const PointOfSale: React.FC = () => {
     setProcessing(true);
 
     try {
+      const effectiveMontantPaye = venteACredit
+        ? parseFloat(montantPaye) || 0
+        : methodePaiement === "especes"
+          ? montant
+          : total;
+      const effectiveMontantRestant = total - effectiveMontantPaye;
+      const effectiveStatut: "paye" | "partiel" | "impaye" =
+        effectiveMontantRestant <= 0
+          ? "paye"
+          : effectiveMontantPaye > 0
+            ? "partiel"
+            : "impaye";
+
       const saleData: Sale = {
+        client_id: selectedClientId || undefined,
         serveur_id: selectedServer?.id,
         client_nom: clientName || "Client comptoir",
         total,
-        montant_paye: methodePaiement === "especes" ? montant : total,
-        monnaie_rendue: methodePaiement === "especes" ? monnaieRendue : 0,
+        montant_paye: effectiveMontantPaye,
+        monnaie_rendue:
+          !venteACredit && methodePaiement === "especes" ? monnaieRendue : 0,
         methode_paiement: methodePaiement,
-        montant_restant: 0,
-        statut_paiement: "paye",
+        montant_restant:
+          effectiveMontantRestant > 0 ? effectiveMontantRestant : 0,
+        statut_paiement: effectiveStatut,
         utilisateur_id: user?.id,
         utilisateur_nom: user?.nom,
         // Informations de remise
         remise_type: montantRemise > 0 ? remiseType : undefined,
         remise_valeur: montantRemise > 0 ? parseFloat(remiseValeur) : undefined,
         total_avant_remise: montantRemise > 0 ? sousTotal : undefined,
-        produits: cart.map((item) => ({
-          produit_id: item.id!,
-          nom_produit: item.nom,
-          quantite: item.quantity,
-          prix_unitaire: item.prix_vente,
-          sous_total: item.prix_vente * item.quantity,
-        })),
+        produits: cart.map((item) => {
+          const effectivePrice =
+            item.customPrice !== undefined ? item.customPrice : item.prix_vente;
+          return {
+            produit_id: item.id!,
+            nom_produit: item.nom,
+            quantite: item.quantity,
+            prix_unitaire: effectivePrice,
+            sous_total: effectivePrice * item.quantity,
+          };
+        }),
       };
 
       // Creer la vente et recuperer l'ID
@@ -1081,6 +1960,11 @@ const PointOfSale: React.FC = () => {
 
       // Creer et afficher la facture
       const receipt = createReceiptData();
+
+      // Récupérer les informations du client sélectionné
+      const selectedClient = selectedClientId
+        ? clients.find((c) => c.id === selectedClientId)
+        : null;
 
       // Sauvegarder la facture liee a la vente
       const invoiceData = {
@@ -1090,11 +1974,15 @@ const PointOfSale: React.FC = () => {
         heure_facture: receipt.heure,
         vendeur: receipt.caissier,
         client_nom: clientName || "Client comptoir",
+        client_telephone: selectedClient?.telephone || undefined,
+        client_email: selectedClient?.email || undefined,
         serveur_nom: receipt.serveur,
         total_ttc: receipt.totalTTC,
         methode_paiement: receipt.methodePaiement,
         montant_paye: receipt.montantPaye,
         monnaie_rendue: receipt.monnaieRendue,
+        montant_restant: receipt.montantRestant || 0,
+        statut_paiement: effectiveStatut,
         // Informations de remise
         remise_type: receipt.remiseType,
         remise_valeur: receipt.remiseValeur,
@@ -1107,10 +1995,12 @@ const PointOfSale: React.FC = () => {
       setReceiptData(receipt);
       setShowReceipt(true);
 
-      // Fermer le modal de paiement
+      // Fermer le modal de paiement et reset crédit
       setShowPayment(false);
       setMontantPaye("");
       setMethodePaiement("especes");
+      setVenteACredit(false);
+      setSelectedClientId(null);
 
       showSaleToast(total);
     } catch (error) {
@@ -1133,6 +2023,9 @@ const PointOfSale: React.FC = () => {
     clientName,
     user,
     createReceiptData,
+    venteACredit,
+    selectedClientId,
+    clients,
   ]);
 
   const handleReceiptClose = useCallback(() => {
@@ -1151,26 +2044,52 @@ const PointOfSale: React.FC = () => {
       <div className="flex-1 flex flex-col space-y-4">
         {/* En-tête avec stats */}
 
-        {/* Recherche améliorée */}
+        {/* Recherche améliorée avec toggle vue */}
         <div className="card shadow-lg">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Rechercher un produit par nom ou code-barre..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-            />
-            {searchQuery && (
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Rechercher un produit par nom ou code-barre..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => handleSearch("")}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg p-1 transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
               <button
-                onClick={() => handleSearch("")}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg p-1 transition-all"
+                onClick={() => setProductViewMode("list")}
+                className={`p-2 rounded-md transition-all ${
+                  productViewMode === "list"
+                    ? "bg-white shadow-sm text-blue-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                title="Vue liste"
               >
-                <X className="w-5 h-5" />
+                <LayoutList className="w-5 h-5" />
               </button>
-            )}
+              <button
+                onClick={() => setProductViewMode("card")}
+                className={`p-2 rounded-md transition-all ${
+                  productViewMode === "card"
+                    ? "bg-white shadow-sm text-blue-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                title="Vue cartes"
+              >
+                <LayoutGrid className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           {searchQuery && (
             <p className="text-sm text-gray-500 mt-2">
@@ -1199,23 +2118,37 @@ const PointOfSale: React.FC = () => {
             </div>
           ) : (
             <>
-              <div
-                className={`grid gap-4 p-4 ${
-                  sidebarContext?.isCollapsed
-                    ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5"
-                    : "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5"
-                }`}
-              >
-                {paginatedProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    onAddToCart={addToCart}
-                    onViewDetails={handleViewProductDetails}
-                    imageCache={imageCache}
-                  />
-                ))}
-              </div>
+              {productViewMode === "card" ? (
+                <div
+                  className={`grid gap-4 p-4 ${
+                    sidebarContext?.isCollapsed
+                      ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-7"
+                      : "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-6"
+                  }`}
+                >
+                  {paginatedProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onAddToCart={handleAddToCart}
+                      onViewDetails={handleViewProductDetails}
+                      imageCache={imageCache}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 space-y-2">
+                  {paginatedProducts.map((product) => (
+                    <ProductRow
+                      key={product.id}
+                      product={product}
+                      onAddToCart={handleAddToCart}
+                      onViewDetails={handleViewProductDetails}
+                      imageCache={imageCache}
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* Pagination */}
               <Pagination
@@ -1233,11 +2166,11 @@ const PointOfSale: React.FC = () => {
       </div>
 
       {/* Droite - Panier */}
-      <div className="w-85 flex flex-col space-y-4">
+      <div className="w-125 flex flex-col space-y-4 shrink-0">
         <div className="card flex-1 flex flex-col shadow-xl border-2 border-gray-100">
-          {/* En-tête du panier */}
+          {/* En-tête du panier avec toggle vue */}
           <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-gray-100">
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-3 rounded-xl shadow-lg">
+            <div className="bg-linear-to-br from-blue-600 to-indigo-600 p-3 rounded-xl shadow-lg">
               <ShoppingCart className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
@@ -1245,6 +2178,30 @@ const PointOfSale: React.FC = () => {
               <p className="text-sm text-gray-500">
                 {cart.length} {cart.length > 1 ? "articles" : "article"}
               </p>
+            </div>
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setCartViewMode("list")}
+                className={`p-1.5 rounded-md transition-all ${
+                  cartViewMode === "list"
+                    ? "bg-white shadow-sm text-blue-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                title="Vue cartes"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setCartViewMode("card")}
+                className={`p-1.5 rounded-md transition-all ${
+                  cartViewMode === "card"
+                    ? "bg-white shadow-sm text-blue-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                title="Vue liste"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
             </div>
             {cart.length > 0 && (
               <button
@@ -1282,23 +2239,142 @@ const PointOfSale: React.FC = () => {
             </select>
           </div>
 
-          {/* Nom du client (optionnel) */}
+          {/* Client avec recherche */}
           <div className="border-b-2 border-gray-100 pb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-              <User className="w-4 h-4 text-green-600" />
-              Client (optionnel)
+              <User className="w-4 h-4 text-blue-600" />
+              Client
             </label>
-            <input
-              type="text"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder="Nom du client..."
-              className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all outline-none"
-            />
+            <div ref={clientDropdownRef} className="relative">
+              {selectedClientId ? (
+                <div className="flex items-center justify-between p-2 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                      {clients
+                        .find((c) => c.id === selectedClientId)
+                        ?.nom?.charAt(0) || "C"}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">
+                        {clients.find((c) => c.id === selectedClientId)?.nom}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {clients.find((c) => c.id === selectedClientId)
+                          ?.telephone || "Pas de téléphone"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedClientId(null);
+                      setClientName("");
+                      setVenteACredit(false);
+                    }}
+                    className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      value={clientSearchQuery}
+                      onChange={(e) => {
+                        setClientSearchQuery(e.target.value);
+                        setShowClientDropdown(true);
+                      }}
+                      onFocus={() => setShowClientDropdown(true)}
+                      placeholder="Rechercher un client..."
+                      className="w-full pl-9 pr-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                    />
+                  </div>
+                  {showClientDropdown && (
+                    <div className="absolute z-20 w-full mt-1 bg-white border-2 border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                      <button
+                        onClick={() => {
+                          setSelectedClientId(null);
+                          setClientName("");
+                          setClientSearchQuery("");
+                          setShowClientDropdown(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100"
+                      >
+                        <div className="w-7 h-7 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold">
+                          ?
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-700 text-sm">
+                            Client comptoir
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Sans compte client
+                          </p>
+                        </div>
+                      </button>
+                      {filteredClients.length === 0 ? (
+                        <div className="px-3 py-4 text-center text-gray-500 text-sm">
+                          Aucun client trouvé
+                        </div>
+                      ) : (
+                        filteredClients.map((client) => (
+                          <button
+                            key={client.id}
+                            onClick={() => {
+                              setSelectedClientId(client.id);
+                              setClientName(client.nom);
+                              setClientSearchQuery("");
+                              setShowClientDropdown(false);
+                            }}
+                            className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center gap-2 transition-colors"
+                          >
+                            <div className="w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                              {client.nom?.charAt(0) || "C"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 text-sm truncate">
+                                {client.nom}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {client.telephone ||
+                                  client.email ||
+                                  "Pas de contact"}
+                              </p>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                  <input
+                    type="text"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="Nom du client (optionnel)..."
+                    className="w-full mt-2 px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all outline-none text-sm"
+                  />
+                </>
+              )}
+              {selectedClientId && (
+                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={venteACredit}
+                    onChange={(e) => setVenteACredit(e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
+                  />
+                  <span className="text-sm font-medium text-orange-700">
+                    Vente à crédit
+                  </span>
+                </label>
+              )}
+            </div>
           </div>
 
           {/* Items du panier */}
-          <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+          <div className="flex-1 overflow-y-auto mb-4">
             {cart.length === 0 ? (
               <div className="text-center py-12">
                 <div className="bg-gray-100 rounded-full p-8 w-32 h-32 mx-auto mb-4 flex items-center justify-center">
@@ -1309,64 +2385,170 @@ const PointOfSale: React.FC = () => {
                   Ajoutez des produits pour commencer
                 </p>
               </div>
+            ) : cartViewMode === "card" ? (
+              <div className="space-y-3">
+                {cart.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 space-y-3 border border-gray-200 hover:shadow-md transition-all duration-200 animate-slideIn"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 leading-tight mb-1">
+                          {item.nom}
+                        </h4>
+                        <p className="text-xs text-gray-500">
+                          {formatCurrency(
+                            item.customPrice !== undefined
+                              ? item.customPrice
+                              : item.prix_vente || 0,
+                          )}{" "}
+                          / unité
+                          {item.customPrice !== undefined && (
+                            <span className="text-purple-600 ml-1">
+                              (prix personnalisé)
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeFromCart(item.id!)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-200">
+                      <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm">
+                        <button
+                          onClick={() =>
+                            updateCartQuantity(item.id!, item.quantity - 1)
+                          }
+                          className="w-8 h-8 bg-gray-100 rounded-md hover:bg-gray-200 active:scale-95 flex items-center justify-center transition-all"
+                        >
+                          <Minus className="w-4 h-4 text-gray-700" />
+                        </button>
+                        <span className="w-10 text-center font-bold text-gray-900">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateCartQuantity(item.id!, item.quantity + 1)
+                          }
+                          disabled={item.quantity >= item.quantite_stock}
+                          className="w-8 h-8 bg-blue-600 rounded-md hover:bg-blue-700 active:scale-95 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Plus className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-blue-600">
+                          {formatCurrency(
+                            Number(
+                              item.customPrice !== undefined
+                                ? item.customPrice
+                                : item.prix_vente || 0,
+                            ) * item.quantity,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-              cart.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 space-y-3 border border-gray-200 hover:shadow-md transition-all duration-200 animate-slideIn"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex justify-between items-start gap-3">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 leading-tight mb-1">
-                        {item.nom}
-                      </h4>
-                      <p className="text-xs text-gray-500">
-                        {formatCurrency(item.prix_vente || 0)} / unité
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => removeFromCart(item.id!)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-all"
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+                  <tr className="text-left text-xs text-gray-500 uppercase">
+                    <th className="py-2 px-2 font-medium">Produit</th>
+                    <th className="py-2 px-2 font-medium text-center w-24">
+                      Qté
+                    </th>
+                    <th className="py-2 px-2 font-medium text-right w-24">
+                      Total
+                    </th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {cart.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-blue-50/50 transition-colors animate-slideIn"
+                      style={{ animationDelay: `${index * 30}ms` }}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-200">
-                    <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm">
-                      <button
-                        onClick={() =>
-                          updateCartQuantity(item.id!, item.quantity - 1)
-                        }
-                        className="w-8 h-8 bg-gray-100 rounded-md hover:bg-gray-200 active:scale-95 flex items-center justify-center transition-all"
-                      >
-                        <Minus className="w-4 h-4 text-gray-700" />
-                      </button>
-                      <span className="w-10 text-center font-bold text-gray-900">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() =>
-                          updateCartQuantity(item.id!, item.quantity + 1)
-                        }
-                        disabled={item.quantity >= item.quantite_stock}
-                        className="w-8 h-8 bg-blue-600 rounded-md hover:bg-blue-700 active:scale-95 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Plus className="w-4 h-4 text-white" />
-                      </button>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-blue-600">
-                        {formatCurrency(
-                          Number(item.prix_vente || 0) * item.quantity,
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
+                      <td className="py-2 px-2">
+                        <div
+                          className="font-medium text-gray-900 truncate"
+                          title={item.nom}
+                        >
+                          {item.nom}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {formatCurrency(
+                            item.customPrice !== undefined
+                              ? item.customPrice
+                              : item.prix_vente || 0,
+                          )}{" "}
+                          / unité
+                          {item.customPrice !== undefined && (
+                            <span className="text-purple-600 ml-1">
+                              (personnalisé)
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2 px-1">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() =>
+                              updateCartQuantity(item.id!, item.quantity - 1)
+                            }
+                            className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all"
+                          >
+                            <Minus className="w-3 h-3 text-gray-700" />
+                          </button>
+                          <span className="w-6 text-center font-bold text-gray-900">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() =>
+                              updateCartQuantity(item.id!, item.quantity + 1)
+                            }
+                            disabled={item.quantity >= item.quantite_stock}
+                            className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
+                          >
+                            <Plus className="w-3 h-3 text-white" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-2 px-2 text-right">
+                        <span className="font-bold text-blue-600">
+                          {formatCurrency(
+                            Number(
+                              item.customPrice !== undefined
+                                ? item.customPrice
+                                : item.prix_vente || 0,
+                            ) * item.quantity,
+                          )}
+                        </span>
+                      </td>
+                      <td className="py-2 px-1">
+                        <button
+                          onClick={() => removeFromCart(item.id!)}
+                          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-all"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
 
@@ -1604,15 +2786,17 @@ const PointOfSale: React.FC = () => {
                 </div>
               </div>
 
-              {/* Montant payé (seulement pour espèces) */}
-              {methodePaiement === "especes" && (
+              {/* Montant payé */}
+              {(methodePaiement === "especes" || venteACredit) && (
                 <>
                   <div>
                     <label className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                       <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
                         2
                       </span>
-                      Montant reçu
+                      {venteACredit
+                        ? "Montant payé maintenant"
+                        : "Montant reçu"}
                     </label>
                     <div className="relative">
                       <input
@@ -1621,15 +2805,18 @@ const PointOfSale: React.FC = () => {
                         value={montantPaye}
                         onChange={(e) => setMontantPaye(e.target.value)}
                         onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            parseFloat(montantPaye) >= total
-                          ) {
-                            handlePayment();
+                          if (e.key === "Enter") {
+                            if (
+                              venteACredit ||
+                              parseFloat(montantPaye) >= total
+                            ) {
+                              handlePayment();
+                            }
                           }
                         }}
                         step="0.01"
-                        min={total}
+                        min={0}
+                        max={venteACredit ? total : undefined}
                         className="w-full px-4 py-4 text-2xl font-bold border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
                         placeholder="0"
                       />
@@ -1637,40 +2824,73 @@ const PointOfSale: React.FC = () => {
                         FCFA
                       </span>
                     </div>
-                    {montantPaye && parseFloat(montantPaye) < total && (
-                      <p className="text-red-600 text-sm mt-2 flex items-center gap-1 animate-pulse font-semibold">
-                        Montant insuffisant
-                      </p>
-                    )}
+                    {!venteACredit &&
+                      montantPaye &&
+                      parseFloat(montantPaye) < total && (
+                        <p className="text-red-600 text-sm mt-2 flex items-center gap-1 animate-pulse font-semibold">
+                          Montant insuffisant
+                        </p>
+                      )}
+                    {venteACredit &&
+                      montantPaye &&
+                      parseFloat(montantPaye) > total && (
+                        <p className="text-red-600 text-sm mt-2 flex items-center gap-1 animate-pulse font-semibold">
+                          Le montant ne peut pas dépasser{" "}
+                          {formatCurrency(total)}
+                        </p>
+                      )}
                   </div>
 
                   {/* Boutons de montants rapides */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-amber-500" />
-                      Montants rapides
-                    </label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {quickAmounts.map((amount) => (
-                        <button
-                          key={amount}
-                          onClick={() => handleQuickAmount(amount)}
-                          className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all hover:scale-105 active:scale-95 ${
-                            parseFloat(montantPaye) === amount
-                              ? "bg-blue-600 text-white shadow-lg"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          {formatCurrency(amount)}
-                        </button>
-                      ))}
+                  {!venteACredit && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-amber-500" />
+                        Montants rapides
+                      </label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {quickAmounts.map((amount) => (
+                          <button
+                            key={amount}
+                            onClick={() => handleQuickAmount(amount)}
+                            className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all hover:scale-105 active:scale-95 ${
+                              parseFloat(montantPaye) === amount
+                                ? "bg-blue-600 text-white shadow-lg"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}
+                          >
+                            {formatCurrency(amount)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
 
-              {/* Monnaie à rendre */}
-              {methodePaiement === "especes" &&
+              {/* Reste à payer (mode crédit) */}
+              {venteACredit && (
+                <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="bg-orange-600 rounded-lg p-1.5">
+                      <CreditCard className="w-4 h-4 text-white" />
+                    </div>
+                    <p className="text-sm font-semibold text-orange-800">
+                      Reste à payer (crédit)
+                    </p>
+                  </div>
+                  <p className="text-4xl font-bold text-orange-600">
+                    {formatCurrency(total - (parseFloat(montantPaye) || 0))}
+                  </p>
+                  <p className="text-xs text-orange-700 mt-2">
+                    Ce montant sera ajouté à la dette du client
+                  </p>
+                </div>
+              )}
+
+              {/* Monnaie à rendre (mode normal espèces) */}
+              {!venteACredit &&
+                methodePaiement === "especes" &&
                 montantPaye &&
                 parseFloat(montantPaye) >= total && (
                   <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 animate-slideDown">
@@ -1694,22 +2914,23 @@ const PointOfSale: React.FC = () => {
                   </div>
                 )}
 
-              {/* Résumé pour carte et mobile */}
-              {(methodePaiement === "carte" ||
-                methodePaiement === "mobile") && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5">
-                  <p className="text-sm text-blue-800 mb-2 font-medium">
-                    Montant exact à payer
-                  </p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {formatCurrency(total || 0)}
-                  </p>
-                  <p className="text-xs text-blue-700 mt-2 flex items-center gap-1">
-                    <Keyboard className="w-3 h-3" />
-                    Appuyez sur Entrée pour valider
-                  </p>
-                </div>
-              )}
+              {/* Résumé pour carte et mobile (mode normal) */}
+              {!venteACredit &&
+                (methodePaiement === "carte" ||
+                  methodePaiement === "mobile") && (
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5">
+                    <p className="text-sm text-blue-800 mb-2 font-medium">
+                      Montant exact à payer
+                    </p>
+                    <p className="text-3xl font-bold text-blue-600">
+                      {formatCurrency(total || 0)}
+                    </p>
+                    <p className="text-xs text-blue-700 mt-2 flex items-center gap-1">
+                      <Keyboard className="w-3 h-3" />
+                      Appuyez sur Entrée pour valider
+                    </p>
+                  </div>
+                )}
 
               {/* Boutons d'action */}
               <div className="flex gap-3 pt-4 border-t-2 border-gray-100">
@@ -1736,8 +2957,10 @@ const PointOfSale: React.FC = () => {
                   }}
                   disabled={
                     processing ||
-                    (methodePaiement === "especes" &&
-                      parseFloat(montantPaye) < total)
+                    (!venteACredit &&
+                      methodePaiement === "especes" &&
+                      parseFloat(montantPaye) < total) ||
+                    (venteACredit && (parseFloat(montantPaye) || 0) > total)
                   }
                   className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
@@ -1823,7 +3046,7 @@ const PointOfSale: React.FC = () => {
 
               {selectedProduct.description && (
                 <div className="bg-gray-50 rounded-2xl p-5">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
+                  <p className="text-sm font-semibold text-gray-700 mb-4">
                     Description
                   </p>
                   <p className="text-gray-600">{selectedProduct.description}</p>
@@ -1864,7 +3087,7 @@ const PointOfSale: React.FC = () => {
               {selectedProduct.quantite_stock > selectedProduct.stock_min && (
                 <button
                   onClick={() => {
-                    addToCart(selectedProduct);
+                    handleAddToCart(selectedProduct);
                     handleCloseProductDetail();
                   }}
                   className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3"
@@ -1896,6 +3119,7 @@ const PointOfSale: React.FC = () => {
         <ReceiptPreview
           receipt={receiptData}
           config={config}
+          logoBase64={logoBase64}
           onClose={handleReceiptClose}
           onPrint={handleReceiptClose}
         />

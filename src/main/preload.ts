@@ -9,7 +9,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("create-product", product),
   updateProduct: (id: number, product: any) =>
     ipcRenderer.invoke("update-product", id, product),
-  deleteProduct: (id: number, utilisateur_id?: number, utilisateur_nom?: string) =>
+  deleteProduct: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
     ipcRenderer.invoke("delete-product", id, utilisateur_id, utilisateur_nom),
   searchProducts: (query: string) =>
     ipcRenderer.invoke("search-products", query),
@@ -19,6 +23,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("save-product-image", base64Data),
   getProductImage: (filename: string) =>
     ipcRenderer.invoke("get-product-image", filename),
+  saveCompanyLogo: (base64Data: string) =>
+    ipcRenderer.invoke("save-company-logo", base64Data),
+  getCompanyLogo: () => ipcRenderer.invoke("get-company-logo"),
+  deleteCompanyLogo: () => ipcRenderer.invoke("delete-company-logo"),
 
   // Catégories
   getCategories: () => ipcRenderer.invoke("get-categories"),
@@ -26,7 +34,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("create-category", category),
   updateCategory: (id: number, category: any) =>
     ipcRenderer.invoke("update-category", id, category),
-  deleteCategory: (id: number, utilisateur_id?: number, utilisateur_nom?: string) =>
+  deleteCategory: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
     ipcRenderer.invoke("delete-category", id, utilisateur_id, utilisateur_nom),
 
   // Ventes
@@ -39,6 +51,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Statistiques
   getDashboardStats: () => ipcRenderer.invoke("get-dashboard-stats"),
+  getDashboardStatsByDate: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-dashboard-stats-by-date", startDate, endDate),
   getLowStockProducts: () => ipcRenderer.invoke("get-low-stock-products"),
 
   // Utilisateurs
@@ -58,7 +72,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("create-supplier", supplier),
   updateSupplier: (id: number, supplier: any) =>
     ipcRenderer.invoke("update-supplier", id, supplier),
-  deleteSupplier: (id: number, utilisateur_id?: number, utilisateur_nom?: string) =>
+  deleteSupplier: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
     ipcRenderer.invoke("delete-supplier", id, utilisateur_id, utilisateur_nom),
 
   // Achats
@@ -73,7 +91,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSupplierDebts: () => ipcRenderer.invoke("get-supplier-debts"),
   getSupplierUnpaidPurchases: (supplierId: number) =>
     ipcRenderer.invoke("get-supplier-unpaid-purchases", supplierId),
-  deletePurchase: (id: number, utilisateur_id?: number, utilisateur_nom?: string) =>
+  deletePurchase: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
     ipcRenderer.invoke("delete-purchase", id, utilisateur_id, utilisateur_nom),
 
   // Paiements Fournisseurs
@@ -88,8 +110,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
   createClient: (client: any) => ipcRenderer.invoke("create-client", client),
   updateClient: (id: number, client: any) =>
     ipcRenderer.invoke("update-client", id, client),
-  deleteClient: (id: number, utilisateur_id?: number, utilisateur_nom?: string) =>
-    ipcRenderer.invoke("delete-client", id, utilisateur_id, utilisateur_nom),
+  deleteClient: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) => ipcRenderer.invoke("delete-client", id, utilisateur_id, utilisateur_nom),
+
+  // Prix Clients
+  getClientPrices: (clientId: number) =>
+    ipcRenderer.invoke("get-client-prices", clientId),
+  getClientPrice: (clientId: number, productId: number) =>
+    ipcRenderer.invoke("get-client-price", clientId, productId),
+  createClientPrice: (clientPrice: any) =>
+    ipcRenderer.invoke("create-client-price", clientPrice),
+  updateClientPrice: (id: number, clientPrice: any) =>
+    ipcRenderer.invoke("update-client-price", id, clientPrice),
+  deleteClientPrice: (id: number) =>
+    ipcRenderer.invoke("delete-client-price", id),
+  bulkCreateClientPrices: (clientId: number, prices: any[]) =>
+    ipcRenderer.invoke("bulk-create-client-prices", clientId, prices),
 
   // Serveurs
   getServers: () => ipcRenderer.invoke("get-servers"),
@@ -98,8 +137,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   createServer: (server: any) => ipcRenderer.invoke("create-server", server),
   updateServer: (id: number, server: any) =>
     ipcRenderer.invoke("update-server", id, server),
-  deleteServer: (id: number, utilisateur_id?: number, utilisateur_nom?: string) =>
-    ipcRenderer.invoke("delete-server", id, utilisateur_id, utilisateur_nom),
+  deleteServer: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) => ipcRenderer.invoke("delete-server", id, utilisateur_id, utilisateur_nom),
+
+  // Dettes Clients
+  getCustomerDebts: () => ipcRenderer.invoke("get-customer-debts"),
+  getCustomerUnpaidSales: (clientId: number) =>
+    ipcRenderer.invoke("get-customer-unpaid-sales", clientId),
 
   // Paiements Clients
   getCustomerPayments: (saleId: number) =>
@@ -110,12 +157,26 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Comptabilité
   getAccountingEntries: (startDate?: string, endDate?: string) =>
     ipcRenderer.invoke("get-accounting-entries", startDate, endDate),
-  getAccountingEntriesPaginated: (page: number, limit: number, startDate?: string, endDate?: string) =>
-    ipcRenderer.invoke("get-accounting-entries-paginated", page, limit, startDate, endDate),
+  getAccountingEntriesPaginated: (
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "get-accounting-entries-paginated",
+      page,
+      limit,
+      startDate,
+      endDate,
+    ),
   getTreasury: () => ipcRenderer.invoke("get-treasury"),
+  getProfitStats: (startDate?: string, endDate?: string) =>
+    ipcRenderer.invoke("get-profit-stats", startDate, endDate),
 
   // Factures
-  createInvoice: (invoice: any) => ipcRenderer.invoke("create-invoice", invoice),
+  createInvoice: (invoice: any) =>
+    ipcRenderer.invoke("create-invoice", invoice),
   getInvoices: () => ipcRenderer.invoke("get-invoices"),
   getInvoice: (id: number) => ipcRenderer.invoke("get-invoice", id),
   getInvoiceByVenteId: (venteId: number) =>
@@ -126,15 +187,100 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("get-invoices-by-date", startDate, endDate),
   updateInvoice: (id: number, invoice: any) =>
     ipcRenderer.invoke("update-invoice", id, invoice),
-  deleteInvoice: (id: number, utilisateur_id?: number, utilisateur_nom?: string) =>
+  deleteInvoice: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
     ipcRenderer.invoke("delete-invoice", id, utilisateur_id, utilisateur_nom),
 
   // Configuration
   getConfiguration: () => ipcRenderer.invoke("get-configuration"),
   updateConfiguration: (config: any) =>
     ipcRenderer.invoke("update-configuration", config),
-  updateSale: (id: number, sale: any) =>
-    ipcRenderer.invoke("update-sale", id, sale),
+  updateSale: (
+    id: number,
+    sale: any,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "update-sale",
+      id,
+      sale,
+      utilisateur_id,
+      utilisateur_nom,
+    ),
+  canModifySale: (venteId: number) =>
+    ipcRenderer.invoke("can-modify-sale", venteId),
+
+  // Factures Proforma
+  createProformaInvoice: (
+    proforma: any,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "create-proforma-invoice",
+      proforma,
+      utilisateur_id,
+      utilisateur_nom,
+    ),
+  getProformaInvoices: () => ipcRenderer.invoke("get-proforma-invoices"),
+  getProformaInvoice: (id: number) =>
+    ipcRenderer.invoke("get-proforma-invoice", id),
+  updateProformaInvoice: (
+    id: number,
+    proforma: any,
+    usuario_id?: number,
+    usuario_nom?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "update-proforma-invoice",
+      id,
+      proforma,
+      usuario_id,
+      usuario_nom,
+    ),
+  updateProformaStatus: (
+    id: number,
+    statut: string,
+    vente_id?: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "update-proforma-status",
+      id,
+      statut,
+      vente_id,
+      utilisateur_id,
+      utilisateur_nom,
+    ),
+  deleteProformaInvoice: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "delete-proforma-invoice",
+      id,
+      utilisateur_id,
+      utilisateur_nom,
+    ),
+  getProformaInvoicesPaginated: (
+    page: number,
+    limit: number,
+    search?: string,
+    statut?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "get-proforma-invoices-paginated",
+      page,
+      limit,
+      search,
+      statut,
+    ),
 
   // // Firebase Sync
   // firebaseConfigInit: (config: any) => ipcRenderer.invoke('firebase-config-init', config),
@@ -162,24 +308,58 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Backup & Restauration
   backupDatabase: () => ipcRenderer.invoke("backup-database"),
-  restoreDatabase: (backupPath: string) => ipcRenderer.invoke("restore-database", backupPath),
+  restoreDatabase: (backupPath: string) =>
+    ipcRenderer.invoke("restore-database", backupPath),
   getBackups: () => ipcRenderer.invoke("get-backups"),
-  deleteBackup: (filename: string) => ipcRenderer.invoke("delete-backup", filename),
+  deleteBackup: (filename: string) =>
+    ipcRenderer.invoke("delete-backup", filename),
   relaunchApp: () => ipcRenderer.invoke("relaunch-app"),
+
+  // Inventaire
+  getInventoryData: (
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+    search?: string,
+    categorieId?: number,
+  ) =>
+    ipcRenderer.invoke(
+      "get-inventory-data",
+      page,
+      limit,
+      startDate,
+      endDate,
+      search,
+      categorieId,
+    ),
 
   // Server-Side Pagination
   getProductsPaginated: (page: number, limit: number, search?: string) =>
     ipcRenderer.invoke("get-products-paginated", page, limit, search),
   getInvoicesPaginated: (page: number, limit: number, search?: string) =>
     ipcRenderer.invoke("get-invoices-paginated", page, limit, search),
-  getSalesPaginated: (page: number, limit: number, startDate?: string, endDate?: string) =>
+  getSalesPaginated: (
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+  ) =>
     ipcRenderer.invoke("get-sales-paginated", page, limit, startDate, endDate),
   getClientsPaginated: (page: number, limit: number, search?: string) =>
     ipcRenderer.invoke("get-clients-paginated", page, limit, search),
   getUsersPaginated: (page: number, limit: number, search?: string) =>
     ipcRenderer.invoke("get-users-paginated", page, limit, search),
-  getAuditLogsPaginated: (page: number, limit: number, filters?: { startDate?: string; endDate?: string; table?: string; search?: string }) =>
-    ipcRenderer.invoke("get-audit-logs-paginated", page, limit, filters),
+  getAuditLogsPaginated: (
+    page: number,
+    limit: number,
+    filters?: {
+      startDate?: string;
+      endDate?: string;
+      table?: string;
+      search?: string;
+    },
+  ) => ipcRenderer.invoke("get-audit-logs-paginated", page, limit, filters),
   getSuppliersPaginated: (page: number, limit: number, search?: string) =>
     ipcRenderer.invoke("get-suppliers-paginated", page, limit, search),
   getPurchasesPaginated: (page: number, limit: number) =>
@@ -188,14 +368,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("get-servers-paginated", page, limit),
 
   // Purge & Stats
-  purgeOldData: (config?: any) =>
-    ipcRenderer.invoke("purge-old-data", config),
-  getDatabaseStats: () =>
-    ipcRenderer.invoke("get-database-stats"),
-  repairDatabase: () =>
-    ipcRenderer.invoke("repair-database"),
+  purgeOldData: (config?: any) => ipcRenderer.invoke("purge-old-data", config),
+  getDatabaseStats: () => ipcRenderer.invoke("get-database-stats"),
+  repairDatabase: () => ipcRenderer.invoke("repair-database"),
+  clearAllData: (
+    options?: any,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "clear-all-data",
+      options,
+      utilisateur_id,
+      utilisateur_nom,
+    ),
+  importProductsCSV: (csvContent: string) =>
+    ipcRenderer.invoke("import-products-csv", csvContent),
 
   // App Info
-  getAppInfo: () =>
-    ipcRenderer.invoke("get-app-info"),
+  getAppInfo: () => ipcRenderer.invoke("get-app-info"),
 });

@@ -26,6 +26,7 @@ const DatabaseMaintenance: React.FC = () => {
   const [stats, setStats] = useState<DatabaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [purging, setPurging] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const [auditLogsRetention, setAuditLogsRetention] = useState(90);
   const [salesRetention, setSalesRetention] = useState(365);
@@ -52,7 +53,7 @@ const DatabaseMaintenance: React.FC = () => {
   const handlePurge = async () => {
     if (
       !confirm(
-        "Êtes-vous sûr de vouloir purger les anciennes données ? Cette action est irréversible."
+        "Êtes-vous sûr de vouloir purger les anciennes données ? Cette action est irréversible.",
       )
     ) {
       return;
@@ -85,11 +86,11 @@ const DatabaseMaintenance: React.FC = () => {
     if (
       !confirm(
         "Êtes-vous sûr de vouloir réparer la base de données ?\n\n" +
-        "Cette opération va :\n" +
-        "1. Supprimer les tables FTS5 corrompues\n" +
-        "2. Recréer les tables FTS5\n" +
-        "3. Nettoyer la base de données\n\n" +
-        "Une sauvegarde sera automatiquement créée avant la réparation."
+          "Cette opération va :\n" +
+          "1. Supprimer les tables FTS5 corrompues\n" +
+          "2. Recréer les tables FTS5\n" +
+          "3. Nettoyer la base de données\n\n" +
+          "Une sauvegarde sera automatiquement créée avant la réparation.",
       )
     ) {
       return;
@@ -102,13 +103,17 @@ const DatabaseMaintenance: React.FC = () => {
       if (result.success) {
         showSuccessToast(result.message);
         if (result.backupPath) {
-          alert(`Base de données réparée avec succès !\n\nSauvegarde créée : ${result.backupPath}`);
+          alert(
+            `Base de données réparée avec succès !\n\nSauvegarde créée : ${result.backupPath}`,
+          );
         }
         loadStats();
       } else {
         showErrorToast(result.message);
         if (result.backupPath) {
-          alert(`Erreur lors de la réparation.\n\nUne sauvegarde a été créée : ${result.backupPath}\n\nContactez le support technique.`);
+          alert(
+            `Erreur lors de la réparation.\n\nUne sauvegarde a été créée : ${result.backupPath}\n\nContactez le support technique.`,
+          );
         }
       }
     } catch (error) {
@@ -154,7 +159,8 @@ const DatabaseMaintenance: React.FC = () => {
               Maintenance de la Base de Données
             </h1>
             <p className="text-gray-600 mt-1">
-              Gérez et optimisez votre base de données pour de meilleures performances
+              Gérez et optimisez votre base de données pour de meilleures
+              performances
             </p>
           </div>
           <button
@@ -233,7 +239,9 @@ const DatabaseMaintenance: React.FC = () => {
               <div className="bg-red-600 p-3 rounded-xl shadow-lg">
                 <Settings className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">Réparation de la Base de Données</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                Réparation de la Base de Données
+              </h2>
             </div>
 
             <div className="space-y-4">
@@ -377,8 +385,9 @@ const DatabaseMaintenance: React.FC = () => {
                 <div className="text-xs text-orange-600 font-medium">
                   {(() => {
                     const daysAgo = Math.floor(
-                      (Date.now() - new Date(stats.oldestData.auditLog).getTime()) /
-                        (1000 * 60 * 60 * 24)
+                      (Date.now() -
+                        new Date(stats.oldestData.auditLog).getTime()) /
+                        (1000 * 60 * 60 * 24),
                     );
                     return `${daysAgo} jours`;
                   })()}
@@ -388,7 +397,9 @@ const DatabaseMaintenance: React.FC = () => {
 
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
-                <p className="text-sm font-medium text-gray-900">Dernière vente</p>
+                <p className="text-sm font-medium text-gray-900">
+                  Dernière vente
+                </p>
                 <p className="text-xs text-gray-600">
                   {formatDate(stats?.oldestData.sale || "")}
                 </p>
@@ -398,7 +409,7 @@ const DatabaseMaintenance: React.FC = () => {
                   {(() => {
                     const daysAgo = Math.floor(
                       (Date.now() - new Date(stats.oldestData.sale).getTime()) /
-                        (1000 * 60 * 60 * 24)
+                        (1000 * 60 * 60 * 24),
                     );
                     return `${daysAgo} jours`;
                   })()}
@@ -415,7 +426,9 @@ const DatabaseMaintenance: React.FC = () => {
               <div className="bg-red-600 p-3 rounded-xl shadow-lg">
                 <Trash2 className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">Purge Automatique</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                Purge Automatique
+              </h2>
             </div>
 
             <div className="space-y-6">
@@ -426,7 +439,9 @@ const DatabaseMaintenance: React.FC = () => {
                 <input
                   type="number"
                   value={auditLogsRetention}
-                  onChange={(e) => setAuditLogsRetention(Number(e.target.value))}
+                  onChange={(e) =>
+                    setAuditLogsRetention(Number(e.target.value))
+                  }
                   min="7"
                   max="365"
                   className="input-field"
@@ -460,7 +475,9 @@ const DatabaseMaintenance: React.FC = () => {
                 <input
                   type="number"
                   value={purchasesRetention}
-                  onChange={(e) => setPurchasesRetention(Number(e.target.value))}
+                  onChange={(e) =>
+                    setPurchasesRetention(Number(e.target.value))
+                  }
                   min="30"
                   max="1825"
                   className="input-field"
@@ -492,6 +509,72 @@ const DatabaseMaintenance: React.FC = () => {
             </div>
           </div>
         )}
+        {/* Zone Danger */}
+        <div className="card shadow-lg border-2 border-red-200">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-red-100">
+            <div className="bg-gradient-to-br from-red-600 to-red-700 p-3 rounded-xl shadow-lg">
+              <AlertTriangle className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-red-900">Zone Danger</h2>
+              <p className="text-sm text-red-600">Actions irréversibles</p>
+            </div>
+          </div>
+
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-red-800">
+              <strong>Attention :</strong> Cette action supprimera
+              définitivement toutes les données : produits, catégories, ventes,
+              factures, factures proforma, achats, paiements et écritures
+              comptables. Cette opération est irréversible.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            disabled={clearing}
+            onClick={async () => {
+              if (
+                !confirm(
+                  "⚠️ ATTENTION : Vous êtes sur le point de supprimer TOUTES les données (produits, ventes, factures, etc.).\n\nCette action est IRRÉVERSIBLE.\n\nÊtes-vous sûr de vouloir continuer ?",
+                )
+              ) {
+                return;
+              }
+              if (
+                !confirm(
+                  "Dernière confirmation : Toutes les données seront perdues définitivement. Continuer ?",
+                )
+              ) {
+                return;
+              }
+              setClearing(true);
+              try {
+                const result = await window.electronAPI.clearAllData();
+                if (result.success) {
+                  showSuccessToast(result.message);
+                } else {
+                  showErrorToast(result.message);
+                }
+              } catch (error) {
+                console.error("Erreur suppression:", error);
+                showErrorToast("Erreur lors de la suppression des données");
+              } finally {
+                setClearing(false);
+              }
+            }}
+            className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            {clearing ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            ) : (
+              <>
+                <Trash2 className="w-5 h-5" />
+                Réinitialiser toutes les données
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </ProtectedRoute>
   );

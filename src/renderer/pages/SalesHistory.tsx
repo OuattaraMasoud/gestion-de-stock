@@ -13,17 +13,21 @@ import {
 import { Sale, Configuration } from "../types";
 import Pagination from "../components/Pagination";
 import { formatCurrency } from "../utils/formatters";
+import { montantEnLettres } from "../utils/numberToWords";
 import { useAuthStore } from "../store/useAuthStore";
 import { toast } from "react-hot-toast";
+import { generateInvoiceQR } from "../utils/qrcode";
 
 const SalesHistory: React.FC = () => {
   const { user } = useAuthStore();
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [config, setConfig] = useState<Configuration | null>(null);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -44,18 +48,25 @@ const SalesHistory: React.FC = () => {
     try {
       const data = await window.electronAPI.getConfiguration();
       setConfig(data);
+      const logo = await window.electronAPI.getCompanyLogo();
+      setLogoBase64(logo);
     } catch (error) {
       console.error("Erreur chargement configuration:", error);
     }
   };
 
-  const loadSales = async (page: number = currentPage, limit: number = itemsPerPage, startDateFilter: string = startDate, endDateFilter: string = endDate) => {
+  const loadSales = async (
+    page: number = currentPage,
+    limit: number = itemsPerPage,
+    startDateFilter: string = startDate,
+    endDateFilter: string = endDate,
+  ) => {
     try {
       const result = await window.electronAPI.getSalesPaginated(
         page,
         limit,
         startDateFilter,
-        endDateFilter
+        endDateFilter,
       );
       setSales(result.data);
       setTotalItems(result.total);
@@ -66,178 +77,229 @@ const SalesHistory: React.FC = () => {
     }
   };
 
-  const handlePrintInvoice = () => {
+  const isA4 = config?.format_facture === "A4";
+
+  // Générer le QR code quand une facture est sélectionnée
+  useEffect(() => {
+    if (selectedInvoice) {
+      const remise = selectedInvoice.total_avant_remise
+        ? selectedInvoice.total_avant_remise - selectedInvoice.total_ttc
+        : 0;
+      generateInvoiceQR({
+        numero: selectedInvoice.numero,
+        date: selectedInvoice.date_facture,
+        client: selectedInvoice.client_nom || "Client comptoir",
+        totalAchat:
+          selectedInvoice.total_avant_remise || selectedInvoice.total_ttc,
+        remise,
+        tva: 0,
+        totalTTC: selectedInvoice.total_ttc,
+        devise: config?.devise,
+      })
+        .then(setQrCodeUrl)
+        .catch(() => setQrCodeUrl(null));
+    } else {
+      setQrCodeUrl(null);
+    }
+  }, [selectedInvoice, config?.devise]);
+
+  const handlePrintInvoice = async () => {
     if (!selectedInvoice || !invoiceRef.current) return;
 
     const printWindow = window.open("", "_blank");
-    if (printWindow) {
+    if (!printWindow) return;
+
+    if (isA4) {
+      // Format A4 - Facture professionnelle compacte
+      const remiseAmount =
+        selectedInvoice.remise_valeur > 0
+          ? selectedInvoice.remise_type === "pourcentage"
+            ? ((selectedInvoice.total_avant_remise || 0) *
+                selectedInvoice.remise_valeur) /
+              100
+            : selectedInvoice.remise_valeur
+          : 0;
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Facture - ${selectedInvoice.numero}</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              @page { size: A4; margin: 8mm; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
+              .invoice { max-width: 194mm; margin: 0 auto; }
+              .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 2px solid #2563eb; margin-bottom: 10px; }
+              .company-info h1 { font-size: 16px; color: #1e40af; margin-bottom: 2px; }
+              .company-info p { font-size: 9px; color: #555; margin: 1px 0; }
+              .invoice-badge { background: #2563eb; color: white; padding: 6px 14px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; }
+              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
+              .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
+              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 2px 0; font-size: 10px; }
+              .info-box strong { color: #1e293b; }
+              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
+              thead th:first-child { border-radius: 4px 0 0 0; }
+              thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
+              thead th.text-right { text-align: right; }
+              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+              tbody tr:nth-child(even) { background: #f8fafc; }
+              tbody td.text-right { text-align: right; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
+              .totals-box { width: 280px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
+              .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
+              .totals-row.discount { color: #dc2626; }
+              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 4px; }
+              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 4px; font-size: 9px; }
+              .totals-row.remaining { color: #dc2626; font-weight: bold; }
+              .amount-words { margin-top: 8px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 9px; color: #92400e; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
+              .qr-code { text-align: center; }
+              .qr-code img { width: 80px; height: 80px; }
+              .qr-code p { font-size: 8px; color: #64748b; margin-top: 2px; }
+              .stamp-area { width: 150px; height: 80px; border: 1px dashed #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+              .stamp-area p { font-size: 9px; color: #94a3b8; text-align: center; }
+              .footer { margin-top: 15px; text-align: center; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+              .footer .message { font-size: 11px; font-weight: 500; color: #1e40af; margin-bottom: 2px; }
+              .footer .sub { font-size: 8px; color: #94a3b8; }
+              @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            </style>
+          </head>
+          <body>
+            <div class="invoice">
+              <div class="header">
+                <div class="company-info">
+                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="max-height: 50px; max-width: 120px; margin-bottom: 4px; object-fit: contain;" />` : ""}
+                  <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
+                  ${config?.description_entreprise ? `<p style="font-size: 8px; color: #666; font-style: italic;">${config.description_entreprise}</p>` : ""}
+                  ${config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
+                  ${config?.telephone ? `<p>Tel: ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}${config?.nif ? " | NIF: " + config.nif : ""}</p>` : ""}
+                  ${config?.email && !config?.telephone ? `<p>${config.email}</p>` : ""}
+                </div>
+                <div class="invoice-badge">
+                  FACTURE
+                  <div class="numero">N° ${selectedInvoice.numero}</div>
+                </div>
+              </div>
+
+              <div class="info-grid">
+                <div class="info-box">
+                  <h3>Client</h3>
+                  <p><strong>${selectedInvoice.client_nom || "Client comptoir"}</strong></p>
+                  ${selectedInvoice.client_telephone ? `<p>Tel: ${selectedInvoice.client_telephone}</p>` : ""}
+                  ${selectedInvoice.client_email ? `<p>${selectedInvoice.client_email}</p>` : ""}
+                </div>
+                <div class="info-box">
+                  <h3>Facture</h3>
+                  <p><strong>Date:</strong> ${selectedInvoice.date_facture} | <strong>Heure:</strong> ${selectedInvoice.heure_facture}</p>
+                  <p><strong>Caissier:</strong> ${selectedInvoice.vendeur}${selectedInvoice.serveur_nom ? " | <strong>Serveur:</strong> " + selectedInvoice.serveur_nom : ""}</p>
+                </div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Designation</th>
+                    <th class="text-right" style="width: 40px;">Qte</th>
+                    <th class="text-right" style="width: 80px;">P.U.</th>
+                    <th class="text-right" style="width: 80px;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${selectedInvoice.articles
+                    .map(
+                      (a: any) => `
+                    <tr>
+                      <td>${a.designation}</td>
+                      <td class="text-right">${a.quantite}</td>
+                      <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
+                      <td class="text-right">${formatCurrency(a.total)}</td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+
+              <div class="totals-section">
+                <div class="totals-box">
+                  ${
+                    selectedInvoice.remise_valeur > 0
+                      ? `
+                    <div class="totals-row subtotal">
+                      <span>Sous-total:</span>
+                      <span>${formatCurrency(selectedInvoice.total_avant_remise || 0)}</span>
+                    </div>
+                    <div class="totals-row discount">
+                      <span>Remise (${selectedInvoice.remise_type === "pourcentage" ? selectedInvoice.remise_valeur + "%" : "fixe"}):</span>
+                      <span>-${formatCurrency(remiseAmount)}</span>
+                    </div>
+                  `
+                      : ""
+                  }
+                  <div class="totals-row grand-total">
+                    <span>Total TTC:</span>
+                    <span>${formatCurrency(selectedInvoice.total_ttc)}</span>
+                  </div>
+                  <div class="totals-row payment-info">
+                    <span>Reglement: ${selectedInvoice.methode_paiement} | Recu: ${formatCurrency(selectedInvoice.montant_paye)}</span>
+                  </div>
+                  ${
+                    selectedInvoice.monnaie_rendue > 0
+                      ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(selectedInvoice.monnaie_rendue)}</span></div>`
+                      : ""
+                  }
+                  ${
+                    (selectedInvoice.montant_restant ?? 0) > 0
+                      ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(selectedInvoice.montant_restant)}</span></div>`
+                      : ""
+                  }
+                </div>
+              </div>
+
+              <div class="amount-words">
+                Arrete la presente facture a la somme de : <strong>${montantEnLettres(selectedInvoice.total_ttc, "francs CFA")}</strong>
+              </div>
+
+              <div class="qr-stamp-section">
+                <div class="qr-code">
+                  ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
+                </div>
+                <div >
+                 
+                </div>
+              </div>
+
+              <div class="footer">
+                <p class="message">${config?.message_pied || "Merci de votre confiance !"}</p>
+                ${config?.support_text ? `<p class="sub">${config.support_text}</p>` : ""}
+              </div>
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+    } else {
+      // Format ticket 80mm
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
           <head>
             <title>Ticket - ${selectedInvoice.numero}</title>
             <style>
-              * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-              }
-
-              @page {
-                size: 80mm auto;
-                margin: 2mm;
-              }
-
-              body {
-                font-family: 'Courier New', 'Lucida Console', monospace;
-                font-size: 12px;
-                line-height: 1.4;
-                color: #000;
-                background: white;
-                width: 76mm;
-                margin: 0 auto;
-              }
-
-              .ticket {
-                width: 76mm;
-                padding: 2mm;
-                background: white;
-              }
-
-              .ticket-header {
-                text-align: center;
-                padding-bottom: 3mm;
-                border-bottom: 1px dashed #000;
-                margin-bottom: 3mm;
-              }
-
-              .ticket-header h1 {
-                font-size: 14px;
-                font-weight: bold;
-                margin-bottom: 2mm;
-                text-transform: uppercase;
-              }
-
-              .ticket-header p {
-                font-size: 10px;
-                margin: 1mm 0;
-              }
-
-              .ticket-title {
-                text-align: center;
-                font-size: 16px;
-                font-weight: bold;
-                margin: 3mm 0;
-                padding: 2mm 0;
-                border-top: 1px dashed #000;
-                border-bottom: 1px dashed #000;
-              }
-
-              .ticket-info {
-                margin-bottom: 3mm;
-                padding-bottom: 3mm;
-                border-bottom: 1px dashed #000;
-              }
-
-              .ticket-info-row {
-                display: flex;
-                justify-content: space-between;
-                font-size: 11px;
-                margin: 1mm 0;
-              }
-
-              .ticket-articles {
-                margin-bottom: 3mm;
-                padding-bottom: 3mm;
-                border-bottom: 1px dashed #000;
-              }
-
-              .ticket-article {
-                margin: 2mm 0;
-                font-size: 11px;
-              }
-
-              .ticket-article-name {
-                font-weight: bold;
-              }
-
-              .ticket-article-details {
-                display: flex;
-                justify-content: space-between;
-                padding-left: 2mm;
-                font-size: 10px;
-              }
-
-              .ticket-totals {
-                margin-bottom: 3mm;
-                padding-bottom: 3mm;
-                border-bottom: 1px dashed #000;
-              }
-
-              .ticket-total-row {
-                display: flex;
-                justify-content: space-between;
-                font-size: 11px;
-                margin: 1mm 0;
-              }
-
-              .ticket-total-row.grand-total {
-                font-size: 14px;
-                font-weight: bold;
-                margin-top: 2mm;
-                padding-top: 2mm;
-                border-top: 1px solid #000;
-              }
-
-              .ticket-payment {
-                margin-bottom: 3mm;
-                padding-bottom: 3mm;
-                border-bottom: 1px dashed #000;
-              }
-
-              .ticket-payment-row {
-                display: flex;
-                justify-content: space-between;
-                font-size: 11px;
-                margin: 1mm 0;
-              }
-
-              .ticket-payment-row.change {
-                font-weight: bold;
-                font-size: 12px;
-              }
-
-              .ticket-footer {
-                text-align: center;
-                padding-top: 3mm;
-              }
-
-              .ticket-footer p {
-                font-size: 10px;
-                margin: 1mm 0;
-              }
-
-              .ticket-footer .thank-you {
-                font-size: 12px;
-                font-weight: bold;
-                margin-bottom: 2mm;
-              }
-
-              .ticket-footer .ticket-ref {
-                font-size: 9px;
-                margin-top: 3mm;
-                padding-top: 2mm;
-                border-top: 1px dashed #000;
-              }
-
-              @media print {
-                body {
-                  width: 76mm;
-                }
-                .ticket {
-                  width: 76mm;
-                }
-              }
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              @page { size: 80mm auto; margin: 2mm; }
+              body { font-family: 'Courier New', 'Lucida Console', monospace; font-size: 12px; line-height: 1.4; color: #000; background: white; width: 76mm; margin: 0 auto; }
+              .ticket { width: 76mm; padding: 2mm; background: white; }
+              @media print { body { width: 76mm; } .ticket { width: 76mm; } }
             </style>
           </head>
           <body>
@@ -250,8 +312,8 @@ const SalesHistory: React.FC = () => {
           </body>
         </html>
       `);
-      printWindow.document.close();
     }
+    printWindow.document.close();
   };
 
   const handleResetFilter = () => {
@@ -554,26 +616,37 @@ const SalesHistory: React.FC = () => {
                     {formatCurrency(selectedSale.monnaie_rendue || 0)}
                   </span>
                 </div>
-                {selectedSale.remise_valeur && selectedSale.remise_valeur > 0 && (
-                  <>
-                    <div className="flex justify-between pt-2 border-t border-gray-200">
-                      <span className="text-gray-600">Total avant remise:</span>
-                      <span className="font-medium">
-                        {formatCurrency(selectedSale.total_avant_remise || 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Remise ({selectedSale.remise_type === 'pourcentage' ? `${selectedSale.remise_valeur}%` : 'fixe'}):</span>
-                      <span className="font-medium text-green-600">
-                        -{formatCurrency(
-                          selectedSale.remise_type === 'pourcentage'
-                            ? (selectedSale.total_avant_remise || 0) * (selectedSale.remise_valeur / 100)
-                            : selectedSale.remise_valeur
-                        )}
-                      </span>
-                    </div>
-                  </>
-                )}
+                {selectedSale.remise_valeur != null &&
+                  selectedSale.remise_valeur > 0 && (
+                    <>
+                      <div className="flex justify-between pt-2 border-t border-gray-200">
+                        <span className="text-gray-600">
+                          Total avant remise:
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(selectedSale.total_avant_remise || 0)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">
+                          Remise (
+                          {selectedSale.remise_type === "pourcentage"
+                            ? `${selectedSale.remise_valeur}%`
+                            : "fixe"}
+                          ):
+                        </span>
+                        <span className="font-medium text-green-600">
+                          -
+                          {formatCurrency(
+                            selectedSale.remise_type === "pourcentage"
+                              ? (selectedSale.total_avant_remise || 0) *
+                                  (selectedSale.remise_valeur / 100)
+                              : selectedSale.remise_valeur,
+                          )}
+                        </span>
+                      </div>
+                    </>
+                  )}
               </div>
 
               {/* Produits vendus */}
@@ -647,123 +720,676 @@ const SalesHistory: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">
-                    Ticket {selectedInvoice.numero}
+                    {isA4 ? "Facture" : "Ticket"} {selectedInvoice.numero}
                   </h2>
                   <p className="text-white/80 text-sm">
                     {selectedInvoice.date_facture} à{" "}
-                    {selectedInvoice.heure_facture} - Format 80mm
+                    {selectedInvoice.heure_facture} - Format{" "}
+                    {isA4 ? "A4" : "80mm"}
                   </p>
                 </div>
               </div>
             </div>
 
+            {/* Contenu de la facture */}
             <div className="flex-1 overflow-y-auto p-6 bg-gray-100 flex justify-center">
-              <div
-                ref={invoiceRef}
-                className="ticket bg-white shadow-xl"
-                style={{
-                  width: "80mm",
-                  padding: "3mm",
-                  fontFamily: "'Courier New', 'Lucida Console', monospace",
-                  fontSize: "12px",
-                  lineHeight: "1.4",
-                  color: "#000",
-                }}
-              >
+              {isA4 ? (
+                /* Format A4 - Facture professionnelle */
                 <div
+                  ref={invoiceRef}
+                  className="bg-white shadow-xl"
                   style={{
-                    textAlign: "center",
-                    paddingBottom: "3mm",
-                    borderBottom: "1px dashed #000",
-                    marginBottom: "3mm",
+                    width: "210mm",
+                    minHeight: "297mm",
+                    padding: "15mm",
+                    fontFamily: "'Segoe UI', Arial, sans-serif",
+                    fontSize: "12px",
+                    lineHeight: "1.5",
+                    color: "#333",
                   }}
                 >
-                  <h1
+                  {/* Header */}
+                  <div
                     style={{
-                      fontSize: "14px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      paddingBottom: "20px",
+                      borderBottom: "3px solid #2563eb",
+                      marginBottom: "25px",
+                    }}
+                  >
+                    <div>
+                      {logoBase64 && (
+                        <img
+                          src={logoBase64}
+                          alt="Logo"
+                          style={{
+                            maxHeight: "80px",
+                            maxWidth: "160px",
+                            marginBottom: "8px",
+                            objectFit: "contain",
+                          }}
+                        />
+                      )}
+                      <h1
+                        style={{
+                          fontSize: "22px",
+                          color: "#1e40af",
+                          marginBottom: "5px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {config?.nom_entreprise || "Mon Entreprise"}
+                      </h1>
+                      {config?.description_entreprise && (
+                        <p
+                          style={{
+                            fontSize: "10px",
+                            color: "#666",
+                            fontStyle: "italic",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          {config.description_entreprise}
+                        </p>
+                      )}
+                      {config?.adresse && (
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: "#555",
+                            margin: "2px 0",
+                          }}
+                        >
+                          {config.adresse}
+                          {config?.ville ? ", " + config.ville : ""}
+                        </p>
+                      )}
+                      {config?.telephone && (
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: "#555",
+                            margin: "2px 0",
+                          }}
+                        >
+                          Tel: {config.telephone}
+                          {config?.telephone2 ? " / " + config.telephone2 : ""}
+                        </p>
+                      )}
+                      {config?.email && (
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: "#555",
+                            margin: "2px 0",
+                          }}
+                        >
+                          {config.email}
+                        </p>
+                      )}
+                      {config?.nif && (
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: "#555",
+                            margin: "2px 0",
+                          }}
+                        >
+                          NIF: {config.nif}
+                        </p>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        background: "#2563eb",
+                        color: "white",
+                        padding: "8px 20px",
+                        borderRadius: "6px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>
+                        FACTURE
+                      </div>
+                      <div style={{ fontSize: "12px" }}>
+                        N° {selectedInvoice.numero}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Info grid */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "25px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "48%",
+                        background: "#f8fafc",
+                        padding: "15px",
+                        borderRadius: "8px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          fontSize: "11px",
+                          textTransform: "uppercase",
+                          color: "#64748b",
+                          letterSpacing: "0.5px",
+                          marginBottom: "8px",
+                          paddingBottom: "5px",
+                          borderBottom: "1px solid #e2e8f0",
+                        }}
+                      >
+                        Informations Client
+                      </h3>
+                      <p
+                        style={{
+                          margin: "3px 0",
+                          fontWeight: "bold",
+                          color: "#1e293b",
+                        }}
+                      >
+                        {selectedInvoice.client_nom || "Client comptoir"}
+                      </p>
+                    </div>
+                    <div
+                      style={{
+                        width: "48%",
+                        background: "#f8fafc",
+                        padding: "15px",
+                        borderRadius: "8px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          fontSize: "11px",
+                          textTransform: "uppercase",
+                          color: "#64748b",
+                          letterSpacing: "0.5px",
+                          marginBottom: "8px",
+                          paddingBottom: "5px",
+                          borderBottom: "1px solid #e2e8f0",
+                        }}
+                      >
+                        Details Facture
+                      </h3>
+                      <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                        <strong>Date:</strong> {selectedInvoice.date_facture}
+                      </p>
+                      <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                        <strong>Heure:</strong> {selectedInvoice.heure_facture}
+                      </p>
+                      <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                        <strong>Caissier:</strong> {selectedInvoice.vendeur}
+                      </p>
+                      {selectedInvoice.serveur_nom && (
+                        <p style={{ margin: "3px 0", fontSize: "12px" }}>
+                          <strong>Serveur:</strong>{" "}
+                          {selectedInvoice.serveur_nom}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Table des articles */}
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      margin: "20px 0",
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <th
+                          style={{
+                            background: "#1e40af",
+                            color: "white",
+                            padding: "10px 12px",
+                            textAlign: "left",
+                            fontSize: "11px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.3px",
+                            borderRadius: "6px 0 0 0",
+                          }}
+                        >
+                          Designation
+                        </th>
+                        <th
+                          style={{
+                            background: "#1e40af",
+                            color: "white",
+                            padding: "10px 12px",
+                            textAlign: "right",
+                            fontSize: "11px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.3px",
+                          }}
+                        >
+                          Qte
+                        </th>
+                        <th
+                          style={{
+                            background: "#1e40af",
+                            color: "white",
+                            padding: "10px 12px",
+                            textAlign: "right",
+                            fontSize: "11px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.3px",
+                          }}
+                        >
+                          Prix Unitaire
+                        </th>
+                        <th
+                          style={{
+                            background: "#1e40af",
+                            color: "white",
+                            padding: "10px 12px",
+                            textAlign: "right",
+                            fontSize: "11px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.3px",
+                            borderRadius: "0 6px 0 0",
+                          }}
+                        >
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedInvoice.articles.map(
+                        (article: any, index: number) => (
+                          <tr
+                            key={index}
+                            style={{
+                              background: index % 2 === 0 ? "white" : "#f8fafc",
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #e2e8f0",
+                                fontSize: "12px",
+                              }}
+                            >
+                              {article.designation}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #e2e8f0",
+                                fontSize: "12px",
+                                textAlign: "right",
+                              }}
+                            >
+                              {article.quantite}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #e2e8f0",
+                                fontSize: "12px",
+                                textAlign: "right",
+                              }}
+                            >
+                              {formatCurrency(article.prixUnitaire)}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #e2e8f0",
+                                fontSize: "12px",
+                                textAlign: "right",
+                                fontWeight: "500",
+                              }}
+                            >
+                              {formatCurrency(article.total)}
+                            </td>
+                          </tr>
+                        ),
+                      )}
+                    </tbody>
+                  </table>
+
+                  {/* Totaux */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      marginTop: "15px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "320px",
+                        background: "#f0f9ff",
+                        borderRadius: "8px",
+                        border: "1px solid #bae6fd",
+                        padding: "12px 15px",
+                      }}
+                    >
+                      {selectedInvoice.remise_valeur > 0 && (
+                        <>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              padding: "6px 0",
+                              fontSize: "12px",
+                              borderBottom: "1px solid #e2e8f0",
+                            }}
+                          >
+                            <span>Sous-total:</span>
+                            <span>
+                              {formatCurrency(
+                                selectedInvoice.total_avant_remise || 0,
+                              )}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              padding: "6px 0",
+                              fontSize: "12px",
+                              color: "#dc2626",
+                            }}
+                          >
+                            <span>
+                              Remise (
+                              {selectedInvoice.remise_type === "pourcentage"
+                                ? `${selectedInvoice.remise_valeur}%`
+                                : "fixe"}
+                              ):
+                            </span>
+                            <span>
+                              -
+                              {formatCurrency(
+                                selectedInvoice.remise_type === "pourcentage"
+                                  ? (selectedInvoice.total_avant_remise || 0) *
+                                      (selectedInvoice.remise_valeur / 100)
+                                  : selectedInvoice.remise_valeur,
+                              )}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "10px 0 6px 0",
+                          fontSize: "16px",
+                          fontWeight: "bold",
+                          color: "#1e40af",
+                          borderTop: "2px solid #1e40af",
+                          marginTop: "5px",
+                        }}
+                      >
+                        <span>Total TTC:</span>
+                        <span>{formatCurrency(selectedInvoice.total_ttc)}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "12px",
+                          padding: "8px 0 4px 0",
+                          marginTop: "6px",
+                          borderTop: "1px dashed #bae6fd",
+                        }}
+                      >
+                        <span>Mode de paiement:</span>
+                        <span>{selectedInvoice.methode_paiement}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "12px",
+                          margin: "4px 0",
+                        }}
+                      >
+                        <span>Montant recu:</span>
+                        <span>
+                          {formatCurrency(selectedInvoice.montant_paye)}
+                        </span>
+                      </div>
+                      {selectedInvoice.monnaie_rendue > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: "12px",
+                            margin: "4px 0",
+                          }}
+                        >
+                          <span>Monnaie rendue:</span>
+                          <span>
+                            {formatCurrency(selectedInvoice.monnaie_rendue)}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedInvoice.montant_restant ?? 0) > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: "12px",
+                            margin: "4px 0",
+                            color: "#dc2626",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          <span>Reste a payer:</span>
+                          <span>
+                            {formatCurrency(selectedInvoice.montant_restant)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Arrêté la présente facture */}
+                  <div
+                    style={{
+                      marginTop: "20px",
+                      padding: "10px 15px",
+                      borderRadius: "6px",
+                      fontStyle: "italic",
+                      fontSize: "11px",
+                    }}
+                  >
+                    Arrêté la présente facture à la somme de :{" "}
+                    <strong>
+                      {montantEnLettres(
+                        selectedInvoice.total_ttc,
+                        "francs CFA",
+                      )}
+                    </strong>
+                  </div>
+
+                  {/* QR Code et Cachet */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginTop: "30px",
+                      padding: "20px 0",
+                    }}
+                  >
+                    <div style={{ textAlign: "center" }}>
+                      {qrCodeUrl && (
+                        <>
+                          <img
+                            src={qrCodeUrl}
+                            alt="QR Code"
+                            style={{ width: "120px", height: "120px" }}
+                          />
+                          <p
+                            style={{
+                              fontSize: "9px",
+                              color: "#64748b",
+                              marginTop: "4px",
+                            }}
+                          >
+                            Scanner pour vérifier
+                          </p>
+                        </>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        width: "200px",
+                        height: "120px",
+                        border: "2px dashed #cbd5e1",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: "11px",
+                          color: "#94a3b8",
+                          textAlign: "center",
+                        }}
+                      >
+                        Cachet et signature
+                        <br />
+                        du gérant
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div
+                    style={{
+                      marginTop: "40px",
+                      textAlign: "center",
+                      paddingTop: "15px",
+                      borderTop: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: "500",
+                        color: "#1e40af",
+                        marginBottom: "5px",
+                      }}
+                    >
+                      {config?.message_pied || "Merci de votre confiance !"}
+                    </p>
+                    {config?.support_text && (
+                      <p style={{ fontSize: "10px", color: "#94a3b8" }}>
+                        {config.support_text}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Format ticket 80mm */
+                <div
+                  ref={invoiceRef}
+                  className="ticket bg-white shadow-xl"
+                  style={{
+                    width: "80mm",
+                    padding: "3mm",
+                    fontFamily: "'Courier New', 'Lucida Console', monospace",
+                    fontSize: "12px",
+                    lineHeight: "1.4",
+                    color: "#000",
+                  }}
+                >
+                  <div
+                    style={{
+                      textAlign: "center",
+                      paddingBottom: "3mm",
+                      borderBottom: "1px dashed #000",
+                      marginBottom: "3mm",
+                    }}
+                  >
+                    {logoBase64 && (
+                      <img
+                        src={logoBase64}
+                        alt="Logo"
+                        style={{
+                          maxHeight: "75px",
+                          maxWidth: "100mm",
+                          marginBottom: "2mm",
+                          objectFit: "contain",
+                        }}
+                      />
+                    )}
+                    <h1
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: "bold",
+                        marginBottom: "2mm",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {config?.nom_entreprise || "Mon Entreprise"}
+                    </h1>
+                    {config?.telephone && (
+                      <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                        Tel: {config.telephone}
+                      </p>
+                    )}
+                    {config?.telephone2 && (
+                      <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                        {config.telephone2}
+                      </p>
+                    )}
+                    {config?.adresse && (
+                      <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                        {config.adresse}
+                      </p>
+                    )}
+                    {config?.email && (
+                      <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                        {config.email}
+                      </p>
+                    )}
+                    {config?.nif && (
+                      <p style={{ fontSize: "10px", margin: "1mm 0" }}>
+                        NIF: {config.nif}
+                      </p>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      textAlign: "center",
+                      fontSize: "16px",
                       fontWeight: "bold",
-                      marginBottom: "2mm",
-                      textTransform: "uppercase",
+                      margin: "3mm 0",
+                      padding: "2mm 0",
+                      borderBottom: "1px dashed #000",
                     }}
                   >
-                    {config?.nom_entreprise || "Mon Entreprise"}
-                  </h1>
-                  {config?.telephone && (
-                    <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                      Tel: {config.telephone}
-                    </p>
-                  )}
-                  {config?.telephone2 && (
-                    <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                      {config.telephone2}
-                    </p>
-                  )}
-                  {config?.adresse && (
-                    <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                      {config.adresse}
-                    </p>
-                  )}
-                  {config?.email && (
-                    <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                      {config.email}
-                    </p>
-                  )}
-                </div>
+                    TICKET N° {selectedInvoice.numero}
+                  </div>
 
-                <div
-                  style={{
-                    textAlign: "center",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    margin: "3mm 0",
-                    padding: "2mm 0",
-                    borderBottom: "1px dashed #000",
-                  }}
-                >
-                  TICKET N° {selectedInvoice.numero}
-                </div>
-
-                <div
-                  style={{
-                    marginBottom: "3mm",
-                    paddingBottom: "3mm",
-                    borderBottom: "1px dashed #000",
-                  }}
-                >
                   <div
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "11px",
-                      margin: "1mm 0",
+                      marginBottom: "3mm",
+                      paddingBottom: "3mm",
+                      borderBottom: "1px dashed #000",
                     }}
                   >
-                    <span>Date:</span>
-                    <span>{selectedInvoice.date_facture}</span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "11px",
-                      margin: "1mm 0",
-                    }}
-                  >
-                    <span>Heure:</span>
-                    <span>{selectedInvoice.heure_facture}</span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "11px",
-                      margin: "1mm 0",
-                    }}
-                  >
-                    <span>Caissier:</span>
-                    <span>{selectedInvoice.vendeur}</span>
-                  </div>
-                  {selectedInvoice.serveur_nom && (
                     <div
                       style={{
                         display: "flex",
@@ -772,12 +1398,32 @@ const SalesHistory: React.FC = () => {
                         margin: "1mm 0",
                       }}
                     >
-                      <span>Serveur:</span>
-                      <span>{selectedInvoice.serveur_nom}</span>
+                      <span>Date:</span>
+                      <span>{selectedInvoice.date_facture}</span>
                     </div>
-                  )}
-                  {selectedInvoice.client_nom &&
-                    selectedInvoice.client_nom !== "Client comptoir" && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "11px",
+                        margin: "1mm 0",
+                      }}
+                    >
+                      <span>Heure:</span>
+                      <span>{selectedInvoice.heure_facture}</span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "11px",
+                        margin: "1mm 0",
+                      }}
+                    >
+                      <span>Caissier:</span>
+                      <span>{selectedInvoice.vendeur}</span>
+                    </div>
+                    {selectedInvoice.serveur_nom && (
                       <div
                         style={{
                           display: "flex",
@@ -786,183 +1432,224 @@ const SalesHistory: React.FC = () => {
                           margin: "1mm 0",
                         }}
                       >
-                        <span>Client:</span>
-                        <span>{selectedInvoice.client_nom}</span>
+                        <span>Serveur:</span>
+                        <span>{selectedInvoice.serveur_nom}</span>
                       </div>
                     )}
-                </div>
-
-                <div
-                  style={{
-                    marginBottom: "3mm",
-                    paddingBottom: "3mm",
-                  }}
-                >
-                  {selectedInvoice.articles.map(
-                    (article: any, index: number) => (
-                      <div key={index} style={{ margin: "2mm 0" }}>
+                    {selectedInvoice.client_nom &&
+                      selectedInvoice.client_nom !== "Client comptoir" && (
                         <div
                           style={{
+                            display: "flex",
+                            justifyContent: "space-between",
                             fontSize: "11px",
-                            fontWeight: "bold",
+                            margin: "1mm 0",
                           }}
                         >
-                          {article.designation}
+                          <span>Client:</span>
+                          <span>{selectedInvoice.client_nom}</span>
+                        </div>
+                      )}
+                  </div>
+
+                  <div style={{ marginBottom: "3mm", paddingBottom: "3mm" }}>
+                    {selectedInvoice.articles.map(
+                      (article: any, index: number) => (
+                        <div key={index} style={{ margin: "2mm 0" }}>
+                          <div style={{ fontSize: "11px", fontWeight: "bold" }}>
+                            {article.designation}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              paddingLeft: "2mm",
+                              fontSize: "10px",
+                            }}
+                          >
+                            <span>
+                              {article.quantite} x{" "}
+                              {formatCurrency(article.prixUnitaire)}
+                            </span>
+                            <span style={{ fontWeight: "bold" }}>
+                              {formatCurrency(article.total)}
+                            </span>
+                          </div>
+                        </div>
+                      ),
+                    )}
+                  </div>
+
+                  <div style={{ marginBottom: "3mm", paddingBottom: "3mm" }}>
+                    {selectedInvoice.remise_valeur > 0 && (
+                      <>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: "11px",
+                            margin: "1mm 0",
+                            borderTop: "1px dashed #000",
+                            paddingTop: "2mm",
+                          }}
+                        >
+                          <span>Sous-total:</span>
+                          <span>
+                            {formatCurrency(
+                              selectedInvoice.total_avant_remise || 0,
+                            )}
+                          </span>
                         </div>
                         <div
                           style={{
                             display: "flex",
                             justifyContent: "space-between",
-                            paddingLeft: "2mm",
-                            fontSize: "10px",
+                            fontSize: "11px",
+                            margin: "1mm 0",
                           }}
                         >
                           <span>
-                            {article.quantite} x{" "}
-                            {formatCurrency(article.prixUnitaire)}
+                            Remise (
+                            {selectedInvoice.remise_type === "pourcentage"
+                              ? `${selectedInvoice.remise_valeur}%`
+                              : "fixe"}
+                            ):
                           </span>
-                          <span style={{ fontWeight: "bold" }}>
-                            {formatCurrency(article.total)}
+                          <span>
+                            -
+                            {formatCurrency(
+                              selectedInvoice.remise_type === "pourcentage"
+                                ? (selectedInvoice.total_avant_remise || 0) *
+                                    (selectedInvoice.remise_valeur / 100)
+                                : selectedInvoice.remise_valeur,
+                            )}
                           </span>
                         </div>
-                      </div>
-                    ),
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    marginBottom: "3mm",
-                    paddingBottom: "3mm",
-                  }}
-                >
-                  {selectedInvoice.remise_valeur && selectedInvoice.remise_valeur > 0 && (
-                    <>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: "11px",
-                          margin: "1mm 0",
-                          borderTop: "1px dashed #000",
-                          paddingTop: "2mm",
-                        }}
-                      >
-                        <span>Sous-total:</span>
-                        <span>{formatCurrency(selectedInvoice.total_avant_remise || 0)}</span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: "11px",
-                          margin: "1mm 0",
-                        }}
-                      >
-                        <span>Remise ({selectedInvoice.remise_type === 'pourcentage' ? `${selectedInvoice.remise_valeur}%` : 'fixe'}):</span>
-                        <span>
-                          -{formatCurrency(
-                            selectedInvoice.remise_type === 'pourcentage'
-                              ? (selectedInvoice.total_avant_remise || 0) * (selectedInvoice.remise_valeur / 100)
-                              : selectedInvoice.remise_valeur
-                          )}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "14px",
-                      fontWeight: "bold",
-                      marginTop: "2mm",
-                      paddingTop: "2mm",
-                      borderTop: "1px solid #000",
-                    }}
-                  >
-                    <span>TOTAL:</span>
-                    <span>{formatCurrency(selectedInvoice.total_ttc)}</span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    marginBottom: "3mm",
-                    paddingBottom: "3mm",
-                    borderBottom: "1px dashed #000",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "11px",
-                      margin: "1mm 0",
-                    }}
-                  >
-                    <span>Mode:</span>
-                    <span>{selectedInvoice.methode_paiement}</span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "11px",
-                      margin: "1mm 0",
-                    }}
-                  >
-                    <span>Recu:</span>
-                    <span>{formatCurrency(selectedInvoice.montant_paye)}</span>
-                  </div>
-                  {selectedInvoice.monnaie_rendue > 0 && (
+                      </>
+                    )}
                     <div
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        fontSize: "12px",
+                        fontSize: "14px",
                         fontWeight: "bold",
+                        marginTop: "2mm",
+                        paddingTop: "2mm",
+                        borderTop: "1px solid #000",
+                      }}
+                    >
+                      <span>TOTAL:</span>
+                      <span>{formatCurrency(selectedInvoice.total_ttc)}</span>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      marginBottom: "3mm",
+                      paddingBottom: "3mm",
+                      borderBottom: "1px dashed #000",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "11px",
                         margin: "1mm 0",
                       }}
                     >
-                      <span>Monnaie:</span>
+                      <span>Mode:</span>
+                      <span>{selectedInvoice.methode_paiement}</span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "11px",
+                        margin: "1mm 0",
+                      }}
+                    >
+                      <span>Recu:</span>
                       <span>
-                        {formatCurrency(selectedInvoice.monnaie_rendue)}
+                        {formatCurrency(selectedInvoice.montant_paye)}
                       </span>
                     </div>
-                  )}
-                </div>
+                    {selectedInvoice.monnaie_rendue > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          margin: "1mm 0",
+                        }}
+                      >
+                        <span>Monnaie:</span>
+                        <span>
+                          {formatCurrency(selectedInvoice.monnaie_rendue)}
+                        </span>
+                      </div>
+                    )}
+                    {(selectedInvoice.montant_restant ?? 0) > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          margin: "1mm 0",
+                          color: "red",
+                        }}
+                      >
+                        <span>Reste à payer:</span>
+                        <span>
+                          {formatCurrency(selectedInvoice.montant_restant)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                <div style={{ textAlign: "center", paddingTop: "3mm" }}>
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                      marginBottom: "2mm",
-                    }}
-                  >
-                    {config?.message_pied || "Merci de votre visite !"}
-                  </p>
-                  {config?.support_text && (
+                  {/* QR Code */}
+                  {qrCodeUrl && (
+                    <div style={{ textAlign: "center", paddingTop: "3mm" }}>
+                      <img
+                        src={qrCodeUrl}
+                        alt="QR Code"
+                        style={{
+                          width: "25mm",
+                          height: "25mm",
+                          margin: "0 auto",
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ textAlign: "center", paddingTop: "3mm" }}>
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        marginBottom: "2mm",
+                      }}
+                    >
+                      {config?.message_pied || "Merci de votre visite !"}
+                    </p>
+                    {config?.support_text && (
+                      <p style={{ fontSize: "9px", margin: "1mm 0" }}>
+                        --------------------------------
+                      </p>
+                    )}
+                    {config?.support_text && (
+                      <p style={{ fontSize: "9px", margin: "1mm 0" }}>
+                        {config.support_text}
+                      </p>
+                    )}
                     <p style={{ fontSize: "9px", margin: "1mm 0" }}>
                       --------------------------------
                     </p>
-                  )}
-                  {config?.support_text && (
-                    <p style={{ fontSize: "9px", margin: "1mm 0" }}>
-                      {config.support_text}
-                    </p>
-                  )}
-                  {config?.nif && (
-                    <p style={{ fontSize: "9px", margin: "1mm 0" }}>
-                      NIF: {config.nif}
-                    </p>
-                  )}
-                  <p style={{ fontSize: "9px", margin: "1mm 0" }}>
-                    --------------------------------
-                  </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="p-5 bg-gray-50 border-t border-gray-200 flex gap-4 rounded-b-2xl flex-shrink-0">
@@ -978,7 +1665,7 @@ const SalesHistory: React.FC = () => {
                 className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2"
               >
                 <Printer className="w-5 h-5" />
-                Imprimer
+                {isA4 ? "Imprimer la facture" : "Imprimer"}
               </button>
             </div>
           </div>

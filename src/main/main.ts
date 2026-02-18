@@ -2,7 +2,13 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import * as db from "./database";
-import { purgeOldData, getDatabaseStats, repairDatabase } from "./database";
+import {
+  purgeOldData,
+  getDatabaseStats,
+  repairDatabase,
+  clearAllData,
+  importProductsFromCSV,
+} from "./database";
 import { checkInternetConnection } from "./apiClient";
 
 import {
@@ -146,17 +152,23 @@ ipcMain.handle("update-product", async (_, id: number, product: any) => {
   return db.updateProduct(id, product);
 });
 
-ipcMain.handle("delete-product", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deleteProduct(id, utilisateur_id, utilisateur_nom);
-});
+ipcMain.handle(
+  "delete-product",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteProduct(id, utilisateur_id, utilisateur_nom);
+  },
+);
 
 ipcMain.handle("search-products", async (_, query: string) => {
   return db.searchProducts(query);
 });
 
-ipcMain.handle("search-products-fts", async (_, query: string, limit?: number) => {
-  return db.searchProductsFTS(query, limit);
-});
+ipcMain.handle(
+  "search-products-fts",
+  async (_, query: string, limit?: number) => {
+    return db.searchProductsFTS(query, limit);
+  },
+);
 
 ipcMain.handle("save-product-image", async (_, base64Data: string) => {
   return db.saveProductImage(base64Data);
@@ -164,6 +176,18 @@ ipcMain.handle("save-product-image", async (_, base64Data: string) => {
 
 ipcMain.handle("get-product-image", async (_, filename: string) => {
   return db.getProductImage(filename);
+});
+
+ipcMain.handle("save-company-logo", async (_, base64Data: string) => {
+  return db.saveCompanyLogo(base64Data);
+});
+
+ipcMain.handle("get-company-logo", async () => {
+  return db.getCompanyLogo();
+});
+
+ipcMain.handle("delete-company-logo", async () => {
+  return db.deleteCompanyLogo();
 });
 
 // IPC Handlers pour les catégories
@@ -179,9 +203,12 @@ ipcMain.handle("update-category", async (_, id: number, category: any) => {
   return db.updateCategory(id, category);
 });
 
-ipcMain.handle("delete-category", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deleteCategory(id, utilisateur_id, utilisateur_nom);
-});
+ipcMain.handle(
+  "delete-category",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteCategory(id, utilisateur_id, utilisateur_nom);
+  },
+);
 
 // IPC Handlers pour les ventes
 ipcMain.handle("get-sales", async () => {
@@ -199,14 +226,24 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle("delete-sale", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deleteSale(id, utilisateur_id, utilisateur_nom);
-});
+ipcMain.handle(
+  "delete-sale",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteSale(id, utilisateur_id, utilisateur_nom);
+  },
+);
 
 // IPC Handlers pour les statistiques
 ipcMain.handle("get-dashboard-stats", async () => {
   return db.getDashboardStats();
 });
+
+ipcMain.handle(
+  "get-dashboard-stats-by-date",
+  async (_, startDate: string, endDate: string) => {
+    return db.getDashboardStatsByDate(startDate, endDate);
+  },
+);
 
 ipcMain.handle("get-low-stock-products", async () => {
   return db.getLowStockProducts();
@@ -229,9 +266,12 @@ ipcMain.handle("update-user", async (_, id: number, user: any) => {
   return db.updateUser(id, user);
 });
 
-ipcMain.handle("delete-user", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deleteUser(id, utilisateur_id, utilisateur_nom);
-});
+ipcMain.handle(
+  "delete-user",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteUser(id, utilisateur_id, utilisateur_nom);
+  },
+);
 
 // IPC Handlers pour les fournisseurs
 ipcMain.handle("get-suppliers", async () => {
@@ -250,9 +290,12 @@ ipcMain.handle("update-supplier", async (_, id: number, supplier: any) => {
   return db.updateSupplier(id, supplier);
 });
 
-ipcMain.handle("delete-supplier", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deleteSupplier(id, utilisateur_id, utilisateur_nom);
-});
+ipcMain.handle(
+  "delete-supplier",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteSupplier(id, utilisateur_id, utilisateur_nom);
+  },
+);
 
 // IPC Handlers pour les achats
 ipcMain.handle("get-purchases", async () => {
@@ -271,18 +314,24 @@ ipcMain.handle("get-purchase", async (_, id: number) => {
   return db.getPurchase(id);
 });
 
-ipcMain.handle("delete-purchase", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deletePurchase(id, utilisateur_id, utilisateur_nom);
-});
+ipcMain.handle(
+  "delete-purchase",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deletePurchase(id, utilisateur_id, utilisateur_nom);
+  },
+);
 
 // IPC Handlers pour les dettes fournisseurs
 ipcMain.handle("get-supplier-debts", async () => {
   return db.getSupplierDebts();
 });
 
-ipcMain.handle("get-supplier-unpaid-purchases", async (_, supplierId: number) => {
-  return db.getSupplierUnpaidPurchases(supplierId);
-});
+ipcMain.handle(
+  "get-supplier-unpaid-purchases",
+  async (_, supplierId: number) => {
+    return db.getSupplierUnpaidPurchases(supplierId);
+  },
+);
 
 // IPC Handlers pour les paiements fournisseurs
 ipcMain.handle("get-supplier-payments", async (_, purchaseId: number) => {
@@ -310,9 +359,46 @@ ipcMain.handle("update-client", async (_, id: number, client: any) => {
   return db.updateClient(id, client);
 });
 
-ipcMain.handle("delete-client", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deleteClient(id, utilisateur_id, utilisateur_nom);
+ipcMain.handle(
+  "delete-client",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteClient(id, utilisateur_id, utilisateur_nom);
+  },
+);
+
+// IPC Handlers pour les prix personnalisés des clients
+ipcMain.handle("get-client-prices", async (_, clientId: number) => {
+  return db.getClientPrices(clientId);
 });
+
+ipcMain.handle(
+  "get-client-price",
+  async (_, clientId: number, productId: number) => {
+    return db.getClientPrice(clientId, productId);
+  },
+);
+
+ipcMain.handle("create-client-price", async (_, clientPrice: any) => {
+  return db.createClientPrice(clientPrice);
+});
+
+ipcMain.handle(
+  "update-client-price",
+  async (_, id: number, clientPrice: any) => {
+    return db.updateClientPrice(id, clientPrice);
+  },
+);
+
+ipcMain.handle("delete-client-price", async (_, id: number) => {
+  return db.deleteClientPrice(id);
+});
+
+ipcMain.handle(
+  "bulk-create-client-prices",
+  async (_, clientId: number, prices: any[]) => {
+    return db.bulkCreateClientPrices(clientId, prices);
+  },
+);
 
 // IPC Handlers pour les serveurs
 ipcMain.handle("get-servers", async () => {
@@ -335,8 +421,20 @@ ipcMain.handle("update-server", async (_, id: number, server: any) => {
   return db.updateServer(id, server);
 });
 
-ipcMain.handle("delete-server", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deleteServer(id, utilisateur_id, utilisateur_nom);
+ipcMain.handle(
+  "delete-server",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteServer(id, utilisateur_id, utilisateur_nom);
+  },
+);
+
+// IPC Handlers pour les dettes clients
+ipcMain.handle("get-customer-debts", async () => {
+  return db.getCustomerDebts();
+});
+
+ipcMain.handle("get-customer-unpaid-sales", async (_, clientId: number) => {
+  return db.getCustomerUnpaidSales(clientId);
 });
 
 // IPC Handlers pour les paiements clients
@@ -360,9 +458,25 @@ ipcMain.handle("get-treasury", async () => {
   return db.getTreasury();
 });
 
-ipcMain.handle("get-accounting-entries-paginated", async (_, page: number, limit: number, startDate?: string, endDate?: string) => {
-  return db.getAccountingEntriesPaginated(page, limit, startDate, endDate);
-});
+ipcMain.handle(
+  "get-profit-stats",
+  async (_, startDate?: string, endDate?: string) => {
+    return db.getProfitStats(startDate, endDate);
+  },
+);
+
+ipcMain.handle(
+  "get-accounting-entries-paginated",
+  async (
+    _,
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+  ) => {
+    return db.getAccountingEntriesPaginated(page, limit, startDate, endDate);
+  },
+);
 
 // // IPC Handlers pour Firebase Sync
 // ipcMain.handle("firebase-config-init", async (_, config: any) => {
@@ -423,92 +537,240 @@ ipcMain.handle("update-invoice", async (_, id: number, invoice: any) => {
   return db.updateInvoice(id, invoice);
 });
 
-ipcMain.handle("delete-invoice", async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
-  return db.deleteInvoice(id, utilisateur_id, utilisateur_nom);
-});
+ipcMain.handle(
+  "delete-invoice",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteInvoice(id, utilisateur_id, utilisateur_nom);
+  },
+);
+
+// ===== INVENTAIRE =====
+
+ipcMain.handle(
+  "get-inventory-data",
+  async (
+    _,
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+    search?: string,
+    categorieId?: number,
+  ) => {
+    try {
+      return db.getInventoryData(
+        page,
+        limit,
+        startDate,
+        endDate,
+        search,
+        categorieId,
+      );
+    } catch (error) {
+      console.error("Erreur get inventory data:", error);
+      throw error;
+    }
+  },
+);
 
 // ===== SERVER-SIDE PAGINATION =====
 
-ipcMain.handle("get-products-paginated", async (_, page: number, limit: number, search?: string) => {
-  try {
-    return db.getProductsPaginated(page, limit, search);
-  } catch (error) {
-    console.error("Erreur get products paginated:", error);
-    throw error;
-  }
+ipcMain.handle(
+  "get-products-paginated",
+  async (_, page: number, limit: number, search?: string) => {
+    try {
+      return db.getProductsPaginated(page, limit, search);
+    } catch (error) {
+      console.error("Erreur get products paginated:", error);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle(
+  "get-invoices-paginated",
+  async (_, page: number, limit: number, search?: string) => {
+    try {
+      return db.getInvoicesPaginated(page, limit, search);
+    } catch (error) {
+      console.error("Erreur get invoices paginated:", error);
+      throw error;
+    }
+  },
+);
+
+// Factures Proforma
+ipcMain.handle(
+  "create-proforma-invoice",
+  async (
+    _,
+    proforma: any,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) => {
+    return db.createProformaInvoice(proforma, utilisateur_id, utilisateur_nom);
+  },
+);
+
+ipcMain.handle("get-proforma-invoices", async () => {
+  return db.getProformaInvoices();
 });
 
-ipcMain.handle("get-invoices-paginated", async (_, page: number, limit: number, search?: string) => {
-  try {
-    return db.getInvoicesPaginated(page, limit, search);
-  } catch (error) {
-    console.error("Erreur get invoices paginated:", error);
-    throw error;
-  }
+ipcMain.handle("get-proforma-invoice", async (_, id: number) => {
+  return db.getProformaInvoice(id);
 });
 
-ipcMain.handle("get-sales-paginated", async (_, page: number, limit: number, startDate?: string, endDate?: string) => {
-  try {
-    return db.getSalesPaginated(page, limit, startDate, endDate);
-  } catch (error) {
-    console.error("Erreur get sales paginated:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "update-proforma-invoice",
+  async (
+    _,
+    id: number,
+    proforma: any,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) => {
+    return db.updateProformaInvoice(
+      id,
+      proforma,
+      utilisateur_id,
+      utilisateur_nom,
+    );
+  },
+);
 
-ipcMain.handle("get-clients-paginated", async (_, page: number, limit: number, search?: string) => {
-  try {
-    return db.getClientsPaginated(page, limit, search);
-  } catch (error) {
-    console.error("Erreur get clients paginated:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "update-proforma-status",
+  async (
+    _,
+    id: number,
+    statut: string,
+    vente_id?: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) => {
+    return db.updateProformaStatus(
+      id,
+      statut,
+      vente_id,
+      utilisateur_id,
+      utilisateur_nom,
+    );
+  },
+);
 
-ipcMain.handle("get-users-paginated", async (_, page: number, limit: number, search?: string) => {
-  try {
-    return db.getUsersPaginated(page, limit, search);
-  } catch (error) {
-    console.error("Erreur get users paginated:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "delete-proforma-invoice",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteProformaInvoice(id, utilisateur_id, utilisateur_nom);
+  },
+);
 
-ipcMain.handle("get-audit-logs-paginated", async (_, page: number, limit: number, filters?: { startDate?: string; endDate?: string; table?: string; search?: string }) => {
-  try {
-    return db.getAuditLogsPaginated(page, limit, filters);
-  } catch (error) {
-    console.error("Erreur get audit logs paginated:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "get-proforma-invoices-paginated",
+  async (_, page: number, limit: number, search?: string, statut?: string) => {
+    return db.getProformaInvoicesPaginated(page, limit, search, statut);
+  },
+);
 
-ipcMain.handle("get-suppliers-paginated", async (_, page: number, limit: number, search?: string) => {
-  try {
-    return db.getSuppliersPaginated(page, limit, search);
-  } catch (error) {
-    console.error("Erreur get suppliers paginated:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "get-sales-paginated",
+  async (
+    _,
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+  ) => {
+    try {
+      return db.getSalesPaginated(page, limit, startDate, endDate);
+    } catch (error) {
+      console.error("Erreur get sales paginated:", error);
+      throw error;
+    }
+  },
+);
 
-ipcMain.handle("get-purchases-paginated", async (_, page: number, limit: number) => {
-  try {
-    return db.getPurchasesPaginated(page, limit);
-  } catch (error) {
-    console.error("Erreur get purchases paginated:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "get-clients-paginated",
+  async (_, page: number, limit: number, search?: string) => {
+    try {
+      return db.getClientsPaginated(page, limit, search);
+    } catch (error) {
+      console.error("Erreur get clients paginated:", error);
+      throw error;
+    }
+  },
+);
 
-ipcMain.handle("get-servers-paginated", async (_, page: number, limit: number) => {
-  try {
-    return db.getServersPaginated(page, limit);
-  } catch (error) {
-    console.error("Erreur get servers paginated:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "get-users-paginated",
+  async (_, page: number, limit: number, search?: string) => {
+    try {
+      return db.getUsersPaginated(page, limit, search);
+    } catch (error) {
+      console.error("Erreur get users paginated:", error);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle(
+  "get-audit-logs-paginated",
+  async (
+    _,
+    page: number,
+    limit: number,
+    filters?: {
+      startDate?: string;
+      endDate?: string;
+      table?: string;
+      search?: string;
+    },
+  ) => {
+    try {
+      return db.getAuditLogsPaginated(page, limit, filters);
+    } catch (error) {
+      console.error("Erreur get audit logs paginated:", error);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle(
+  "get-suppliers-paginated",
+  async (_, page: number, limit: number, search?: string) => {
+    try {
+      return db.getSuppliersPaginated(page, limit, search);
+    } catch (error) {
+      console.error("Erreur get suppliers paginated:", error);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle(
+  "get-purchases-paginated",
+  async (_, page: number, limit: number) => {
+    try {
+      return db.getPurchasesPaginated(page, limit);
+    } catch (error) {
+      console.error("Erreur get purchases paginated:", error);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle(
+  "get-servers-paginated",
+  async (_, page: number, limit: number) => {
+    try {
+      return db.getServersPaginated(page, limit);
+    } catch (error) {
+      console.error("Erreur get servers paginated:", error);
+      throw error;
+    }
+  },
+);
 
 // ===== FIN SERVER-SIDE PAGINATION =====
 
@@ -521,8 +783,21 @@ ipcMain.handle("update-configuration", async (_, config: any) => {
   return db.updateConfiguration(config);
 });
 
-ipcMain.handle("update-sale", async (_, id: number, sale: any) => {
-  return db.updateSale(id, sale);
+ipcMain.handle(
+  "update-sale",
+  async (
+    _,
+    id: number,
+    sale: any,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) => {
+    return db.updateSale(id, sale, utilisateur_id, utilisateur_nom);
+  },
+);
+
+ipcMain.handle("can-modify-sale", async (_, venteId: number) => {
+  return db.canModifySale(venteId);
 });
 
 // IPC Handlers pour la Licence
@@ -557,32 +832,41 @@ ipcMain.handle("get-audit-logs", async (_, limit: number = 100) => {
   }
 });
 
-ipcMain.handle("get-audit-logs-by-user", async (_, utilisateurId: number, limit: number = 100) => {
-  try {
-    return db.getAuditLogsByUser(utilisateurId, limit);
-  } catch (error) {
-    console.error("Erreur get audit logs by user:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "get-audit-logs-by-user",
+  async (_, utilisateurId: number, limit: number = 100) => {
+    try {
+      return db.getAuditLogsByUser(utilisateurId, limit);
+    } catch (error) {
+      console.error("Erreur get audit logs by user:", error);
+      throw error;
+    }
+  },
+);
 
-ipcMain.handle("get-audit-logs-by-date", async (_, startDate: string, endDate: string) => {
-  try {
-    return db.getAuditLogsByDate(startDate, endDate);
-  } catch (error) {
-    console.error("Erreur get audit logs by date:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "get-audit-logs-by-date",
+  async (_, startDate: string, endDate: string) => {
+    try {
+      return db.getAuditLogsByDate(startDate, endDate);
+    } catch (error) {
+      console.error("Erreur get audit logs by date:", error);
+      throw error;
+    }
+  },
+);
 
-ipcMain.handle("get-audit-logs-by-table", async (_, table: string, limit: number = 100) => {
-  try {
-    return db.getAuditLogsByTable(table, limit);
-  } catch (error) {
-    console.error("Erreur get audit logs by table:", error);
-    throw error;
-  }
-});
+ipcMain.handle(
+  "get-audit-logs-by-table",
+  async (_, table: string, limit: number = 100) => {
+    try {
+      return db.getAuditLogsByTable(table, limit);
+    } catch (error) {
+      console.error("Erreur get audit logs by table:", error);
+      throw error;
+    }
+  },
+);
 
 ipcMain.handle("create-audit-log", async (_, log: any) => {
   try {
@@ -654,6 +938,34 @@ ipcMain.handle("purge-old-data", async (_, config?: any) => {
     return result;
   } catch (error) {
     console.error("Erreur purge old data:", error);
+    throw error;
+  }
+});
+
+ipcMain.handle(
+  "clear-all-data",
+  async (
+    _,
+    options?: any,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) => {
+    try {
+      const result = clearAllData(options, utilisateur_id, utilisateur_nom);
+      return result;
+    } catch (error) {
+      console.error("Erreur clear all data:", error);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle("import-products-csv", async (_, csvContent: string) => {
+  try {
+    const result = importProductsFromCSV(csvContent);
+    return result;
+  } catch (error) {
+    console.error("Erreur import CSV:", error);
     throw error;
   }
 });

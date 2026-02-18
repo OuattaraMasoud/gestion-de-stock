@@ -21,6 +21,7 @@ import Suppliers from "./pages/Suppliers";
 import Clients from "./pages/Clients";
 import Accounting from "./pages/Accounting";
 import Invoices from "./pages/Invoices";
+import ProformaInvoices from "./pages/ProformaInvoices";
 import Servers from "./pages/Servers";
 import Settings from "./pages/Settings";
 import Purchases from "./pages/Purchases";
@@ -28,6 +29,8 @@ import Audit from "./pages/Audit";
 import Backup from "./pages/Backup";
 import DatabaseMaintenance from "./pages/DatabaseMaintenance";
 import SupplierDebts from "./pages/SupplierDebts";
+import CustomerDebts from "./pages/CustomerDebts";
+import Inventory from "./pages/Inventory";
 
 const App: React.FC = () => {
   return (
@@ -65,13 +68,16 @@ const App: React.FC = () => {
                       <Route path="/fournisseurs" element={<Suppliers />} />
                       <Route path="/dettes-fournisseurs" element={<SupplierDebts />} />
                       <Route path="/clients" element={<Clients />} />
+                      <Route path="/dettes-clients" element={<CustomerDebts />} />
                       <Route path="/serveurs" element={<Servers />} />
                       <Route path="/comptabilite" element={<Accounting />} />
                       <Route path="/factures" element={<Invoices />} />
+                      <Route path="/proforma" element={<ProformaInvoices />} />
                       <Route path="/parametres" element={<Settings />} />
                       <Route path="/achats" element={<Purchases />} />
                       <Route path="/audit" element={<Audit />} />
                       <Route path="/sauvegardes" element={<Backup />} />
+                      <Route path="/inventaire" element={<Inventory />} />
                       <Route path="/maintenance" element={<DatabaseMaintenance />} />
                     </Routes>
                   </Layout>

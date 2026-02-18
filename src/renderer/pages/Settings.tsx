@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Building2,
   Phone,
@@ -10,6 +10,7 @@ import {
   Printer,
   Globe,
   CreditCard,
+  ImagePlus,
 } from "lucide-react";
 import { Configuration } from "../types";
 import { showErrorToast, showSuccessToast } from "../utils/toast";
@@ -18,6 +19,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 const Settings: React.FC = () => {
   const [config, setConfig] = useState<Configuration>({
     nom_entreprise: "Mon Entreprise",
+    description_entreprise: "",
     logo_url: "",
     adresse: "",
     telephone: "",
@@ -33,12 +35,18 @@ const Settings: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const loadConfig = async () => {
     setLoading(true);
     try {
       const data = await window.electronAPI.getConfiguration();
       setConfig(data);
+      // Charger le logo
+      const logo = await window.electronAPI.getCompanyLogo();
+      setLogoPreview(logo);
     } catch (error) {
       showErrorToast("Erreur lors du chargement de la configuration");
     } finally {
@@ -108,6 +116,24 @@ const Settings: React.FC = () => {
                       setConfig({ ...config, nom_entreprise: e.target.value })
                     }
                     required
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Description de l'entreprise
+                  </label>
+                  <input
+                    type="text"
+                    value={config.description_entreprise}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        description_entreprise: e.target.value,
+                      })
+                    }
+                    placeholder="Ex: Électroménager - Informatique - Électronique"
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                   />
                 </div>
@@ -216,6 +242,114 @@ const Settings: React.FC = () => {
                     }
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <ImagePlus className="w-4 h-4 text-blue-600" />
+                    Logo de l'entreprise
+                  </label>
+                  <div className="flex items-center gap-4">
+                    {logoPreview ? (
+                      <div className="relative">
+                        <img
+                          src={logoPreview}
+                          alt="Logo"
+                          className="w-20 h-20 object-contain rounded-lg border-2 border-gray-200 bg-white p-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await window.electronAPI.deleteCompanyLogo();
+                              setLogoPreview(null);
+                              setConfig({ ...config, logo_url: "" });
+                              showSuccessToast("Logo supprimé");
+                            } catch {
+                              showErrorToast(
+                                "Erreur lors de la suppression du logo",
+                              );
+                            }
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                          title="Supprimer le logo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+                        <ImagePlus className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                    <div>
+                      <button
+                        type="button"
+                        disabled={uploadingLogo}
+                        onClick={() => logoInputRef.current?.click()}
+                        className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium text-sm transition-colors disabled:opacity-50"
+                      >
+                        {uploadingLogo
+                          ? "Chargement..."
+                          : logoPreview
+                            ? "Changer le logo"
+                            : "Choisir un logo"}
+                      </button>
+                      <p className="text-xs text-gray-500 mt-1">
+                        PNG, JPG. Max 2 Mo
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      ref={logoInputRef}
+                      accept="image/png,image/jpeg,image/jpg"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        if (file.size > 2 * 1024 * 1024) {
+                          showErrorToast(
+                            "Le fichier est trop volumineux (max 2 Mo)",
+                          );
+                          return;
+                        }
+
+                        setUploadingLogo(true);
+                        try {
+                          const reader = new FileReader();
+                          reader.onload = async () => {
+                            const base64 = reader.result as string;
+                            try {
+                              const filename =
+                                await window.electronAPI.saveCompanyLogo(
+                                  base64,
+                                );
+                              setConfig({ ...config, logo_url: filename });
+                              setLogoPreview(base64);
+                              showSuccessToast("Logo enregistré avec succès");
+                            } catch {
+                              showErrorToast(
+                                "Erreur lors de l'enregistrement du logo",
+                              );
+                            } finally {
+                              setUploadingLogo(false);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        } catch {
+                          showErrorToast(
+                            "Erreur lors de la lecture du fichier",
+                          );
+                          setUploadingLogo(false);
+                        }
+
+                        if (logoInputRef.current) {
+                          logoInputRef.current.value = "";
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

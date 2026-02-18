@@ -8,8 +8,11 @@ import {
   Mail,
   MapPin,
   X,
+  Tag,
+  Search,
+  Save,
 } from "lucide-react";
-import { Client } from "../types";
+import { Client, ClientPrice, Product } from "../types";
 import Pagination from "../components/Pagination";
 import { formatCurrency } from "../utils/formatters";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
@@ -31,6 +34,16 @@ const Clients: React.FC = () => {
     adresse: "",
     ville: "",
   });
+
+  const [showPricesModal, setShowPricesModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [clientPrices, setClientPrices] = useState<ClientPrice[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [searchProduct, setSearchProduct] = useState("");
+  const [pricesLoading, setPricesLoading] = useState(false);
+  const [editingPrices, setEditingPrices] = useState<Record<number, string>>(
+    {},
+  );
 
   useEffect(() => {
     loadClients();
@@ -129,6 +142,112 @@ const Clients: React.FC = () => {
       showErrorToast("Erreur lors de la suppression");
     }
   };
+
+  const handleOpenPricesModal = async (client: Client) => {
+    setSelectedClient(client);
+    setShowPricesModal(true);
+    setPricesLoading(true);
+    setSearchProduct("");
+    setEditingPrices({});
+
+    try {
+      const [pricesData, productsData] = await Promise.all([
+        window.electronAPI.getClientPrices(client.id!),
+        window.electronAPI.getProducts(),
+      ]);
+      setClientPrices(pricesData as ClientPrice[]);
+      setProducts(productsData as Product[]);
+    } catch (error) {
+      console.error("Erreur chargement prix:", error);
+      showErrorToast("Erreur lors du chargement des prix");
+    } finally {
+      setPricesLoading(false);
+    }
+  };
+
+  const handleClosePricesModal = () => {
+    setShowPricesModal(false);
+    setSelectedClient(null);
+    setClientPrices([]);
+    setProducts([]);
+    setSearchProduct("");
+    setEditingPrices({});
+  };
+
+  const handlePriceChange = (productId: number, value: string) => {
+    setEditingPrices((prev) => ({
+      ...prev,
+      [productId]: value,
+    }));
+  };
+
+  const handleSavePrice = async (productId: number) => {
+    const priceValue = editingPrices[productId];
+    if (!priceValue || isNaN(parseFloat(priceValue))) {
+      showErrorToast("Veuillez entrer un prix valide");
+      return;
+    }
+
+    try {
+      const existingPrice = clientPrices.find(
+        (p) => p.produit_id === productId,
+      );
+
+      if (existingPrice) {
+        await window.electronAPI.updateClientPrice(existingPrice.id!, {
+          prix_personnalise: parseFloat(priceValue),
+        } as any);
+      } else {
+        await window.electronAPI.createClientPrice({
+          client_id: selectedClient!.id!,
+          produit_id: productId,
+          prix_personnalise: parseFloat(priceValue),
+        });
+      }
+
+      const pricesData = await window.electronAPI.getClientPrices(
+        selectedClient!.id!,
+      );
+      setClientPrices(pricesData as ClientPrice[]);
+      setEditingPrices((prev) => {
+        const updated = { ...prev };
+        delete updated[productId];
+        return updated;
+      });
+
+      showSuccessToast("Prix enregistré avec succès");
+    } catch (error) {
+      console.error("Erreur sauvegarde prix:", error);
+      showErrorToast("Erreur lors de la sauvegarde du prix");
+    }
+  };
+
+  const handleDeletePrice = async (priceId: number, productId: number) => {
+    if (!confirm("Supprimer ce prix personnalisé ?")) {
+      return;
+    }
+
+    try {
+      await window.electronAPI.deleteClientPrice(priceId);
+      setClientPrices((prev) => prev.filter((p) => p.id !== priceId));
+      setEditingPrices((prev) => {
+        const updated = { ...prev };
+        delete updated[productId];
+        return updated;
+      });
+      showSuccessToast("Prix supprimé avec succès");
+    } catch (error) {
+      console.error("Erreur suppression prix:", error);
+      showErrorToast("Erreur lors de la suppression du prix");
+    }
+  };
+
+  const filteredProducts = products.filter(
+    (product) =>
+      product.nom.toLowerCase().includes(searchProduct.toLowerCase()) ||
+      (product.code_barre &&
+        product.code_barre.toLowerCase().includes(searchProduct.toLowerCase())),
+  );
 
   // Pagination logic
   const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -230,6 +349,13 @@ const Clients: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleOpenPricesModal(client)}
+                        className="text-purple-600 hover:text-purple-900"
+                        title="Prix personnalisés"
+                      >
+                        <Tag className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleOpenModal(client)}
                         className="text-blue-600 hover:text-blue-900"
@@ -384,6 +510,149 @@ const Clients: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Prix Personnalisés */}
+      {showPricesModal && selectedClient && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto modal-content">
+            <div className="bg-linear-to-r from-blue-600 to-blue-800 text-white px-6 py-4 rounded-t-xl flex justify-between items-center sticky top-0">
+              <h2 className="text-2xl font-bold">
+                Prix personnalisés - {selectedClient.nom}
+              </h2>
+              <button
+                onClick={handleClosePricesModal}
+                className="text-white hover:text-gray-200"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un produit..."
+                    value={searchProduct}
+                    onChange={(e) => setSearchProduct(e.target.value)}
+                    className="input-field pl-10"
+                  />
+                </div>
+              </div>
+
+              {pricesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Produit
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Prix standard
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Prix personnalisé
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredProducts.map((product) => {
+                        const clientPrice = clientPrices.find(
+                          (p) => p.produit_id === product.id,
+                        );
+                        const currentPrice =
+                          editingPrices[product.id!] !== undefined
+                            ? editingPrices[product.id!]
+                            : clientPrice?.prix_personnalise?.toString() || "";
+
+                        return (
+                          <tr key={product.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-gray-900">
+                                {product.nom}
+                              </div>
+                              {product.code_barre && (
+                                <div className="text-xs text-gray-500">
+                                  {product.code_barre}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">
+                              {formatCurrency(product.prix_vente)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                value={currentPrice}
+                                onChange={(e) =>
+                                  handlePriceChange(product.id!, e.target.value)
+                                }
+                                placeholder="Prix personnalisé"
+                                className="input-field w-32"
+                                min="0"
+                                step="1"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleSavePrice(product.id!)}
+                                  className="text-green-600 hover:text-green-900"
+                                  title="Enregistrer"
+                                >
+                                  <Save className="w-4 h-4" />
+                                </button>
+                                {clientPrice && (
+                                  <button
+                                    onClick={() =>
+                                      handleDeletePrice(
+                                        clientPrice.id!,
+                                        product.id!,
+                                      )
+                                    }
+                                    className="text-red-600 hover:text-red-900"
+                                    title="Supprimer"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {filteredProducts.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      Aucun produit trouvé
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-6 pt-4 border-t">
+                <button
+                  onClick={handleClosePricesModal}
+                  className="btn-secondary w-full"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

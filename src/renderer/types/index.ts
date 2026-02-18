@@ -69,6 +69,23 @@ export interface DashboardStats {
   nbClients: number;
 }
 
+export interface DashboardStatsByDate {
+  ventesPeriode: number;
+  ventesPeriodePrecedente: number;
+  nbVentesPeriode: number;
+  profitPeriode: number;
+  profitPeriodePrecedente: number;
+  coutsPeriode: number;
+  coutsPeriodePrecedente: number;
+  totalProduits: number;
+  stockFaible: number;
+  valeurStock: number;
+  nbFournisseurs: number;
+  nbClients: number;
+  dateDebut: string;
+  dateFin: string;
+}
+
 export interface User {
   id?: number;
   nom: string;
@@ -148,6 +165,17 @@ export interface Client {
   updated_at?: string;
 }
 
+export interface ClientPrice {
+  id?: number;
+  client_id: number;
+  produit_id: number;
+  produit_nom?: string;
+  prix_personnalise: number;
+  prix_standard?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Server {
   id?: number;
   nom: string;
@@ -168,6 +196,8 @@ export interface CustomerPayment {
   reference?: string;
   commentaire?: string;
   date_paiement?: string;
+  utilisateur_id?: number;
+  utilisateur_nom?: string;
 }
 
 export interface AccountingEntry {
@@ -188,6 +218,7 @@ export interface AccountingEntry {
 }
 
 export interface InvoiceArticle {
+  produit_id?: number;
   designation: string;
   quantite: number;
   prixUnitaire: number;
@@ -202,11 +233,15 @@ export interface Invoice {
   heure_facture: string;
   vendeur: string;
   client_nom?: string;
+  client_telephone?: string;
+  client_email?: string;
   serveur_nom?: string;
   total_ttc: number;
   methode_paiement: string;
   montant_paye: number;
   monnaie_rendue: number;
+  montant_restant?: number;
+  statut_paiement?: "paye" | "partiel" | "impaye";
   remise_type?: "pourcentage" | "montant";
   remise_valeur?: number;
   total_avant_remise?: number;
@@ -217,6 +252,7 @@ export interface Invoice {
 export interface Configuration {
   id?: number;
   nom_entreprise: string;
+  description_entreprise?: string;
   logo_url?: string;
   adresse?: string;
   telephone?: string;
@@ -284,19 +320,34 @@ declare global {
       getProduct: (id: number) => Promise<Product>;
       createProduct: (product: Product) => Promise<any>;
       updateProduct: (id: number, product: Product) => Promise<any>;
-      deleteProduct: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deleteProduct: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
       searchProducts: (query: string) => Promise<Product[]>;
       searchProductsFTS: (query: string, limit?: number) => Promise<Product[]>;
       saveProductImage: (base64Data: string) => Promise<string>;
       getProductImage: (filename: string) => Promise<string | null>;
+      saveCompanyLogo: (base64Data: string) => Promise<string>;
+      getCompanyLogo: () => Promise<string | null>;
+      deleteCompanyLogo: () => Promise<void>;
       getCategories: () => Promise<Category[]>;
       createCategory: (category: Category) => Promise<any>;
       updateCategory: (id: number, category: Category) => Promise<any>;
-      deleteCategory: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deleteCategory: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
       getSales: () => Promise<Sale[]>;
       createSale: (sale: Sale) => Promise<any>;
       getSalesByDate: (startDate: string, endDate: string) => Promise<Sale[]>;
-      deleteSale: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deleteSale: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
       getDashboardStats: () => Promise<DashboardStats>;
       getLowStockProducts: () => Promise<Product[]>;
       // Utilisateurs
@@ -304,13 +355,21 @@ declare global {
       getUsers: () => Promise<User[]>;
       createUser: (user: User) => Promise<any>;
       updateUser: (id: number, user: User) => Promise<any>;
-      deleteUser: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deleteUser: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
       // Fournisseurs
       getSuppliers: () => Promise<Supplier[]>;
       getSupplier: (id: number) => Promise<Supplier>;
       createSupplier: (supplier: Supplier) => Promise<any>;
       updateSupplier: (id: number, supplier: Supplier) => Promise<any>;
-      deleteSupplier: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deleteSupplier: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
       // Dettes Fournisseurs
       getSupplierDebts: () => Promise<any[]>;
       getSupplierUnpaidPurchases: (supplierId: number) => Promise<any[]>;
@@ -319,7 +378,11 @@ declare global {
       createPurchase: (purchase: Purchase) => Promise<any>;
       getPurchasesBySupplier: (supplierId: number) => Promise<Purchase[]>;
       getPurchase: (id: number) => Promise<Purchase>;
-      deletePurchase: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deletePurchase: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
       // Paiements Fournisseurs
       getSupplierPayments: (purchaseId: number) => Promise<SupplierPayment[]>;
       createSupplierPayment: (payment: SupplierPayment) => Promise<any>;
@@ -328,14 +391,32 @@ declare global {
       getClient: (id: number) => Promise<Client>;
       createClient: (client: Client) => Promise<any>;
       updateClient: (id: number, client: Client) => Promise<any>;
-      deleteClient: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deleteClient: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
+      // Prix Clients
+      getClientPrices: (clientId: number) => Promise<ClientPrice[]>;
+      getClientPrice: (clientId: number, productId: number) => Promise<ClientPrice | null>;
+      createClientPrice: (clientPrice: ClientPrice) => Promise<any>;
+      updateClientPrice: (id: number, clientPrice: ClientPrice) => Promise<any>;
+      deleteClientPrice: (id: number) => Promise<any>;
+      bulkCreateClientPrices: (clientId: number, prices: ClientPrice[]) => Promise<any>;
       // Serveurs
       getServers: () => Promise<Server[]>;
       getServer: (id: number) => Promise<Server>;
       getActiveServers: () => Promise<Server[]>;
       createServer: (server: Server) => Promise<any>;
       updateServer: (id: number, server: Server) => Promise<any>;
-      deleteServer: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deleteServer: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
+      // Dettes Clients
+      getCustomerDebts: () => Promise<any[]>;
+      getCustomerUnpaidSales: (clientId: number) => Promise<any[]>;
       // Paiements Clients
       getCustomerPayments: (saleId: number) => Promise<CustomerPayment[]>;
       createCustomerPayment: (payment: CustomerPayment) => Promise<any>;
@@ -349,7 +430,15 @@ declare global {
         limit: number,
         startDate?: string,
         endDate?: string,
-      ) => Promise<{ data: AccountingEntry[]; total: number; page: number; limit: number; totalPages: number; totalEntrees: number; totalSorties: number }>;
+      ) => Promise<{
+        data: AccountingEntry[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+        totalEntrees: number;
+        totalSorties: number;
+      }>;
       getTreasury: () => Promise<{ total: number; entries: AccountingEntry[] }>;
       // Factures
       createInvoice: (invoice: Invoice) => Promise<Invoice>;
@@ -362,11 +451,55 @@ declare global {
         endDate: string,
       ) => Promise<Invoice[]>;
       updateInvoice: (id: number, invoice: Invoice) => Promise<any>;
-      deleteInvoice: (id: number, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      deleteInvoice: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
       // Configuration
       getConfiguration: () => Promise<Configuration>;
       updateConfiguration: (config: Configuration) => Promise<Configuration>;
-      updateSale: (id: number, sale: Sale) => Promise<any>;
+      updateSale: (
+        id: number,
+        sale: any,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
+      canModifySale: (
+        venteId: number,
+      ) => Promise<{ canModify: boolean; reason?: string }>;
+      // Factures Proforma
+      createProformaInvoice: (
+        proforma: any,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
+      getProformaInvoices: () => Promise<any[]>;
+      getProformaInvoice: (id: number) => Promise<any>;
+      updateProformaInvoice: (
+        id: number,
+        proforma: any,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
+      updateProformaStatus: (
+        id: number,
+        statut: string,
+        vente_id?: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
+      deleteProformaInvoice: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
+      getProformaInvoicesPaginated: (
+        page: number,
+        limit: number,
+        search?: string,
+        statut?: string,
+      ) => Promise<any>;
       // Firebase
       // firebaseConfigInit: (config: any) => Promise<{ success: boolean }>;
       // firebaseConfigGet: () => Promise<any>;
@@ -381,32 +514,199 @@ declare global {
       getMachineId: () => Promise<string>;
       // Audit Logs
       getAuditLogs: (limit?: number) => Promise<any[]>;
-      getAuditLogsByUser: (utilisateurId: number, limit?: number) => Promise<any[]>;
-      getAuditLogsByDate: (startDate: string, endDate: string) => Promise<any[]>;
+      getAuditLogsByUser: (
+        utilisateurId: number,
+        limit?: number,
+      ) => Promise<any[]>;
+      getAuditLogsByDate: (
+        startDate: string,
+        endDate: string,
+      ) => Promise<any[]>;
       getAuditLogsByTable: (table: string, limit?: number) => Promise<any[]>;
       createAuditLog: (log: any) => Promise<any>;
       // Backup & Restauration
-      backupDatabase: () => Promise<{ success: boolean; backupPath: string; timestamp: string }>;
-      restoreDatabase: (backupPath: string) => Promise<{ success: boolean; message: string }>;
+      backupDatabase: () => Promise<{
+        success: boolean;
+        backupPath: string;
+        timestamp: string;
+      }>;
+      restoreDatabase: (
+        backupPath: string,
+      ) => Promise<{ success: boolean; message: string }>;
       getBackups: () => Promise<Backup[]>;
       deleteBackup: (filename: string) => Promise<{ success: boolean }>;
       relaunchApp: () => Promise<void>;
+      // Inventaire
+      getInventoryData: (
+        page: number,
+        limit: number,
+        startDate?: string,
+        endDate?: string,
+        search?: string,
+        categorieId?: number,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+        stats: {
+          valeur_stock_achat: number;
+          valeur_stock_vente: number;
+          produits_rupture: number;
+          produits_stock_bas: number;
+        };
+      }>;
       // Server-Side Pagination
-      getProductsPaginated: (page: number, limit: number, search?: string) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
-      getInvoicesPaginated: (page: number, limit: number, search?: string) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
-      getSalesPaginated: (page: number, limit: number, startDate?: string, endDate?: string) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
-      getClientsPaginated: (page: number, limit: number, search?: string) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
-      getUsersPaginated: (page: number, limit: number, search?: string) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
-      getAuditLogsPaginated: (page: number, limit: number, filters?: { startDate?: string; endDate?: string; table?: string; search?: string }) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
-      getSuppliersPaginated: (page: number, limit: number, search?: string) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
-      getPurchasesPaginated: (page: number, limit: number) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
-      getServersPaginated: (page: number, limit: number) => Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
+      getProductsPaginated: (
+        page: number,
+        limit: number,
+        search?: string,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getInvoicesPaginated: (
+        page: number,
+        limit: number,
+        search?: string,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getSalesPaginated: (
+        page: number,
+        limit: number,
+        startDate?: string,
+        endDate?: string,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getClientsPaginated: (
+        page: number,
+        limit: number,
+        search?: string,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getUsersPaginated: (
+        page: number,
+        limit: number,
+        search?: string,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getAuditLogsPaginated: (
+        page: number,
+        limit: number,
+        filters?: {
+          startDate?: string;
+          endDate?: string;
+          table?: string;
+          search?: string;
+        },
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getSuppliersPaginated: (
+        page: number,
+        limit: number,
+        search?: string,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getPurchasesPaginated: (
+        page: number,
+        limit: number,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getServersPaginated: (
+        page: number,
+        limit: number,
+      ) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
       // Purge & Stats
-      purgeOldData: (config?: any) => Promise<{ success: boolean; message: string; stats: any }>;
-      getDatabaseStats: () => Promise<{ totalSize: number; tables: any[]; oldestData: any }>;
-      repairDatabase: () => Promise<{ success: boolean; message: string; backupPath?: string }>;
+      purgeOldData: (
+        config?: any,
+      ) => Promise<{ success: boolean; message: string; stats: any }>;
+      getDatabaseStats: () => Promise<{
+        totalSize: number;
+        tables: any[];
+        oldestData: any;
+      }>;
+      repairDatabase: () => Promise<{
+        success: boolean;
+        message: string;
+        backupPath?: string;
+      }>;
       // App Info
-      getAppInfo: () => Promise<{ version: string; buildNumber: string; buildDate: string }>;
+      getAppInfo: () => Promise<{
+        version: string;
+        buildNumber: string;
+        buildDate: string;
+      }>;
+      // Data Management
+      clearAllData: () => Promise<{
+        success: boolean;
+        message: string;
+        stats: {
+          products: number;
+          categories: number;
+          sales: number;
+          invoices: number;
+          proformas: number;
+          purchases: number;
+          supplierPayments: number;
+          customerPayments: number;
+          accounting: number;
+        };
+      }>;
+      importProductsCSV: (csvContent: string) => Promise<{
+        success: boolean;
+        message: string;
+        stats: {
+          categoriesCreated: number;
+          productsCreated: number;
+          productsUpdated: number;
+          productsSkipped: number;
+        };
+      }>;
     };
   }
 }

@@ -3,34 +3,32 @@ import { Product, Category } from '../types';
 
 interface CartItem extends Product {
   quantity: number;
+  customPrice?: number;
 }
 
 interface StoreState {
-  // Cart pour la caisse
   cart: CartItem[];
-  addToCart: (product: Product) => void;
+  addToCart: (product: Product, customPrice?: number) => void;
   removeFromCart: (productId: number) => void;
   updateCartQuantity: (productId: number, quantity: number) => void;
+  updateCartItemPrice: (productId: number, customPrice: number) => void;
+  updateAllCartPrices: (prices: Map<number, number>) => void;
   clearCart: () => void;
   getCartTotal: () => number;
 
-  // Produits
   products: Product[];
   setProducts: (products: Product[]) => void;
 
-  // Catégories
   categories: Category[];
   setCategories: (categories: Category[]) => void;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
-  // État initial
   cart: [],
   products: [],
   categories: [],
 
-  // Actions cart
-  addToCart: (product) => {
+  addToCart: (product, customPrice) => {
     const { cart } = get();
     const existingItem = cart.find((item) => item.id === product.id);
 
@@ -44,7 +42,7 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     } else {
       set({
-        cart: [...cart, { ...product, quantity: 1 }],
+        cart: [...cart, { ...product, quantity: 1, customPrice }],
       });
     }
   },
@@ -68,20 +66,40 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
+  updateCartItemPrice: (productId, customPrice) => {
+    set({
+      cart: get().cart.map((item) =>
+        item.id === productId ? { ...item, customPrice } : item
+      ),
+    });
+  },
+
+  updateAllCartPrices: (prices) => {
+    set({
+      cart: get().cart.map((item) => {
+        const customPrice = prices.get(item.id!);
+        return customPrice !== undefined
+          ? { ...item, customPrice }
+          : { ...item, customPrice: undefined };
+      }),
+    });
+  },
+
   clearCart: () => {
     set({ cart: [] });
   },
 
   getCartTotal: () => {
     return get().cart.reduce(
-      (total, item) => total + item.prix_vente * item.quantity,
+      (total, item) => {
+        const price = item.customPrice !== undefined ? item.customPrice : item.prix_vente;
+        return total + price * item.quantity;
+      },
       0
     );
   },
 
-  // Actions produits
   setProducts: (products) => set({ products }),
 
-  // Actions catégories
   setCategories: (categories) => set({ categories }),
 }));

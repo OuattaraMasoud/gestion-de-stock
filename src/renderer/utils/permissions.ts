@@ -36,6 +36,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     allowedRoles: ["admin", "gestionnaire"],
   },
   {
+    path: "/inventaire",
+    label: "Inventaire",
+    icon: "ClipboardList",
+    allowedRoles: ["admin", "gestionnaire"],
+  },
+  {
     path: "/caisse",
     label: "Caisse",
     icon: "ShoppingCart",
@@ -66,6 +72,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     allowedRoles: ["admin", "gestionnaire", "caissier"],
   },
   {
+    path: "/proforma",
+    label: "Proforma",
+    icon: "FileCheck",
+    allowedRoles: ["admin", "gestionnaire", "caissier"],
+  },
+  {
     path: "/serveurs",
     label: "Serveurs",
     icon: "User",
@@ -75,7 +87,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     path: "/ventes",
     label: "Historique",
     icon: "History",
-    allowedRoles: ["admin", "gestionnaire"],
+    allowedRoles: ["admin", "gestionnaire", "caissier"],
   },
   {
     path: "/statistiques",
@@ -105,14 +117,20 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     path: "/maintenance",
     label: "Maintenance",
     icon: "Settings",
+    allowedRoles: ["admin"],
+  },
+  {
+    path: "/clients",
+    label: "Clients",
+    icon: "UserCircle",
     allowedRoles: ["admin", "gestionnaire"],
   },
-  // {
-  //   path: "/clients",
-  //   label: "Clients",
-  //   icon: "UserCircle",
-  //   allowedRoles: ["admin", "gestionnaire"],
-  // },
+  {
+    path: "/dettes-clients",
+    label: "Dettes Clients",
+    icon: "AlertCircle",
+    allowedRoles: ["admin", "gestionnaire"],
+  },
 
   {
     path: "/parametres",
