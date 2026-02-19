@@ -166,6 +166,14 @@ export interface ElectronAPI {
     utilisateur_nom?: string,
   ) => Promise<boolean>;
 
+  // Prix Clients
+  getClientPrices: (clientId: number) => Promise<any[]>;
+  getClientPrice: (clientId: number, productId: number) => Promise<any>;
+  createClientPrice: (clientPrice: any) => Promise<any>;
+  updateClientPrice: (id: number, clientPrice: any) => Promise<any>;
+  deleteClientPrice: (id: number) => Promise<boolean>;
+  bulkCreateClientPrices: (clientId: number, prices: any[]) => Promise<any>;
+
   // Serveurs
   getServers: () => Promise<any[]>;
   getServer: (id: number) => Promise<any>;

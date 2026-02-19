@@ -148,13 +148,6 @@ const Inventory: React.FC = () => {
 
       const doc = new jsPDF();
 
-      const formatPrixPDF = (amount: number): string => {
-        const formatted = amount.toFixed(2).replace(".", ",");
-        const parts = formatted.split(",");
-        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-        return `${parts.join(",")} FCFA`;
-      };
-
       doc.setFontSize(18);
       doc.text("Inventaire", 14, 22);
 
@@ -178,27 +171,25 @@ const Inventory: React.FC = () => {
           item.total_entrees.toString(),
           item.total_sorties.toString(),
           item.quantite_stock.toString(),
-          formatPrixPDF(item.quantite_stock * item.prix_achat),
-          formatPrixPDF(item.quantite_stock * item.prix_vente),
           status,
+          "",
         ];
       });
 
       autoTable(doc, {
-        head: [["Produit", "Categorie", "Entrees", "Sorties", "Stock", "Val. (achat)", "Val. (vente)", "Statut"]],
+        head: [["Produit", "Categorie", "Entrees", "Sorties", "Stock", "Statut", "Etat physique"]],
         body: tableData,
         startY: startDate && endDate ? 48 : 42,
         styles: { fontSize: 7, cellPadding: 2 },
         headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
         alternateRowStyles: { fillColor: [245, 247, 250] },
         columnStyles: {
-          0: { cellWidth: 35 },
+          0: { cellWidth: 40 },
           2: { halign: "center" },
           3: { halign: "center" },
           4: { halign: "center" },
-          5: { halign: "right" },
-          6: { halign: "right" },
-          7: { halign: "center" },
+          5: { halign: "center" },
+          6: { cellWidth: 40 },
         },
       });
 
@@ -238,9 +229,8 @@ const Inventory: React.FC = () => {
           "Stock min": item.stock_min,
           "Prix Achat": item.prix_achat,
           "Prix Vente": item.prix_vente,
-          "Valeur Stock (achat)": item.quantite_stock * item.prix_achat,
-          "Valeur Stock (vente)": item.quantite_stock * item.prix_vente,
           "Statut": status,
+          "Etat physique": "",
         };
       });
 
@@ -252,7 +242,7 @@ const Inventory: React.FC = () => {
         { wch: 30 }, { wch: 15 }, { wch: 20 },
         { wch: 10 }, { wch: 10 }, { wch: 12 },
         { wch: 10 }, { wch: 12 }, { wch: 12 },
-        { wch: 18 }, { wch: 18 }, { wch: 12 },
+        { wch: 12 }, { wch: 25 },
       ];
 
       XLSX.writeFile(workbook, `inventaire_${new Date().toISOString().split("T")[0]}.xlsx`);

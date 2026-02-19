@@ -57,7 +57,12 @@ const MENU_GROUPS = [
     key: "partenaires",
     label: "Partenaires",
     icon: UserCircle,
-    paths: ["/fournisseurs", "/dettes-fournisseurs", "/clients", "/dettes-clients"],
+    paths: [
+      "/fournisseurs",
+      "/dettes-fournisseurs",
+      "/clients",
+      "/dettes-clients",
+    ],
   },
   {
     key: "equipe",
@@ -163,10 +168,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   };
 
-  const themeButtons: { mode: ThemeMode; icon: React.ReactNode; label: string }[] = [
-    { mode: 'light', icon: <Sun className="w-3.5 h-3.5" />, label: 'Clair' },
-    { mode: 'dark', icon: <Moon className="w-3.5 h-3.5" />, label: 'Sombre' },
-    { mode: 'system', icon: <Monitor className="w-3.5 h-3.5" />, label: 'Système' },
+  const themeButtons: {
+    mode: ThemeMode;
+    icon: React.ReactNode;
+    label: string;
+  }[] = [
+    { mode: "light", icon: <Sun className="w-3.5 h-3.5" />, label: "Clair" },
+    { mode: "dark", icon: <Moon className="w-3.5 h-3.5" />, label: "Sombre" },
+    {
+      mode: "system",
+      icon: <Monitor className="w-3.5 h-3.5" />,
+      label: "Système",
+    },
   ];
 
   return (
@@ -175,7 +188,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* Sidebar */}
         <aside
           className={`${
-            isCollapsed ? "w-22" : "w-64"
+            isCollapsed ? "w-22" : "w-60"
           } bg-linear-to-b from-blue-600 to-blue-800 text-white flex flex-col shadow-xl transition-all duration-300`}
         >
           {/* Logo */}
@@ -273,8 +286,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     title={btn.label}
                     className={`p-1.5 rounded-md transition-colors ${
                       mode === btn.mode
-                        ? 'bg-white/20 text-white'
-                        : 'text-blue-300 hover:text-white hover:bg-blue-700/50'
+                        ? "bg-white/20 text-white"
+                        : "text-blue-300 hover:text-white hover:bg-blue-700/50"
                     }`}
                   >
                     {btn.icon}
@@ -290,8 +303,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     title={btn.label}
                     className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-xs font-medium transition-colors ${
                       mode === btn.mode
-                        ? 'bg-white/20 text-white'
-                        : 'text-blue-300 hover:text-white'
+                        ? "bg-white/20 text-white"
+                        : "text-blue-300 hover:text-white"
                     }`}
                   >
                     {btn.icon}
@@ -313,7 +326,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">{user?.nom}</p>
-                  <p className="text-xs text-blue-200 truncate">{user?.email}</p>
+                  <p className="text-xs text-blue-200 truncate">
+                    {user?.email}
+                  </p>
                   <p className="text-xs text-blue-300 capitalize mt-0.5 truncate">
                     {user?.role}
                   </p>
@@ -342,9 +357,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <LogOut
                 className={`${isCollapsed ? "w-6 h-6" : "w-5 h-5"} flex-shrink-0`}
               />
-              {!isCollapsed && (
-                <span className="font-medium">Déconnexion</span>
-              )}
+              {!isCollapsed && <span className="font-medium">Déconnexion</span>}
             </button>
           </div>
         </aside>

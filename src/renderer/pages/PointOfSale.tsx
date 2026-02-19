@@ -1644,6 +1644,18 @@ const PointOfSale: React.FC = () => {
         telephone: newClientTelephone.trim() || undefined,
         email: newClientEmail.trim() || undefined,
       });
+
+      // Enregistrer automatiquement les prix actuels du panier comme premiers prix du client
+      if (cart.length > 0) {
+        const prices = cart.map((item) => ({
+          client_id: created.id,
+          produit_id: item.id!,
+          prix_personnalise:
+            item.customPrice !== undefined ? item.customPrice : item.prix_vente,
+        }));
+        await window.electronAPI.bulkCreateClientPrices(created.id, prices);
+      }
+
       await loadClients();
       setSelectedClientId(created.id);
       setClientName(created.nom);
@@ -1972,6 +1984,17 @@ const PointOfSale: React.FC = () => {
       // Creer la vente et recuperer l'ID
       const saleResult = await window.electronAPI.createSale(saleData);
 
+      // Enregistrer les prix effectifs de la vente comme prix personnalisés du client
+      if (selectedClientId && cart.length > 0) {
+        const prices = cart.map((item) => ({
+          client_id: selectedClientId,
+          produit_id: item.id!,
+          prix_personnalise:
+            item.customPrice !== undefined ? item.customPrice : item.prix_vente,
+        }));
+        await window.electronAPI.bulkCreateClientPrices(selectedClientId, prices);
+      }
+
       // Creer et afficher la facture
       const receipt = createReceiptData();
 
@@ -2178,7 +2201,7 @@ const PointOfSale: React.FC = () => {
       </div>
 
       {/* Droite - Panier */}
-      <div className="w-140 flex flex-col space-y-4 shrink-0">
+      <div className="w-130 flex flex-col space-y-4 shrink-0">
         <div className="card flex-1 flex flex-col shadow-xl border-2 border-gray-100 dark:border-gray-700">
           {/* En-tête du panier avec toggle vue */}
           <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
@@ -2283,7 +2306,7 @@ const PointOfSale: React.FC = () => {
                     </div>
                     <button
                       onClick={() => setShowCreateClientModal(true)}
-                      className="flex-shrink-0 p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      className="shrink-0 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       title="Créer un client"
                     >
                       <UserPlus className="w-4 h-4" />
@@ -2351,7 +2374,7 @@ const PointOfSale: React.FC = () => {
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Nom du client (optionnel)..."
-                    className="w-full mt-2 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all outline-none text-sm"
+                    className="w-full mt-2 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                   />
                 </>
               )}
@@ -2403,7 +2426,11 @@ const PointOfSale: React.FC = () => {
                             type="number"
                             min="0"
                             step="100"
-                            value={item.customPrice !== undefined ? item.customPrice : item.prix_vente || 0}
+                            value={
+                              item.customPrice !== undefined
+                                ? item.customPrice
+                                : item.prix_vente || 0
+                            }
                             onChange={(e) => {
                               const newPrice = parseFloat(e.target.value) || 0;
                               updateCartItemPrice(item.id!, newPrice);
@@ -2414,7 +2441,9 @@ const PointOfSale: React.FC = () => {
                                 : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800"
                             }`}
                           />
-                          <span className="text-xs text-gray-500 dark:text-gray-400">/ unité</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            / unité
+                          </span>
                         </div>
                       </div>
                       <button
@@ -2630,7 +2659,7 @@ const PointOfSale: React.FC = () => {
                     )}
                   </div>
                   {montantRemise > 0 && (
-                    <div className="flex justify-between text-green-600 font-medium">
+                    <div className="flex justify-between text-blue-600 font-medium">
                       <span>
                         Remise (
                         {remiseType === "pourcentage"
@@ -3170,7 +3199,7 @@ const PointOfSale: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-green-600" />
+                <UserPlus className="w-5 h-5 text-blue-600" />
                 Nouveau client
               </h3>
               <button
@@ -3196,7 +3225,7 @@ const PointOfSale: React.FC = () => {
                   onChange={(e) => setNewClientNom(e.target.value)}
                   placeholder="Nom du client"
                   autoFocus
-                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all outline-none text-sm"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                 />
               </div>
               <div>
@@ -3208,7 +3237,7 @@ const PointOfSale: React.FC = () => {
                   value={newClientTelephone}
                   onChange={(e) => setNewClientTelephone(e.target.value)}
                   placeholder="Numéro de téléphone"
-                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all outline-none text-sm"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                 />
               </div>
               <div>
@@ -3220,7 +3249,7 @@ const PointOfSale: React.FC = () => {
                   value={newClientEmail}
                   onChange={(e) => setNewClientEmail(e.target.value)}
                   placeholder="Adresse email"
-                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all outline-none text-sm"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                 />
               </div>
             </div>
@@ -3239,7 +3268,7 @@ const PointOfSale: React.FC = () => {
               <button
                 onClick={handleCreateClient}
                 disabled={!newClientNom.trim() || creatingClient}
-                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creatingClient ? "Création..." : "Créer"}
               </button>
