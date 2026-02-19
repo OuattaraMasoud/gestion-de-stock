@@ -118,13 +118,20 @@ const Clients: React.FC = () => {
       }
       handleCloseModal();
       loadClients();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur:", error);
-      showErrorToast(
-        editingClient
-          ? "Erreur lors de la modification"
-          : "Erreur lors de la création",
-      );
+      if (
+        error?.message?.includes("UNIQUE constraint failed") ||
+        error?.message?.includes("telephone")
+      ) {
+        showErrorToast("Un client avec ce numéro de téléphone existe déjà");
+      } else {
+        showErrorToast(
+          editingClient
+            ? "Erreur lors de la modification"
+            : "Erreur lors de la création",
+        );
+      }
     }
   };
 
@@ -275,8 +282,12 @@ const Clients: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Clients</h1>
-          <p className="text-gray-600 mt-1">{totalItems} client(s)</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Clients
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            {totalItems} client(s)
+          </p>
         </div>
         <button onClick={() => handleOpenModal()} className="btn-primary">
           <Plus className="w-5 h-5" />
@@ -287,44 +298,47 @@ const Clients: React.FC = () => {
       {/* Liste des clients */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Client
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Localisation
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Solde Dû
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {paginatedClients.map((client) => (
-                <tr key={client.id} className="hover:bg-gray-50">
+                <tr
+                  key={client.id}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
                   <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-900 dark:text-white">
                       {client.nom}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="space-y-1">
                       {client.telephone && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                           <Phone className="w-4 h-4" />
                           {client.telephone}
                         </div>
                       )}
                       {client.email && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                           <Mail className="w-4 h-4" />
                           {client.email}
                         </div>
@@ -332,7 +346,7 @@ const Clients: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-start gap-2 text-sm text-gray-600">
+                    <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
                       <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                       <div>
                         {client.adresse && <div>{client.adresse}</div>}
@@ -342,7 +356,7 @@ const Clients: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`font-semibold ${(client.solde_du || 0) > 0 ? "text-red-600" : "text-gray-600"}`}
+                      className={`font-semibold ${(client.solde_du || 0) > 0 ? "text-red-600" : "text-gray-600 dark:text-gray-400"}`}
                     >
                       {formatCurrency(client.solde_du || 0)}
                     </span>
@@ -378,10 +392,10 @@ const Clients: React.FC = () => {
           {clients.length === 0 && (
             <div className="text-center py-12">
               <UserCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Aucun client
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Commencez par ajouter votre premier client.
               </p>
             </div>
@@ -405,7 +419,7 @@ const Clients: React.FC = () => {
       {/* Modal Formulaire */}
       {showModal && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
             <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 rounded-t-xl flex justify-between items-center sticky top-0">
               <h2 className="text-2xl font-bold">
                 {editingClient ? "Modifier le client" : "Nouveau client"}
@@ -421,7 +435,7 @@ const Clients: React.FC = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Nom */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Nom du client <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -439,7 +453,7 @@ const Clients: React.FC = () => {
               {/* Téléphone et Email */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Téléphone
                   </label>
                   <input
@@ -452,7 +466,7 @@ const Clients: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Email
                   </label>
                   <input
@@ -468,7 +482,7 @@ const Clients: React.FC = () => {
 
               {/* Adresse */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Adresse
                 </label>
                 <input
@@ -483,7 +497,7 @@ const Clients: React.FC = () => {
 
               {/* Ville */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Ville
                 </label>
                 <input
@@ -517,7 +531,7 @@ const Clients: React.FC = () => {
       {/* Modal Prix Personnalisés */}
       {showPricesModal && selectedClient && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto modal-content">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto modal-content">
             <div className="bg-linear-to-r from-blue-600 to-blue-800 text-white px-6 py-4 rounded-t-xl flex justify-between items-center sticky top-0">
               <h2 className="text-2xl font-bold">
                 Prix personnalisés - {selectedClient.nom}
@@ -533,7 +547,7 @@ const Clients: React.FC = () => {
             <div className="p-6">
               <div className="mb-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Search className="absolute left-1 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 mr-2 pr-1" />
                   <input
                     type="text"
                     placeholder="Rechercher un produit..."
@@ -550,24 +564,24 @@ const Clients: React.FC = () => {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-900">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                           Produit
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                           Prix standard
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                           Prix personnalisé
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {filteredProducts.map((product) => {
                         const clientPrice = clientPrices.find(
                           (p) => p.produit_id === product.id,
@@ -578,18 +592,21 @@ const Clients: React.FC = () => {
                             : clientPrice?.prix_personnalise?.toString() || "";
 
                         return (
-                          <tr key={product.id} className="hover:bg-gray-50">
+                          <tr
+                            key={product.id}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                          >
                             <td className="px-4 py-3">
-                              <div className="font-medium text-gray-900">
+                              <div className="font-medium text-gray-900 dark:text-white">
                                 {product.nom}
                               </div>
                               {product.code_barre && (
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
                                   {product.code_barre}
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-gray-600">
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                               {formatCurrency(product.prix_vente)}
                             </td>
                             <td className="px-4 py-3">
@@ -637,7 +654,7 @@ const Clients: React.FC = () => {
                   </table>
 
                   {filteredProducts.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                       Aucun produit trouvé
                     </div>
                   )}

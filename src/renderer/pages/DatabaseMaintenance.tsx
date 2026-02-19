@@ -155,10 +155,10 @@ const DatabaseMaintenance: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               Maintenance de la Base de Données
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
               Gérez et optimisez votre base de données pour de meilleures
               performances
             </p>
@@ -181,8 +181,8 @@ const DatabaseMaintenance: React.FC = () => {
                 <HardDrive className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Taille totale</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Taille totale</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {formatBytes(stats?.totalSize || 0)}
                 </p>
               </div>
@@ -195,8 +195,8 @@ const DatabaseMaintenance: React.FC = () => {
                 <Database className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Nombre de tables</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Nombre de tables</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {stats?.tables.length || 0}
                 </p>
               </div>
@@ -209,8 +209,8 @@ const DatabaseMaintenance: React.FC = () => {
                 <Database className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Audit logs</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Audit logs</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {getTableCount("audit_logs").toLocaleString()}
                 </p>
               </div>
@@ -223,8 +223,8 @@ const DatabaseMaintenance: React.FC = () => {
                 <Database className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Ventes</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Ventes</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {getTableCount("ventes").toLocaleString()}
                 </p>
               </div>
@@ -235,11 +235,11 @@ const DatabaseMaintenance: React.FC = () => {
         {/* Réparation de la base de données */}
         {(user?.role === "admin" || user?.role === "gestionnaire") && (
           <div className="card shadow-lg">
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
               <div className="bg-red-600 p-3 rounded-xl shadow-lg">
                 <Settings className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Réparation de la Base de Données
               </h2>
             </div>
@@ -302,37 +302,37 @@ const DatabaseMaintenance: React.FC = () => {
 
         {/* Détails par table */}
         <div className="card shadow-lg">
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
             <div className="bg-blue-600 p-3 rounded-xl shadow-lg">
               <Database className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Détails par Table
             </h2>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Nom de la table
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Nombre d'entrées
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Statut
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {stats?.tables.map((table) => (
-                  <tr key={table.name} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={table.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {table.name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                       {table.count.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -362,22 +362,22 @@ const DatabaseMaintenance: React.FC = () => {
 
         {/* Données les plus anciennes */}
         <div className="card shadow-lg">
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
             <div className="bg-orange-600 p-3 rounded-xl shadow-lg">
               <AlertTriangle className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Données les Plus Anciennes
             </h2>
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
               <div>
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
                   Dernier audit log
                 </p>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
                   {formatDate(stats?.oldestData.auditLog || "")}
                 </p>
               </div>
@@ -395,12 +395,12 @@ const DatabaseMaintenance: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
               <div>
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
                   Dernière vente
                 </p>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
                   {formatDate(stats?.oldestData.sale || "")}
                 </p>
               </div>
@@ -422,18 +422,18 @@ const DatabaseMaintenance: React.FC = () => {
         {/* Configuration de la purge */}
         {(user?.role === "admin" || user?.role === "gestionnaire") && (
           <div className="card shadow-lg">
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
               <div className="bg-red-600 p-3 rounded-xl shadow-lg">
                 <Trash2 className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Purge Automatique
               </h2>
             </div>
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Rétention des logs d'audit (jours)
                 </label>
                 <input
@@ -446,13 +446,13 @@ const DatabaseMaintenance: React.FC = () => {
                   max="365"
                   className="input-field"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Les logs d'audit plus anciens seront supprimés
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Rétention des ventes archivées (jours)
                 </label>
                 <input
@@ -463,13 +463,13 @@ const DatabaseMaintenance: React.FC = () => {
                   max="1825"
                   className="input-field"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Les ventes archivées plus anciennes seront supprimées
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Rétention des achats (jours)
                 </label>
                 <input
@@ -482,12 +482,12 @@ const DatabaseMaintenance: React.FC = () => {
                   max="1825"
                   className="input-field"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Les achats plus anciens seront supprimés
                 </p>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={handlePurge}
                   disabled={purging}

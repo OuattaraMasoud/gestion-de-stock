@@ -66,7 +66,7 @@ const Login: React.FC = () => {
       <div className="w-full max-w-md">
         {/* Logo et titre */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full mb-4 shadow-lg">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white dark:bg-gray-800 rounded-full mb-4 shadow-lg">
             <Package className="w-12 h-12 text-blue-600" />
           </div>
           <h1 className="text-4xl font-bold text-white mb-2">SynkaPOS</h1>
@@ -74,7 +74,7 @@ const Login: React.FC = () => {
         </div>
 
         {/* Formulaire de connexion */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3 text-red-800">
@@ -84,7 +84,7 @@ const Login: React.FC = () => {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email
               </label>
               <input
@@ -99,7 +99,7 @@ const Login: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Mot de passe
               </label>
               <input
@@ -130,14 +130,14 @@ const Login: React.FC = () => {
 
           {/* Info compte de test */}
           <div className="mt-6 pt-6 border-t">
-            <p className="text-sm text-gray-600 text-center mb-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-2">
               Compte de test :
             </p>
-            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-              <p className="text-gray-700">
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 text-sm space-y-1">
+              <p className="text-gray-700 dark:text-gray-300">
                 <strong>Email:</strong> admin@example.com
               </p>
-              <p className="text-gray-700">
+              <p className="text-gray-700 dark:text-gray-300">
                 <strong>Mot de passe:</strong> admin123
               </p>
             </div>

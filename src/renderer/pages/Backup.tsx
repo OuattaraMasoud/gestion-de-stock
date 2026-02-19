@@ -63,7 +63,7 @@ const Backup: React.FC = () => {
           isDev
             ? "⚠️ Mode développement : Vous devrez relancer 'npm run dev' après la restauration."
             : "L'application sera redémarrée automatiquement après la restauration."
-        }`
+        }`,
       )
     ) {
       return;
@@ -76,7 +76,9 @@ const Backup: React.FC = () => {
 
       setTimeout(async () => {
         if (isDev) {
-          alert("Restauration terminée. Veuillez relancer 'npm run dev' manuellement.");
+          alert(
+            "Restauration terminée. Veuillez relancer 'npm run dev' manuellement.",
+          );
           window.close();
         } else {
           await window.electronAPI.relaunchApp();
@@ -111,10 +113,10 @@ const Backup: React.FC = () => {
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               Accès refusé
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-400">
               Cette fonctionnalité est réservée aux administrateurs
             </p>
           </div>
@@ -139,8 +141,10 @@ const Backup: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Sauvegardes</h1>
-            <p className="mt-2 text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Sauvegardes
+            </h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
               Gérer les sauvegardes et restaurations de la base de données
             </p>
           </div>
@@ -170,13 +174,13 @@ const Backup: React.FC = () => {
               </h3>
               <p className="text-sm text-blue-800">
                 Les sauvegardes sont stockées localement sur votre ordinateur.
-                Vous pouvez créer des sauvegardes avant des modifications importantes et les
-                restaurer si nécessaire.
+                Vous pouvez créer des sauvegardes avant des modifications
+                importantes et les restaurer si nécessaire.
                 {import.meta.env.DEV && (
                   <span className="font-semibold">
                     {" "}
-                    ⚠️ En développement, vous devrez relancer "npm run dev" après
-                    une restauration.
+                    ⚠️ En développement, vous devrez relancer "npm run dev"
+                    après une restauration.
                   </span>
                 )}
               </p>
@@ -186,16 +190,16 @@ const Backup: React.FC = () => {
 
         {/* Liste des sauvegardes */}
         <div className="card shadow-lg">
-          <div className="flex items-center justify-between mb-4 pb-4 border-b-2 border-gray-100">
+          <div className="flex items-center justify-between mb-4 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
             <div className="flex items-center gap-3">
               <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-3 rounded-xl shadow-lg">
                 <HardDrive className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   Sauvegardes disponibles
                 </h2>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {backups.length} sauvegarde(s)
                 </p>
               </div>
@@ -203,20 +207,22 @@ const Backup: React.FC = () => {
             <button
               onClick={loadBackups}
               disabled={loading}
-              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+              className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
               title="Actualiser la liste"
             >
-              <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
+              />
             </button>
           </div>
 
           {backups.length === 0 ? (
             <div className="text-center py-12">
               <Database className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Aucune sauvegarde
               </h3>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
                 Créez votre première sauvegarde pour sécuriser vos données
               </p>
               <button onClick={handleBackup} className="btn-primary">
@@ -229,7 +235,7 @@ const Backup: React.FC = () => {
               {backups.map((backup) => (
                 <div
                   key={backup.filename}
-                  className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all"
+                  className="bg-linear-to-br bg-gray-50  dark:bg-gray-600 rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3 flex-1">
@@ -238,11 +244,11 @@ const Backup: React.FC = () => {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-gray-900">
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
                             {backup.filename}
                           </h3>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                           <div className="flex items-center gap-1">
                             <Clock className="w-4 h-4" />
                             {backup.formattedDate}

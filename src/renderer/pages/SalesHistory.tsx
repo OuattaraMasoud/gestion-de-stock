@@ -130,10 +130,13 @@ const SalesHistory: React.FC = () => {
               @page { size: A4; margin: 8mm; }
               body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
               .invoice { max-width: 194mm; margin: 0 auto; }
-              .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 2px solid #2563eb; margin-bottom: 10px; }
-              .company-info h1 { font-size: 16px; color: #1e40af; margin-bottom: 2px; }
+              .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #2563eb; margin-bottom: 10px; }
+              .company-logo { width: 150px; display: flex; align-items: center; }
+              .company-logo img { max-height: 110px; max-width: 150px; object-fit: contain; }
+              .company-info { flex: 1; text-align: center; padding: 0 15px; }
+              .company-info h1 { font-size: 18px; color: #1e40af; margin-bottom: 2px; }
               .company-info p { font-size: 9px; color: #555; margin: 1px 0; }
-              .invoice-badge { background: #2563eb; color: white; padding: 6px 14px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; }
+              .invoice-badge { background: #2563eb; color: white; padding: 6px 14px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; min-width: 80px; }
               .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
               .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
               .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
@@ -172,10 +175,12 @@ const SalesHistory: React.FC = () => {
           <body>
             <div class="invoice">
               <div class="header">
+                <div class="company-logo">
+                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
+                </div>
                 <div class="company-info">
-                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="max-height: 50px; max-width: 120px; margin-bottom: 4px; object-fit: contain;" />` : ""}
                   <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-                  ${config?.description_entreprise ? `<p style="font-size: 8px; color: #666; font-style: italic;">${config.description_entreprise}</p>` : ""}
+                  ${config?.description_entreprise ? `<p style="font-size: 11px; color: #666; font-style: italic;">${config.description_entreprise}</p>` : ""}
                   ${config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
                   ${config?.telephone ? `<p>Tel: ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}${config?.nif ? " | NIF: " + config.nif : ""}</p>` : ""}
                   ${config?.email && !config?.telephone ? `<p>${config.email}</p>` : ""}
@@ -407,10 +412,10 @@ const SalesHistory: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Historique des Ventes
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             {totalItems} vente(s) • Total: {formatCurrency(totalVentes)}
           </p>
         </div>
@@ -420,7 +425,7 @@ const SalesHistory: React.FC = () => {
       <div className="card">
         <div className="flex gap-4 items-end">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Date de début
             </label>
             <input
@@ -431,7 +436,7 @@ const SalesHistory: React.FC = () => {
             />
           </div>
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Date de fin
             </label>
             <input
@@ -452,60 +457,63 @@ const SalesHistory: React.FC = () => {
       {/* Liste des ventes */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   #ID
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Client
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Date & Heure
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Total
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Montant Payé
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Monnaie
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Paiement
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {paginatedSales.map((sale) => (
-                <tr key={sale.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <tr
+                  key={sale.id}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     #{sale.id}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {sale.client_nom || "Client comptoir"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {new Date(sale.date_vente!).toLocaleString("fr-FR")}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
                     {formatCurrency(sale.total || 0)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {formatCurrency(sale.montant_paye || 0)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {formatCurrency(sale.monnaie_rendue || 0)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       {getPaymentIcon(sale.methode_paiement)}
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
                         {getPaymentLabel(sale.methode_paiement)}
                       </span>
                     </div>
@@ -545,10 +553,10 @@ const SalesHistory: React.FC = () => {
           {sales.length === 0 && (
             <div className="text-center py-12">
               <History className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Aucune vente trouvée
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Les ventes effectuées apparaîtront ici.
               </p>
             </div>
@@ -572,7 +580,7 @@ const SalesHistory: React.FC = () => {
       {/* Modal détails de la vente */}
       {selectedSale && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
             <div className="relative bg-blue-600 text-white px-8 py-5 rounded-t-2xl shrink-0">
               <button
                 onClick={() => setSelectedSale(null)}
@@ -596,22 +604,28 @@ const SalesHistory: React.FC = () => {
             </div>
             <div className="p-6 space-y-6">
               {/* Informations de paiement */}
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Méthode de paiement:</span>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Méthode de paiement:
+                  </span>
                   <span className="font-medium flex items-center gap-2">
                     {getPaymentIcon(selectedSale.methode_paiement)}
                     {getPaymentLabel(selectedSale.methode_paiement)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Montant payé:</span>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Montant payé:
+                  </span>
                   <span className="font-medium">
                     {formatCurrency(selectedSale.montant_paye || 0)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Monnaie rendue:</span>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Monnaie rendue:
+                  </span>
                   <span className="font-medium">
                     {formatCurrency(selectedSale.monnaie_rendue || 0)}
                   </span>
@@ -619,8 +633,8 @@ const SalesHistory: React.FC = () => {
                 {selectedSale.remise_valeur != null &&
                   selectedSale.remise_valeur > 0 && (
                     <>
-                      <div className="flex justify-between pt-2 border-t border-gray-200">
-                        <span className="text-gray-600">
+                      <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">
                           Total avant remise:
                         </span>
                         <span className="font-medium">
@@ -628,7 +642,7 @@ const SalesHistory: React.FC = () => {
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">
+                        <span className="text-gray-600 dark:text-gray-400">
                           Remise (
                           {selectedSale.remise_type === "pourcentage"
                             ? `${selectedSale.remise_valeur}%`
@@ -651,7 +665,7 @@ const SalesHistory: React.FC = () => {
 
               {/* Produits vendus */}
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
                   Produits vendus
                 </h3>
                 <div className="space-y-2">
@@ -659,13 +673,13 @@ const SalesHistory: React.FC = () => {
                     (item: any, index: number) => (
                       <div
                         key={index}
-                        className="flex justify-between items-center bg-gray-50 rounded-lg p-3"
+                        className="flex justify-between items-center bg-gray-50 dark:bg-gray-900 rounded-lg p-3"
                       >
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-gray-900 dark:text-white">
                             {item.nom_produit}
                           </p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
                             {formatCurrency(item.prix_unitaire || 0)} x{" "}
                             {item.quantite}
                           </p>
@@ -682,7 +696,7 @@ const SalesHistory: React.FC = () => {
               {/* Total */}
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-xl font-semibold text-gray-900">
+                  <span className="text-xl font-semibold text-gray-900 dark:text-white">
                     Total:
                   </span>
                   <span className="text-3xl font-bold text-blue-600">
@@ -706,7 +720,7 @@ const SalesHistory: React.FC = () => {
       {/* Modal facture */}
       {selectedInvoice && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col">
             <div className="relative bg-blue-600 text-white px-8 py-5 rounded-t-2xl shrink-0">
               <button
                 onClick={() => setSelectedInvoice(null)}
@@ -732,12 +746,12 @@ const SalesHistory: React.FC = () => {
             </div>
 
             {/* Contenu de la facture */}
-            <div className="flex-1 overflow-y-auto p-6 bg-gray-100 flex justify-center">
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-200 dark:bg-gray-600 flex justify-center">
               {isA4 ? (
                 /* Format A4 - Facture professionnelle */
                 <div
                   ref={invoiceRef}
-                  className="bg-white shadow-xl"
+                  className="bg-white shadow-xl dark:text-gray-900"
                   style={{
                     width: "210mm",
                     minHeight: "297mm",
@@ -1303,7 +1317,7 @@ const SalesHistory: React.FC = () => {
                 /* Format ticket 80mm */
                 <div
                   ref={invoiceRef}
-                  className="ticket bg-white shadow-xl"
+                  className="ticket bg-white shadow-xl dark:text-gray-900"
                   style={{
                     width: "80mm",
                     padding: "3mm",
@@ -1652,10 +1666,10 @@ const SalesHistory: React.FC = () => {
               )}
             </div>
 
-            <div className="p-5 bg-gray-50 border-t border-gray-200 flex gap-4 rounded-b-2xl flex-shrink-0">
+            <div className="p-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-4 rounded-b-2xl flex-shrink-0">
               <button
                 onClick={() => setSelectedInvoice(null)}
-                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
+                className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
               >
                 <X className="w-5 h-5" />
                 Fermer

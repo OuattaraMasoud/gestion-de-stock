@@ -85,8 +85,8 @@ const Settings: React.FC = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Paramètres</h1>
-            <p className="mt-2 text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Paramètres</h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
               Configurez les informations de votre entreprise et les factures
             </p>
           </div>
@@ -95,18 +95,18 @@ const Settings: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="card shadow-lg">
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
                 <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-3 rounded-xl shadow-lg">
                   <Building2 className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   Informations de l'entreprise
                 </h2>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Nom de l'entreprise *
                   </label>
                   <input
@@ -116,12 +116,12 @@ const Settings: React.FC = () => {
                       setConfig({ ...config, nom_entreprise: e.target.value })
                     }
                     required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Description de l'entreprise
                   </label>
                   <input
@@ -134,12 +134,12 @@ const Settings: React.FC = () => {
                       })
                     }
                     placeholder="Ex: Électroménager - Informatique - Électronique"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-blue-600" />
                     Adresse
                   </label>
@@ -149,13 +149,13 @@ const Settings: React.FC = () => {
                       setConfig({ ...config, adresse: e.target.value })
                     }
                     rows={3}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none resize-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none resize-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                       <Globe className="w-4 h-4 text-blue-600" />
                       Ville
                     </label>
@@ -165,11 +165,11 @@ const Settings: React.FC = () => {
                       onChange={(e) =>
                         setConfig({ ...config, ville: e.target.value })
                       }
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                       <Globe className="w-4 h-4 text-blue-600" />
                       Pays
                     </label>
@@ -179,13 +179,13 @@ const Settings: React.FC = () => {
                       onChange={(e) =>
                         setConfig({ ...config, pays: e.target.value })
                       }
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <Phone className="w-4 h-4 text-blue-600" />
                     Téléphone principal
                   </label>
@@ -195,12 +195,12 @@ const Settings: React.FC = () => {
                     onChange={(e) =>
                       setConfig({ ...config, telephone: e.target.value })
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <Phone className="w-4 h-4 text-blue-600" />
                     Téléphone secondaire
                   </label>
@@ -210,12 +210,12 @@ const Settings: React.FC = () => {
                     onChange={(e) =>
                       setConfig({ ...config, telephone2: e.target.value })
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <Mail className="w-4 h-4 text-blue-600" />
                     Email
                   </label>
@@ -225,12 +225,12 @@ const Settings: React.FC = () => {
                     onChange={(e) =>
                       setConfig({ ...config, email: e.target.value })
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-blue-600" />
                     NIF (Numéro d'Identification Fiscale)
                   </label>
@@ -240,12 +240,12 @@ const Settings: React.FC = () => {
                     onChange={(e) =>
                       setConfig({ ...config, nif: e.target.value })
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <ImagePlus className="w-4 h-4 text-blue-600" />
                     Logo de l'entreprise
                   </label>
@@ -255,7 +255,7 @@ const Settings: React.FC = () => {
                         <img
                           src={logoPreview}
                           alt="Logo"
-                          className="w-20 h-20 object-contain rounded-lg border-2 border-gray-200 bg-white p-1"
+                          className="w-20 h-20 object-contain rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1"
                         />
                         <button
                           type="button"
@@ -278,7 +278,7 @@ const Settings: React.FC = () => {
                         </button>
                       </div>
                     ) : (
-                      <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+                      <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
                         <ImagePlus className="w-8 h-8 text-gray-400" />
                       </div>
                     )}
@@ -295,7 +295,7 @@ const Settings: React.FC = () => {
                             ? "Changer le logo"
                             : "Choisir un logo"}
                       </button>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         PNG, JPG. Max 2 Mo
                       </p>
                     </div>
@@ -355,18 +355,18 @@ const Settings: React.FC = () => {
             </div>
 
             <div className="card shadow-lg">
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
                 <div className="bg-blue-600 p-3 rounded-xl shadow-lg">
                   <Printer className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   Paramètres de facturation
                 </h2>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-blue-600" />
                     Devise
                   </label>
@@ -376,12 +376,12 @@ const Settings: React.FC = () => {
                     onChange={(e) =>
                       setConfig({ ...config, devise: e.target.value })
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Format de facture
                   </label>
                   <select
@@ -392,7 +392,7 @@ const Settings: React.FC = () => {
                         format_facture: e.target.value as "80mm" | "A4",
                       })
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none"
                   >
                     <option value="80mm">Ticket (80mm)</option>
                     <option value="A4">A4</option>
@@ -400,7 +400,7 @@ const Settings: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Message de pied de page
                   </label>
                   <textarea
@@ -409,12 +409,12 @@ const Settings: React.FC = () => {
                       setConfig({ ...config, message_pied: e.target.value })
                     }
                     rows={3}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none resize-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none resize-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Informations de support
                   </label>
                   <textarea
@@ -424,12 +424,12 @@ const Settings: React.FC = () => {
                     }
                     rows={3}
                     placeholder="Ex: TechHelp: +226 55 00 95 05"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none resize-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none resize-none"
                   />
                 </div>
               </div>
 
-              <div className="mt-6 pt-6 border-t-2 border-gray-100">
+              <div className="mt-6 pt-6 border-t-2 border-gray-100 dark:border-gray-700">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800 font-medium mb-2">
                     Aperçu des modifications
@@ -455,7 +455,7 @@ const Settings: React.FC = () => {
               type="button"
               onClick={loadConfig}
               disabled={saving}
-              className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
             >
               <X className="w-5 h-5" />
               Annuler

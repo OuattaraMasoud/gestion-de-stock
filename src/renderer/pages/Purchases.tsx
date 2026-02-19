@@ -65,7 +65,7 @@ const Purchases: React.FC = () => {
       const result = await window.electronAPI.getProductsPaginated(
         currentPage,
         itemsPerPage,
-        searchQuery || undefined
+        searchQuery || undefined,
       );
       setProducts(result.data);
       setTotalProducts(result.total);
@@ -74,12 +74,15 @@ const Purchases: React.FC = () => {
     }
   };
 
-  const loadPurchaseHistory = async (page: number = historyCurrentPage, limit: number = historyItemsPerPage) => {
+  const loadPurchaseHistory = async (
+    page: number = historyCurrentPage,
+    limit: number = historyItemsPerPage,
+  ) => {
     try {
       const result = await window.electronAPI.getPurchasesPaginated(
-          page,
-          limit
-        );
+        page,
+        limit,
+      );
       setPurchaseHistory(result.data);
       setTotalHistoryItems(result.total);
     } catch (error) {
@@ -108,7 +111,10 @@ const Purchases: React.FC = () => {
 
       // Recherche FTS5 côté serveur (ultra-rapide)
       try {
-        const results = await window.electronAPI.searchProductsFTS(query, itemsPerPage * 5);
+        const results = await window.electronAPI.searchProductsFTS(
+          query,
+          itemsPerPage * 5,
+        );
         setProducts(results);
         setTotalProducts(results.length);
       } catch (error) {
@@ -118,12 +124,8 @@ const Purchases: React.FC = () => {
     [itemsPerPage],
   );
 
-  const { totalPages, paginatedProducts } = (() => {
-    const pages = Math.ceil(totalProducts / itemsPerPage);
-    const startIndex = (currentPage -1) * itemsPerPage;
-    const paginated = products.slice(startIndex, startIndex + itemsPerPage);
-    return { totalPages: pages, paginatedProducts: paginated };
-  })();
+  const totalPages = Math.ceil(totalProducts / itemsPerPage);
+  const paginatedProducts = products; // Already server-paginated
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -271,15 +273,17 @@ const Purchases: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Approvisionnements
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               Gérer les entrées de stock auprès des fournisseurs
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-600">Total approvisionnements</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Total approvisionnements
+            </p>
             <p className="text-xl font-bold text-blue-600">
               {formatCurrency(totalApprovisionnements)}
             </p>
@@ -288,13 +292,13 @@ const Purchases: React.FC = () => {
 
         {/* Tabs */}
         <div className="card">
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setActiveTab("creation")}
               className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
                 activeTab === "creation"
                   ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700"
               }`}
             >
               <Truck className="w-5 h-5" />
@@ -305,7 +309,7 @@ const Purchases: React.FC = () => {
               className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
                 activeTab === "history"
                   ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700"
               }`}
             >
               <History className="w-5 h-5" />
@@ -317,18 +321,18 @@ const Purchases: React.FC = () => {
           {activeTab === "creation" && (
             <div className="p-6 space-y-4">
               <div className="card shadow-lg">
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
                   <div className="bg-blue-600 p-2 rounded-lg">
                     <Truck className="w-5 h-5 text-white" />
                   </div>
-                  <h2 className="text-base font-bold text-gray-900">
+                  <h2 className="text-base font-bold text-gray-900 dark:text-white">
                     Nouvel approvisionnement
                   </h2>
                 </div>
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                       Fournisseur *
                     </label>
                     <select
@@ -339,7 +343,7 @@ const Purchases: React.FC = () => {
                         );
                         setSelectedSupplier(supplier || null);
                       }}
-                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                      className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                     >
                       <option value="">Sélectionner un fournisseur</option>
                       {suppliers.map((supplier) => (
@@ -350,7 +354,7 @@ const Purchases: React.FC = () => {
                     </select>
                   </div>
 
-                  <div className="border-t border-gray-100 pt-3">
+                  <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
                     <button
                       onClick={() => setShowProductSearch(true)}
                       disabled={!selectedSupplier}
@@ -366,7 +370,7 @@ const Purchases: React.FC = () => {
               {showProductSearch && (
                 <div className="card shadow-lg">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       Sélectionner un produit
                     </h3>
                     <button
@@ -387,32 +391,33 @@ const Purchases: React.FC = () => {
                       placeholder="Rechercher..."
                       value={searchQuery}
                       onChange={(e) => handleSearch(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                      className="w-full pl-10 pr-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                     />
                   </div>
 
-              {selectedProduct && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-2 mb-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">
-                      {selectedProduct.nom}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      Stock: {selectedProduct.quantite_stock} • Prix: {formatCurrency(selectedProduct.prix_achat || 0)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleClearProduct}
-                    className="text-red-500 hover:text-red-700 p-1"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+                  {selectedProduct && (
+                    <div className="bg-blue-50 dark:bg-gray-700 border-2 border-blue-200 rounded-lg p-2 mb-3 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm text-gray-900 dark:text-white">
+                          {selectedProduct.nom}
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Stock: {selectedProduct.quantite_stock} • Prix:{" "}
+                          {formatCurrency(selectedProduct.prix_achat || 0)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleClearProduct}
+                        className="text-red-500 hover:text-red-700 p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                         Quantité *
                       </label>
                       <input
@@ -422,11 +427,11 @@ const Purchases: React.FC = () => {
                           setQuantity(parseInt(e.target.value) || 1)
                         }
                         min="1"
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                        className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                         Prix unitaire *
                       </label>
                       <input
@@ -436,8 +441,8 @@ const Purchases: React.FC = () => {
                         min="0"
                         step="0.01"
                         placeholder="Prix"
-                        disabled={isPurchasePriceDisabled}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        // disabled={isPurchasePriceDisabled}
+                        className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -451,18 +456,18 @@ const Purchases: React.FC = () => {
                             onClick={() => handleSelectProduct(product)}
                             className={`p-2 rounded-lg border cursor-pointer transition-all ${
                               selectedProduct?.id === product.id
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-200 hover:border-blue-300 hover:bg-gray-50"
+                                ? "border-blue-500 bg-blue-50 dark:bg-gray-700"
+                                : "border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                             }`}
                           >
                             <div className="flex flex-col items-center gap-1">
                               <Package
                                 className={`w-4 h-4 ${selectedProduct?.id === product.id ? "text-blue-600" : "text-gray-400"}`}
                               />
-                              <p className="text-xs font-semibold text-gray-900 text-center truncate w-full">
+                              <p className="text-xs font-semibold text-gray-900 dark:text-white text-center truncate w-full">
                                 {product.nom}
                               </p>
-                              <p className="text-xs text-gray-500 text-center">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
                                 {product.quantite_stock}
                               </p>
                               <p className="text-xs text-blue-600 font-medium text-center">
@@ -486,7 +491,7 @@ const Purchases: React.FC = () => {
                       />
                     </>
                   ) : (
-                    <p className="text-center text-gray-500 py-4 text-sm">
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">
                       {searchQuery
                         ? "Aucun résultat"
                         : "Sélectionnez un produit"}
@@ -509,20 +514,20 @@ const Purchases: React.FC = () => {
               {purchaseItems.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                   <div className="lg:col-span-3 card shadow-lg">
-                    <h3 className="text-base font-semibold text-gray-900 mb-3">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
                       Produits de la commande ({purchaseItems.length})
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                       {purchaseItems.map((item) => (
                         <div
                           key={item.produit_id}
-                          className="bg-gray-50 rounded-lg p-3 border border-gray-200 flex justify-between items-center"
+                          className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700 flex justify-between items-center"
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-gray-900 truncate">
+                            <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
                               {item.nom_produit}
                             </p>
-                            <p className="text-xs text-gray-600">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
                               {item.quantite} x{" "}
                               {formatCurrency(item.prix_unitaire)}
                             </p>
@@ -542,19 +547,21 @@ const Purchases: React.FC = () => {
                   </div>
 
                   <div className="card shadow-lg sticky top-4">
-                    <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                    <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
                       <div className="bg--blue-600 p-2 rounded-lg">
                         <ShoppingCart className="w-5 h-5 text-white" />
                       </div>
-                      <h2 className="text-base font-bold text-gray-900">
+                      <h2 className="text-base font-bold text-gray-900 dark:text-white">
                         Récapitulatif
                       </h2>
                     </div>
 
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-600">Articles</span>
-                        <span className="text-lg font-bold text-gray-900">
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          Articles
+                        </span>
+                        <span className="text-lg font-bold text-gray-900 dark:text-white">
                           {purchaseItems.reduce(
                             (sum, item) => sum + item.quantite,
                             0,
@@ -562,15 +569,17 @@ const Purchases: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
-                        <span className="text-xs text-gray-600">Total</span>
+                      <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex justify-between items-center">
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          Total
+                        </span>
                         <span className="text-2xl font-bold text-blue-600">
                           {formatCurrency(getTotal())}
                         </span>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                           Mode de paiement
                         </label>
                         <div className="grid grid-cols-2 gap-2">
@@ -593,8 +602,8 @@ const Purchases: React.FC = () => {
                               }
                               className={`p-2 rounded-lg border-2 transition-all ${
                                 paymentMethod === method.value
-                                  ? "border-blue-500 bg-blue-50"
-                                  : "border-gray-200 hover:border-gray-300"
+                                  ? "border-blue-500 bg-blue-50 dark:bg-gray-700"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                               }`}
                             >
                               <method.icon className="w-4 h-4 mx-auto" />
@@ -604,21 +613,21 @@ const Purchases: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                           Montant payé
                         </label>
                         <div className="flex gap-2">
                           <button
                             type="button"
                             onClick={() => setAmountPaid(getTotal().toString())}
-                            className="px-2 py-2 text-xs bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium"
+                            className="px-2 py-2 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium"
                           >
                             Total: {formatCurrency(getTotal())}
                           </button>
                           <button
                             type="button"
                             onClick={() => setAmountPaid("0")}
-                            className="px-2 py-2 text-xs bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium"
+                            className="px-2 py-2 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium"
                           >
                             0 (Credit)
                           </button>
@@ -630,7 +639,7 @@ const Purchases: React.FC = () => {
                           min="0"
                           step="0.01"
                           placeholder="Montant"
-                          className="w-full mt-2 px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                          className="w-full mt-2 px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                         />
                       </div>
 
@@ -657,59 +666,62 @@ const Purchases: React.FC = () => {
           {/* Contenu Tab Historique */}
           {activeTab === "history" && (
             <div className="p-6">
-              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
                 <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-lg">
                   <History className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-gray-900">
-                      Historique des approvisionnements
-                    </h2>
-                    <p className="text-xs text-gray-600">
-                      {totalHistoryItems} entrée(s)
-                    </p>
-                  </div>
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                    Historique des approvisionnements
+                  </h2>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    {totalHistoryItems} entrée(s)
+                  </p>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         #ID
                       </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Date
                       </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Fournisseur
                       </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Produits
                       </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Total
                       </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Statut
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {historyPaginatedPurchases.map((purchase) => (
-                      <tr key={purchase.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                      <tr
+                        key={purchase.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900 dark:text-white">
                           #{purchase.id}
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
                           {new Date(
                             purchase.date_achat || "",
                           ).toLocaleDateString("fr-FR")}
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-medium">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 dark:text-white font-medium">
                           {purchase.fournisseur_nom}
                         </td>
-                        <td className="px-3 py-2 text-xs text-gray-600 max-w-xs truncate">
+                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate">
                           {purchase.produits
                             ?.map((item) => item.nom_produit)
                             .join(", ") || "-"}
@@ -742,10 +754,10 @@ const Purchases: React.FC = () => {
                 {purchaseHistory.length === 0 && (
                   <div className="text-center py-8">
                     <History className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <h3 className="text-sm font-medium text-gray-900 mb-1">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
                       Aucun approvisionnement
                     </h3>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
                       Les approvisionnements effectués apparaîtront ici.
                     </p>
                   </div>
@@ -753,7 +765,7 @@ const Purchases: React.FC = () => {
               </div>
 
               {purchaseHistory.length > 0 && (
-                <div className="border-t border-gray-200">
+                <div className="border-t border-gray-200 dark:border-gray-700">
                   <Pagination
                     currentPage={historyCurrentPage}
                     totalPages={historyTotalPages}
@@ -776,33 +788,39 @@ const Purchases: React.FC = () => {
 
         {showConfirmation && (
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-5">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                 Confirmer l'approvisionnement
               </h3>
               <div className="space-y-2 mb-5 text-sm">
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
                   <span>Fournisseur:</span>
                   <span className="font-semibold">{selectedSupplier?.nom}</span>
                 </div>
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
                   <span>Produits:</span>
                   <span className="font-semibold">{purchaseItems.length}</span>
                 </div>
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
                   <span>Total:</span>
                   <span className="font-bold text-blue-600">
                     {formatCurrency(getTotal())}
                   </span>
                 </div>
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
                   <span>Montant payé:</span>
-                  <span className="font-semibold">{formatCurrency(parseFloat(amountPaid) || 0)}</span>
+                  <span className="font-semibold">
+                    {formatCurrency(parseFloat(amountPaid) || 0)}
+                  </span>
                 </div>
-                {(getTotal() - (parseFloat(amountPaid) || 0)) > 0 && (
+                {getTotal() - (parseFloat(amountPaid) || 0) > 0 && (
                   <div className="flex justify-between text-red-600 font-semibold">
                     <span>Reste à payer:</span>
-                    <span>{formatCurrency(getTotal() - (parseFloat(amountPaid) || 0))}</span>
+                    <span>
+                      {formatCurrency(
+                        getTotal() - (parseFloat(amountPaid) || 0),
+                      )}
+                    </span>
                   </div>
                 )}
               </div>
@@ -810,7 +828,7 @@ const Purchases: React.FC = () => {
                 <button
                   onClick={() => setShowConfirmation(false)}
                   disabled={processing}
-                  className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-all text-sm"
+                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all text-sm"
                 >
                   Annuler
                 </button>

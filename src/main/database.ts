@@ -7,7 +7,7 @@ let db: Database.Database;
 
 // Version actuelle du schéma de la base de données
 // Incrémentez ce numéro à chaque nouveau changement de schéma
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 11;
 
 // Vérifier l'intégrité de la base de données
 function checkAndRepairDatabase(): { success: boolean; message: string } {
@@ -682,7 +682,83 @@ const migrations: Migration[] = [
           CREATE INDEX IF NOT EXISTS idx_client_prix_produit ON client_prix(produit_id);
           CREATE INDEX IF NOT EXISTS idx_client_prix_unique ON client_prix(client_id, produit_id);
         `);
-        console.log("✓ Migration 8 terminée");
+      console.log("✓ Migration 8 terminée");
+      }
+    },
+  },
+  {
+    version: 9,
+    description: "Création de la table depenses pour les dépenses de fonctionnement",
+    up: () => {
+      if (!tableExists("depenses")) {
+        console.log("Migration 9: Création de la table depenses...");
+        db.exec(`
+          CREATE TABLE depenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            categorie TEXT NOT NULL CHECK(categorie IN ('restauration', 'energie', 'carburant', 'transport', 'fournitures', 'salaire', 'loyer', 'communication', 'don', 'maintenance', 'autre')),
+            description TEXT NOT NULL,
+            montant REAL NOT NULL,
+            date_depense DATE NOT NULL,
+            methode_paiement TEXT CHECK(methode_paiement IN ('especes', 'carte', 'virement', 'cheque', 'mobile')),
+            reference TEXT,
+            utilisateur_id INTEGER,
+            utilisateur_nom TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_depenses_categorie ON depenses(categorie);
+          CREATE INDEX IF NOT EXISTS idx_depenses_date ON depenses(date_depense);
+          CREATE INDEX IF NOT EXISTS idx_depenses_montant ON depenses(montant);
+        `);
+        console.log("✓ Migration 9 terminée");
+      }
+    },
+  },
+  {
+    version: 10,
+    description: "Ajout colonne sans_stock pour produits sans suivi de stock",
+    up: () => {
+      if (!columnExists("produits", "sans_stock")) {
+        console.log("Migration 10: Ajout colonne sans_stock...");
+        db.exec(`ALTER TABLE produits ADD COLUMN sans_stock INTEGER DEFAULT 0`);
+        console.log("✓ Migration 10 terminée");
+      }
+    },
+  },
+  {
+    version: 11,
+    description: "Ajout index unique sur téléphone client",
+    up: () => {
+      console.log("Migration 11: Création index unique sur téléphone client...");
+      try {
+        const duplicates = db.prepare(`
+          SELECT telephone, COUNT(*) as count
+          FROM clients
+          WHERE telephone IS NOT NULL AND telephone != ''
+          GROUP BY telephone
+          HAVING count > 1
+        `).all() as { telephone: string; count: number }[];
+
+        if (duplicates.length > 0) {
+          console.log(`  Attention: ${duplicates.length} doublons de téléphone détectés`);
+          for (const dup of duplicates) {
+            const clients = db.prepare(`
+              SELECT id FROM clients WHERE telephone = ? ORDER BY created_at ASC
+            `).all(dup.telephone) as { id: number }[];
+            
+            for (let i = 1; i < clients.length; i++) {
+              db.prepare(`UPDATE clients SET telephone = NULL WHERE id = ?`).run(clients[i].id);
+            }
+          }
+          console.log("  Doublons de téléphone nettoyés");
+        }
+
+        db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_telephone_unique ON clients(telephone) WHERE telephone IS NOT NULL AND telephone != ''`);
+        console.log("✓ Migration 11 terminée");
+      } catch (error) {
+        console.log("  Index déjà existant ou erreur mineure:", error);
       }
     },
   },
@@ -4086,6 +4162,302 @@ export function getTreasury() {
   }
 }
 
+// ==================== GESTION DES DÉPENSES ====================
+
+export function getExpenses(startDate?: string, endDate?: string) {
+  try {
+    let query = "SELECT * FROM depenses";
+    const params: any[] = [];
+
+    if (startDate && endDate) {
+      query += " WHERE DATE(date_depense) BETWEEN DATE(?) AND DATE(?)";
+      params.push(startDate, endDate);
+    }
+
+    query += " ORDER BY date_depense DESC, created_at DESC";
+
+    return db.prepare(query).all(...params);
+  } catch (error) {
+    console.error("Erreur get expenses:", error);
+    throw error;
+  }
+}
+
+export function getExpensesPaginated(
+  page: number,
+  limit: number,
+  startDate?: string,
+  endDate?: string,
+  categorie?: string,
+) {
+  try {
+    const offset = (page - 1) * limit;
+    let whereClause = "WHERE 1=1";
+    const params: any[] = [];
+
+    if (startDate && endDate) {
+      whereClause += " AND DATE(date_depense) BETWEEN DATE(?) AND DATE(?)";
+      params.push(startDate, endDate);
+    }
+
+    if (categorie) {
+      whereClause += " AND categorie = ?";
+      params.push(categorie);
+    }
+
+    const countQuery = `SELECT COUNT(*) as total, COALESCE(SUM(montant), 0) as totalMontant FROM depenses ${whereClause}`;
+    const countResult = db.prepare(countQuery).get(...params) as {
+      total: number;
+      totalMontant: number;
+    };
+
+    const dataQuery = `SELECT * FROM depenses ${whereClause} ORDER BY date_depense DESC, created_at DESC LIMIT ? OFFSET ?`;
+    const data = db.prepare(dataQuery).all(...params, limit, offset);
+
+    return {
+      data,
+      total: countResult.total,
+      page,
+      limit,
+      totalPages: Math.ceil(countResult.total / limit),
+      totalMontant: countResult.totalMontant,
+    };
+  } catch (error) {
+    console.error("Erreur get expenses paginated:", error);
+    throw error;
+  }
+}
+
+export function createExpense(expense: any) {
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO depenses (categorie, description, montant, date_depense, methode_paiement, reference, utilisateur_id, utilisateur_nom)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      expense.categorie,
+      expense.description,
+      expense.montant,
+      expense.date_depense,
+      expense.methode_paiement || null,
+      expense.reference || null,
+      expense.utilisateur_id || null,
+      expense.utilisateur_nom || null,
+    );
+
+    const expenseId = result.lastInsertRowid;
+
+    db.prepare(`
+      INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      "depense",
+      expenseId,
+      `Dépense: ${expense.description} (${expense.categorie})`,
+      expense.montant,
+      "sortie",
+      expense.methode_paiement || null,
+    );
+
+    if (expense.utilisateur_id && expense.utilisateur_nom) {
+      createAuditLog({
+        utilisateur_id: expense.utilisateur_id,
+        utilisateur_nom: expense.utilisateur_nom,
+        action: "CREATE",
+        table_cible: "depenses",
+        enregistrement_id: expenseId,
+        details: JSON.stringify(expense),
+      });
+    }
+
+    return { id: expenseId, ...expense };
+  } catch (error) {
+    console.error("Erreur create expense:", error);
+    throw error;
+  }
+}
+
+export function updateExpense(id: number, expense: any) {
+  try {
+    const oldExpense = db.prepare("SELECT * FROM depenses WHERE id = ?").get(id) as any;
+    if (!oldExpense) {
+      throw new Error("Dépense non trouvée");
+    }
+
+    const stmt = db.prepare(`
+      UPDATE depenses
+      SET categorie = ?, description = ?, montant = ?, date_depense = ?, methode_paiement = ?, reference = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+
+    stmt.run(
+      expense.categorie,
+      expense.description,
+      expense.montant,
+      expense.date_depense,
+      expense.methode_paiement || null,
+      expense.reference || null,
+      id,
+    );
+
+    db.prepare(`
+      UPDATE comptabilite
+      SET description = ?, montant = ?, methode_paiement = ?
+      WHERE type = 'depense' AND reference_id = ?
+    `).run(
+      `Dépense: ${expense.description} (${expense.categorie})`,
+      expense.montant,
+      expense.methode_paiement || null,
+      id,
+    );
+
+    if (expense.utilisateur_id && expense.utilisateur_nom) {
+      createAuditLog({
+        utilisateur_id: expense.utilisateur_id,
+        utilisateur_nom: expense.utilisateur_nom,
+        action: "UPDATE",
+        table_cible: "depenses",
+        enregistrement_id: id,
+        details: JSON.stringify({ old: oldExpense, new: expense }),
+      });
+    }
+
+    return { id, ...expense };
+  } catch (error) {
+    console.error("Erreur update expense:", error);
+    throw error;
+  }
+}
+
+export function deleteExpense(
+  id: number,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
+  try {
+    const expense = db.prepare("SELECT * FROM depenses WHERE id = ?").get(id) as any;
+    if (!expense) {
+      throw new Error("Dépense non trouvée");
+    }
+
+    db.prepare("DELETE FROM comptabilite WHERE type = 'depense' AND reference_id = ?").run(id);
+    db.prepare("DELETE FROM depenses WHERE id = ?").run(id);
+
+    if (utilisateur_id && utilisateur_nom) {
+      createAuditLog({
+        utilisateur_id,
+        utilisateur_nom,
+        action: "DELETE",
+        table_cible: "depenses",
+        enregistrement_id: id,
+        details: JSON.stringify(expense),
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur delete expense:", error);
+    throw error;
+  }
+}
+
+export function getExpenseStats(startDate?: string, endDate?: string) {
+  try {
+    let whereClause = "WHERE 1=1";
+    const params: any[] = [];
+
+    if (startDate && endDate) {
+      whereClause += " AND DATE(date_depense) BETWEEN DATE(?) AND DATE(?)";
+      params.push(startDate, endDate);
+    }
+
+    const totalResult = db.prepare(
+      `SELECT COALESCE(SUM(montant), 0) as total FROM depenses ${whereClause}`,
+    ).get(...params) as { total: number };
+
+    const byCategorie = db.prepare(
+      `SELECT categorie, SUM(montant) as total, COUNT(*) as count FROM depenses ${whereClause} GROUP BY categorie ORDER BY total DESC`,
+    ).all(...params);
+
+    return {
+      total: totalResult.total,
+      byCategorie,
+    };
+  } catch (error) {
+    console.error("Erreur get expense stats:", error);
+    throw error;
+  }
+}
+
+// ==================== TOP PRODUITS ET CLIENTS ====================
+
+export function getTopProducts(limit: number = 10, startDate?: string, endDate?: string) {
+  try {
+    let whereClause = "";
+    const params: any[] = [limit];
+
+    if (startDate && endDate) {
+      whereClause = "WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)";
+      params.unshift(startDate, endDate);
+    }
+
+    const query = `
+      SELECT
+        vp.produit_id as product_id,
+        p.nom,
+        SUM(vp.quantite) as quantite_vendue,
+        SUM(vp.sous_total) as chiffre_affaires,
+        SUM((vp.prix_unitaire - p.prix_achat) * vp.quantite) as marge
+      FROM ventes_produits vp
+      JOIN produits p ON vp.produit_id = p.id
+      JOIN ventes v ON vp.vente_id = v.id
+      ${whereClause}
+      GROUP BY vp.produit_id
+      ORDER BY chiffre_affaires DESC
+      LIMIT ?
+    `;
+
+    return db.prepare(query).all(...params);
+  } catch (error) {
+    console.error("Erreur get top products:", error);
+    throw error;
+  }
+}
+
+export function getTopClients(limit: number = 10, startDate?: string, endDate?: string) {
+  try {
+    let whereClause = "WHERE v.client_id IS NOT NULL";
+    const params: any[] = [limit];
+
+    if (startDate && endDate) {
+      whereClause += " AND DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)";
+      params.unshift(startDate, endDate);
+    }
+
+    const query = `
+      SELECT
+        c.id as client_id,
+        c.nom,
+        c.telephone,
+        SUM(v.total) as chiffre_affaires,
+        COUNT(v.id) as nb_achats,
+        COALESCE(c.solde_du, 0) as solde_du
+      FROM ventes v
+      JOIN clients c ON v.client_id = c.id
+      ${whereClause}
+      GROUP BY c.id
+      ORDER BY chiffre_affaires DESC
+      LIMIT ?
+    `;
+
+    return db.prepare(query).all(...params);
+  } catch (error) {
+    console.error("Erreur get top clients:", error);
+    throw error;
+  }
+}
+
 // Statistiques de profit réelles (basées sur les ventes et coûts des produits)
 export function getProfitStats(startDate?: string, endDate?: string) {
   try {
@@ -5139,14 +5511,31 @@ export function getProductsPaginated(
   page: number = 1,
   limit: number = 10,
   search?: string,
+  categorieId?: number,
+  status?: string,
 ) {
   try {
     const offset = (page - 1) * limit;
-    let whereClause = "";
+    let conditions: string[] = [];
     let params: any[] = [];
 
-    // Optimisation FTS5 pour recherche rapide
-    if (search && search.trim()) {
+    // Filtre par catégorie
+    if (categorieId) {
+      conditions.push("p.categorie_id = ?");
+      params.push(categorieId);
+    }
+
+    // Filtre par statut (calculé depuis quantite_stock et stock_min)
+    if (status === "epuise") {
+      conditions.push("p.quantite_stock = 0");
+    } else if (status === "stock_faible") {
+      conditions.push("p.quantite_stock > 0 AND p.quantite_stock <= p.stock_min");
+    } else if (status === "en_stock") {
+      conditions.push("p.quantite_stock > p.stock_min");
+    }
+
+    // Optimisation FTS5 pour recherche rapide (uniquement si pas de filtre catégorie/statut)
+    if (search && search.trim() && !categorieId && !status) {
       const searchQuery = search.trim();
       // Essayer d'abord FTS5 si disponible
       try {
@@ -5186,9 +5575,16 @@ export function getProductsPaginated(
       }
 
       const searchTerm = `%${searchQuery}%`;
-      whereClause = "WHERE (p.nom LIKE ? OR p.code_barre = ?)";
-      params = [searchTerm, searchQuery];
+      conditions.push("(p.nom LIKE ? OR p.code_barre = ?)");
+      params.push(searchTerm, searchQuery);
+    } else if (search && search.trim()) {
+      // Recherche LIKE combinée avec d'autres filtres
+      const searchTerm = `%${search.trim()}%`;
+      conditions.push("(p.nom LIKE ? OR p.code_barre = ?)");
+      params.push(searchTerm, search.trim());
     }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const countStmt = db.prepare(`
       SELECT COUNT(*) as total

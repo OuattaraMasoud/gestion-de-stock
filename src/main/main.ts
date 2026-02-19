@@ -465,6 +465,65 @@ ipcMain.handle(
   },
 );
 
+// Dépenses
+ipcMain.handle(
+  "get-expenses",
+  async (_, startDate?: string, endDate?: string) => {
+    return db.getExpenses(startDate, endDate);
+  },
+);
+
+ipcMain.handle(
+  "get-expenses-paginated",
+  async (
+    _,
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+    categorie?: string,
+  ) => {
+    return db.getExpensesPaginated(page, limit, startDate, endDate, categorie);
+  },
+);
+
+ipcMain.handle("create-expense", async (_, expense: any) => {
+  return db.createExpense(expense);
+});
+
+ipcMain.handle("update-expense", async (_, id: number, expense: any) => {
+  return db.updateExpense(id, expense);
+});
+
+ipcMain.handle(
+  "delete-expense",
+  async (_, id: number, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.deleteExpense(id, utilisateur_id, utilisateur_nom);
+  },
+);
+
+ipcMain.handle(
+  "get-expense-stats",
+  async (_, startDate?: string, endDate?: string) => {
+    return db.getExpenseStats(startDate, endDate);
+  },
+);
+
+// Top Produits et Clients
+ipcMain.handle(
+  "get-top-products",
+  async (_, limit?: number, startDate?: string, endDate?: string) => {
+    return db.getTopProducts(limit, startDate, endDate);
+  },
+);
+
+ipcMain.handle(
+  "get-top-clients",
+  async (_, limit?: number, startDate?: string, endDate?: string) => {
+    return db.getTopClients(limit, startDate, endDate);
+  },
+);
+
 ipcMain.handle(
   "get-accounting-entries-paginated",
   async (
@@ -577,9 +636,9 @@ ipcMain.handle(
 
 ipcMain.handle(
   "get-products-paginated",
-  async (_, page: number, limit: number, search?: string) => {
+  async (_, page: number, limit: number, search?: string, categorieId?: number, status?: string) => {
     try {
-      return db.getProductsPaginated(page, limit, search);
+      return db.getProductsPaginated(page, limit, search, categorieId, status);
     } catch (error) {
       console.error("Erreur get products paginated:", error);
       throw error;

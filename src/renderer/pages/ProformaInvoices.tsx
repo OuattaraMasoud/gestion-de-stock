@@ -619,10 +619,13 @@ const ProformaInvoices: React.FC = () => {
               @page { size: A4; margin: 8mm; }
               body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
               .invoice { max-width: 194mm; margin: 0 auto; }
-              .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 2px solid #f59e0b; margin-bottom: 10px; }
-              .company-info h1 { font-size: 16px; color: #92400e; margin-bottom: 2px; }
+              .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #f59e0b; margin-bottom: 10px; }
+              .company-logo { width: 150px; display: flex; align-items: center; }
+              .company-logo img { max-height: 110px; max-width: 150px; object-fit: contain; }
+              .company-info { flex: 1; text-align: center; padding: 0 15px; }
+              .company-info h1 { font-size: 18px; color: #92400e; margin-bottom: 2px; }
               .company-info p { font-size: 9px; color: #555; margin: 1px 0; }
-              .invoice-badge { background: #f59e0b; color: white; padding: 6px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; text-align: center; }
+              .invoice-badge { background: #f59e0b; color: white; padding: 6px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; text-align: center; min-width: 80px; }
               .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
               .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
               .info-box { width: 48%; background: #fffbeb; padding: 8px 10px; border-radius: 4px; border: 1px solid #fde68a; }
@@ -661,10 +664,12 @@ const ProformaInvoices: React.FC = () => {
           <body>
             <div class="invoice">
               <div class="header">
+                <div class="company-logo">
+                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
+                </div>
                 <div class="company-info">
-                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="max-height: 50px; max-width: 120px; margin-bottom: 4px; object-fit: contain;" />` : ""}
                   <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-                  ${config?.description_entreprise ? `<p style="font-size: 14px; color: #666; font-style: italic;">${config.description_entreprise}</p>` : ""}
+                  ${config?.description_entreprise ? `<p style="font-size: 11px; color: #666; font-style: italic;">${config.description_entreprise}</p>` : ""}
                   ${config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
                   ${config?.telephone ? `<p>Tel: ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}${config?.nif ? " | NIF: " + config.nif : ""}</p>` : ""}
                   ${config?.email && !config?.telephone ? `<p>${config.email}</p>` : ""}
@@ -783,7 +788,7 @@ const ProformaInvoices: React.FC = () => {
       acceptee: "bg-green-100 text-green-700",
       refusee: "bg-red-100 text-red-700",
       convertie: "bg-blue-100 text-blue-700",
-      expiree: "bg-gray-100 text-gray-700",
+      expiree: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300",
     };
     const labels: Record<string, string> = {
       en_attente: "En attente",
@@ -805,7 +810,7 @@ const ProformaInvoices: React.FC = () => {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Client
           </label>
           <select
@@ -826,7 +831,7 @@ const ProformaInvoices: React.FC = () => {
                 });
               }
             }}
-            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 outline-none"
           >
             <option value="">Client comptoir</option>
             {clients.map((client) => (
@@ -837,7 +842,7 @@ const ProformaInvoices: React.FC = () => {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Date de validité
           </label>
           <input
@@ -846,14 +851,14 @@ const ProformaInvoices: React.FC = () => {
             onChange={(e) =>
               setFormData({ ...formData, date_validite: e.target.value })
             }
-            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 outline-none"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Téléphone
           </label>
           <input
@@ -863,11 +868,11 @@ const ProformaInvoices: React.FC = () => {
               setFormData({ ...formData, client_telephone: e.target.value })
             }
             placeholder="Téléphone client"
-            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 outline-none"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Email
           </label>
           <input
@@ -877,13 +882,13 @@ const ProformaInvoices: React.FC = () => {
               setFormData({ ...formData, client_email: e.target.value })
             }
             placeholder="Email client"
-            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 outline-none"
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Ajouter un produit
         </label>
         <div className="relative">
@@ -897,12 +902,12 @@ const ProformaInvoices: React.FC = () => {
             }}
             onFocus={() => setShowProductDropdown(true)}
             placeholder="Rechercher un produit..."
-            className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+            className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 outline-none"
           />
           {showProductDropdown && productSearch && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
               {filteredProducts.length === 0 ? (
-                <p className="p-3 text-gray-500 text-center">
+                <p className="p-3 text-gray-500 dark:text-gray-400 text-center">
                   Aucun produit trouvé
                 </p>
               ) : (
@@ -910,13 +915,13 @@ const ProformaInvoices: React.FC = () => {
                   <button
                     key={product.id}
                     onClick={() => handleAddProduct(product)}
-                    className="w-full px-4 py-2 text-left hover:bg-green-50 flex items-center justify-between"
+                    className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
                       <Package className="w-4 h-4 text-gray-400" />
                       <span>{product.nom}</span>
                     </div>
-                    <span className="font-medium text-green-600">
+                    <span className="font-medium text-blue-600">
                       {formatCurrency(product.prix_vente)}
                     </span>
                   </button>
@@ -928,23 +933,23 @@ const ProformaInvoices: React.FC = () => {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Articles
         </label>
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
                   Produit
                 </th>
-                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 w-32">
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 w-32">
                   Qté
                 </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
                   Prix
                 </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
                   Total
                 </th>
                 <th className="w-10"></th>
@@ -955,14 +960,17 @@ const ProformaInvoices: React.FC = () => {
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-4 py-8 text-center text-gray-500"
+                    className="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
                   >
                     Aucun article
                   </td>
                 </tr>
               ) : (
                 formData.articles.map((article) => (
-                  <tr key={article.tempId} className="hover:bg-gray-50">
+                  <tr
+                    key={article.tempId}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
                     <td className="px-4 py-3 font-medium">
                       {article.designation}
                     </td>
@@ -975,7 +983,7 @@ const ProformaInvoices: React.FC = () => {
                               article.quantite - 1,
                             )
                           }
-                          className="w-7 h-7 bg-gray-100 rounded flex items-center justify-center hover:bg-gray-200"
+                          className="w-7 h-7 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center hover:bg-gray-200"
                         >
                           -
                         </button>
@@ -989,7 +997,7 @@ const ProformaInvoices: React.FC = () => {
                               article.quantite + 1,
                             )
                           }
-                          className="w-7 h-7 bg-green-600 text-white rounded flex items-center justify-center hover:bg-green-700"
+                          className="w-7 h-7 bg-blue-600 text-white rounded flex items-center justify-center hover:bg-blue-700"
                         >
                           +
                         </button>
@@ -998,7 +1006,7 @@ const ProformaInvoices: React.FC = () => {
                     <td className="px-4 py-3 text-right text-sm">
                       {formatCurrency(article.prixUnitaire)}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-green-600">
+                    <td className="px-4 py-3 text-right font-bold text-blue-600">
                       {formatCurrency(article.total)}
                     </td>
                     <td className="px-4 py-3">
@@ -1019,7 +1027,7 @@ const ProformaInvoices: React.FC = () => {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Type de remise
           </label>
           <select
@@ -1031,7 +1039,7 @@ const ProformaInvoices: React.FC = () => {
                 remise_valeur: 0,
               })
             }
-            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+            className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 outline-none"
           >
             <option value="">Aucune remise</option>
             <option value="pourcentage">Pourcentage (%)</option>
@@ -1040,7 +1048,7 @@ const ProformaInvoices: React.FC = () => {
         </div>
         {formData.remise_type && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Valeur remise
             </label>
             <input
@@ -1052,14 +1060,14 @@ const ProformaInvoices: React.FC = () => {
                   remise_valeur: parseFloat(e.target.value) || 0,
                 })
               }
-              className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+              className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 outline-none"
             />
           </div>
         )}
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Notes
         </label>
         <textarea
@@ -1067,11 +1075,11 @@ const ProformaInvoices: React.FC = () => {
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           placeholder="Notes ou conditions particulières..."
           rows={2}
-          className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+          className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 outline-none"
         />
       </div>
 
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+      <div className="bg-blue-50 dark:bg-gray-700 border border-blue-200 rounded-lg p-4">
         <div className="flex justify-between mb-2">
           <span>Sous-total:</span>
           <span>{formatCurrency(subtotal)}</span>
@@ -1084,7 +1092,7 @@ const ProformaInvoices: React.FC = () => {
         )}
         <div className="flex justify-between text-lg font-bold border-t pt-2">
           <span>Total TTC:</span>
-          <span className="text-green-600">{formatCurrency(total)}</span>
+          <span className="text-blue-600">{formatCurrency(total)}</span>
         </div>
       </div>
     </div>
@@ -1094,17 +1102,19 @@ const ProformaInvoices: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Factures Proforma
           </h1>
-          <p className="text-gray-500">Gérez vos devis et factures proforma</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            Gérez vos devis et factures proforma
+          </p>
         </div>
         <button
           onClick={() => {
             resetForm();
             setShowCreateModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           <Plus className="w-5 h-5" />
           Nouvelle proforma
@@ -1120,13 +1130,13 @@ const ProformaInvoices: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher par numéro ou client..."
-              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 outline-none"
             />
           </div>
           <select
             value={statutFilter}
             onChange={(e) => setStatutFilter(e.target.value)}
-            className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 outline-none"
+            className="px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 outline-none"
           >
             <option value="tous">Tous les statuts</option>
             <option value="en_attente">En attente</option>
@@ -1139,48 +1149,51 @@ const ProformaInvoices: React.FC = () => {
       </div>
 
       <div className="card shadow-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 N° Proforma
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Client
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Total TTC
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Validité
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Statut
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {proformas.map((proforma) => (
-              <tr key={proforma.id} className="hover:bg-gray-50">
+              <tr
+                key={proforma.id}
+                className="hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
                 <td className="px-6 py-4 whitespace-nowrap font-medium text-blue-600">
                   {proforma.numero}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                   {proforma.date_proforma}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                   {proforma.client_nom}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
                   {formatCurrency(proforma.total_ttc)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                   {proforma.date_validite || "-"}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -1234,10 +1247,10 @@ const ProformaInvoices: React.FC = () => {
         {proformas.length === 0 && (
           <div className="text-center py-12">
             <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               Aucune facture proforma
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-400">
               Créez votre première facture proforma
             </p>
           </div>
@@ -1259,7 +1272,7 @@ const ProformaInvoices: React.FC = () => {
       {/* Modal Création */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
             <div className="bg-blue-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <FileText className="w-6 h-6" />
@@ -1273,16 +1286,16 @@ const ProformaInvoices: React.FC = () => {
               </button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto">{formContent}</div>
-            <div className="p-4 bg-gray-50 border-t flex gap-3 rounded-b-2xl">
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t flex gap-3 rounded-b-2xl">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium"
               >
                 Annuler
               </button>
               <button
                 onClick={handleCreateProforma}
-                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
               >
                 Créer la proforma
               </button>
@@ -1294,7 +1307,7 @@ const ProformaInvoices: React.FC = () => {
       {/* Modal Édition */}
       {showEditModal && editingProforma && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
             <div className="bg-blue-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Edit className="w-6 h-6" />
@@ -1314,14 +1327,14 @@ const ProformaInvoices: React.FC = () => {
               </button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto">{formContent}</div>
-            <div className="p-4 bg-gray-50 border-t flex gap-3 rounded-b-2xl">
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t flex gap-3 rounded-b-2xl">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setEditingProforma(null);
                   resetForm();
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg font-medium"
               >
                 Annuler
               </button>
@@ -1339,7 +1352,7 @@ const ProformaInvoices: React.FC = () => {
       {/* Modal Détails */}
       {selectedProforma && !showEditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
             <div className="bg-blue-500 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <FileText className="w-6 h-6" />
@@ -1359,27 +1372,31 @@ const ProformaInvoices: React.FC = () => {
             </div>
             <div className="p-6 flex-1 overflow-y-auto" ref={proformaRef}>
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Client</p>
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                    Client
+                  </p>
                   <p className="font-semibold">{selectedProforma.client_nom}</p>
                   {selectedProforma.client_telephone && (
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       {selectedProforma.client_telephone}
                     </p>
                   )}
                   {selectedProforma.client_email && (
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       {selectedProforma.client_email}
                     </p>
                   )}
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Date</p>
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                    Date
+                  </p>
                   <p className="font-semibold">
                     {selectedProforma.date_proforma}
                   </p>
                   {selectedProforma.date_validite && (
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       Valide jusqu'au {selectedProforma.date_validite}
                     </p>
                   )}
@@ -1387,18 +1404,18 @@ const ProformaInvoices: React.FC = () => {
               </div>
 
               <table className="w-full mb-6">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
                       Article
                     </th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400">
                       Qté
                     </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
                       Prix
                     </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
                       Total
                     </th>
                   </tr>
@@ -1421,7 +1438,7 @@ const ProformaInvoices: React.FC = () => {
                 </tbody>
               </table>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded-lg p-4">
                 {selectedProforma.total_avant_remise && (
                   <div className="flex justify-between mb-2">
                     <span>Sous-total:</span>
@@ -1432,7 +1449,7 @@ const ProformaInvoices: React.FC = () => {
                 )}
                 <div className="flex justify-between text-xl font-bold">
                   <span>Total TTC:</span>
-                  <span className="text-green-600">
+                  <span className="text-blue-600">
                     {formatCurrency(selectedProforma.total_ttc)}
                   </span>
                 </div>
@@ -1446,7 +1463,7 @@ const ProformaInvoices: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="p-4 bg-gray-50 border-t flex gap-3 rounded-b-2xl">
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t flex gap-3 rounded-b-2xl">
               {selectedProforma.statut === "en_attente" && (
                 <button
                   onClick={() => handleConvertToSale(selectedProforma)}
@@ -1465,7 +1482,7 @@ const ProformaInvoices: React.FC = () => {
               </button>
               <button
                 onClick={() => setSelectedProforma(null)}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium"
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium"
               >
                 Fermer
               </button>

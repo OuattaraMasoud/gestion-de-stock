@@ -110,7 +110,7 @@ export default function LicenseActivation() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Vérification de la licence...</p>
+          <p className="text-gray-600 dark:text-gray-400">Vérification de la licence...</p>
         </div>
       </div>
     );
@@ -118,16 +118,16 @@ export default function LicenseActivation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-8">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Key className="w-8 h-8 text-blue-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Activation de la licence
           </h1>
-          <p className="text-gray-500 mt-2">
+          <p className="text-gray-500 dark:text-gray-400 mt-2">
             Entrez votre clé de licence pour activer l'application
           </p>
         </div>
@@ -171,7 +171,7 @@ export default function LicenseActivation() {
           <div>
             <label
               htmlFor="licenseKey"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
               Clé de licence
             </label>
@@ -181,7 +181,7 @@ export default function LicenseActivation() {
               value={licenseKey}
               onChange={handleKeyChange}
               placeholder="XXXX-XXXX-XXXX-XXXX"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg tracking-widest font-mono uppercase"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg tracking-widest font-mono uppercase"
               maxLength={19}
               disabled={isActivating}
             />
@@ -211,8 +211,8 @@ export default function LicenseActivation() {
         </div>
 
         {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-center text-sm text-gray-500">
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
             Besoin d'une licence ?{" "}
             <a
               href="mailto:masoud@ouattara.me"

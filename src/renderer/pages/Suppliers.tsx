@@ -170,8 +170,8 @@ const Suppliers: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Fournisseurs</h1>
-          <p className="text-gray-600 mt-1">{totalItems} fournisseur(s)</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Fournisseurs</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{totalItems} fournisseur(s)</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -191,36 +191,36 @@ const Suppliers: React.FC = () => {
       {/* Liste des fournisseurs */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Fournisseur
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Localisation
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Solde Dû
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {paginatedSuppliers.map((supplier) => (
-                <tr key={supplier.id} className="hover:bg-gray-50">
+                <tr key={supplier.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4">
                     <div>
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-gray-900 dark:text-white">
                         {supplier.nom}
                       </div>
                       {supplier.commentaires && (
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
                           {supplier.commentaires}
                         </div>
                       )}
@@ -229,13 +229,13 @@ const Suppliers: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="space-y-1">
                       {supplier.telephone && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                           <Phone className="w-4 h-4" />
                           {supplier.telephone}
                         </div>
                       )}
                       {supplier.email && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                           <Mail className="w-4 h-4" />
                           {supplier.email}
                         </div>
@@ -243,7 +243,7 @@ const Suppliers: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-start gap-2 text-sm text-gray-600">
+                    <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
                       <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                       <div>
                         {supplier.adresse && <div>{supplier.adresse}</div>}
@@ -254,7 +254,7 @@ const Suppliers: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`font-semibold ${(supplier.solde_du || 0) > 0 ? "text-red-600" : "text-gray-600"}`}
+                      className={`font-semibold ${(supplier.solde_du || 0) > 0 ? "text-red-600" : "text-gray-600 dark:text-gray-400"}`}
                     >
                       {(supplier.solde_du || 0).toFixed(2)} FCFA
                     </span>
@@ -283,10 +283,10 @@ const Suppliers: React.FC = () => {
           {suppliers.length === 0 && (
             <div className="text-center py-12">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Aucun fournisseur
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Commencez par ajouter votre premier fournisseur.
               </p>
             </div>
@@ -310,7 +310,7 @@ const Suppliers: React.FC = () => {
       {/* Modal Formulaire */}
       {showModal && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
             <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 rounded-t-xl flex justify-between items-center sticky top-0">
               <h2 className="text-2xl font-bold">
                 {editingSupplier
@@ -328,7 +328,7 @@ const Suppliers: React.FC = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Nom */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Nom du fournisseur <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -346,7 +346,7 @@ const Suppliers: React.FC = () => {
               {/* Téléphone et Email */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Téléphone
                   </label>
                   <input
@@ -359,7 +359,7 @@ const Suppliers: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Email
                   </label>
                   <input
@@ -375,7 +375,7 @@ const Suppliers: React.FC = () => {
 
               {/* Adresse */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Adresse
                 </label>
                 <input
@@ -391,7 +391,7 @@ const Suppliers: React.FC = () => {
               {/* Ville et Pays */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Ville
                   </label>
                   <input
@@ -404,7 +404,7 @@ const Suppliers: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Pays
                   </label>
                   <input
@@ -420,7 +420,7 @@ const Suppliers: React.FC = () => {
 
               {/* Commentaires */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Commentaires
                 </label>
                 <textarea

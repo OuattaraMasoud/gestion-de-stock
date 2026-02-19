@@ -165,8 +165,8 @@ const Servers: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Serveurs</h1>
-          <p className="text-gray-600 mt-1">{totalItems} serveur(s)</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Serveurs</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{totalItems} serveur(s)</p>
         </div>
         <button onClick={() => handleOpenModal()} className="btn-primary">
           <Plus className="w-5 h-5" />
@@ -177,41 +177,41 @@ const Servers: React.FC = () => {
       {/* Liste des serveurs */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Serveur
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Statut
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {paginatedServers.map((server) => (
-                <tr key={server.id} className="hover:bg-gray-50">
+                <tr key={server.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${server.actif ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${server.actif ? "bg-blue-100 text-blue-600" : "bg-gray-100 dark:bg-gray-700 text-gray-400"}`}
                       >
                         <User className="w-5 h-5" />
                       </div>
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-gray-900 dark:text-white">
                         {server.nom}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     {server.telephone && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <Phone className="w-4 h-4" />
                         {server.telephone}
                       </div>
@@ -263,10 +263,10 @@ const Servers: React.FC = () => {
           {servers.length === 0 && (
             <div className="text-center py-12">
               <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Aucun serveur
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Commencez par ajouter votre premier serveur.
               </p>
             </div>
@@ -290,7 +290,7 @@ const Servers: React.FC = () => {
       {/* Modal Formulaire */}
       {showModal && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
             <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 rounded-t-xl flex justify-between items-center sticky top-0">
               <h2 className="text-2xl font-bold">
                 {editingServer ? "Modifier le serveur" : "Nouveau serveur"}
@@ -306,7 +306,7 @@ const Servers: React.FC = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Nom */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Nom du serveur <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -323,7 +323,7 @@ const Servers: React.FC = () => {
 
               {/* Téléphone */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Téléphone
                 </label>
                 <input
@@ -349,7 +349,7 @@ const Servers: React.FC = () => {
                 />
                 <label
                   htmlFor="actif"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   Serveur actif (peut être sélectionné à la caisse)
                 </label>

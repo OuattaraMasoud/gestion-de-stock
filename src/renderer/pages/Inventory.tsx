@@ -278,8 +278,8 @@ const Inventory: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Inventaire</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Inventaire</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             Suivi des entrées, sorties et stock par produit
           </p>
         </div>
@@ -323,8 +323,8 @@ const Inventory: React.FC = () => {
               <Package className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total produits</p>
-              <p className="text-xl font-bold text-gray-900">{totalProduits}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total produits</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{totalProduits}</p>
             </div>
           </div>
         </div>
@@ -334,8 +334,8 @@ const Inventory: React.FC = () => {
               <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Valeur stock (achat)</p>
-              <p className="text-xl font-bold text-gray-900">{formatCurrency(valeurStockAchat)}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Valeur stock (achat)</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(valeurStockAchat)}</p>
             </div>
           </div>
         </div>
@@ -345,8 +345,8 @@ const Inventory: React.FC = () => {
               <TrendingUp className="w-6 h-6 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Valeur stock (vente)</p>
-              <p className="text-xl font-bold text-gray-900">{formatCurrency(valeurStockVente)}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Valeur stock (vente)</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(valeurStockVente)}</p>
             </div>
           </div>
         </div>
@@ -356,7 +356,7 @@ const Inventory: React.FC = () => {
               <AlertTriangle className="w-6 h-6 text-orange-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Stock bas</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Stock bas</p>
               <p className="text-xl font-bold text-orange-600">{produitsStockBas}</p>
             </div>
           </div>
@@ -367,7 +367,7 @@ const Inventory: React.FC = () => {
               <TrendingDown className="w-6 h-6 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">En rupture</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">En rupture</p>
               <p className="text-xl font-bold text-red-600">{produitsEnRupture}</p>
             </div>
           </div>
@@ -378,7 +378,7 @@ const Inventory: React.FC = () => {
       <div className="card">
         <div className="flex gap-4 items-end flex-wrap">
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Rechercher
             </label>
             <div className="relative">
@@ -393,7 +393,7 @@ const Inventory: React.FC = () => {
             </div>
           </div>
           <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Catégorie
             </label>
             <select
@@ -412,7 +412,7 @@ const Inventory: React.FC = () => {
             </select>
           </div>
           <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Date début
             </label>
             <input
@@ -423,7 +423,7 @@ const Inventory: React.FC = () => {
             />
           </div>
           <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Date fin
             </label>
             <input
@@ -444,51 +444,51 @@ const Inventory: React.FC = () => {
       {/* Tableau */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Produit
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Catégorie
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Entrées
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Sorties
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Stock actuel
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Valeur (achat)
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Valeur (vente)
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Statut
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {items.map((item) => {
                 const status = getStockStatus(item);
                 return (
-                  <tr key={item.id} className="hover:bg-gray-50">
+                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {item.nom}
                         </p>
                         {item.code_barre && (
-                          <p className="text-xs text-gray-500">{item.code_barre}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{item.code_barre}</p>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                       {item.categorie_nom || "Sans catégorie"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -503,13 +503,13 @@ const Inventory: React.FC = () => {
                         {item.total_sorties}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-gray-900 dark:text-white">
                       {item.quantite_stock}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600 dark:text-gray-400">
                       {formatCurrency(item.quantite_stock * item.prix_achat)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600 dark:text-gray-400">
                       {formatCurrency(item.quantite_stock * item.prix_vente)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -528,10 +528,10 @@ const Inventory: React.FC = () => {
           {items.length === 0 && (
             <div className="text-center py-12">
               <ClipboardList className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Aucun produit trouvé
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Modifiez vos filtres ou ajoutez des produits.
               </p>
             </div>

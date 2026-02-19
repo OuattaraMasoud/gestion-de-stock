@@ -288,6 +288,8 @@ export interface ElectronAPI {
     page: number,
     limit: number,
     search?: string,
+    categorieId?: number,
+    status?: string,
   ) => Promise<PaginatedResponse<any>>;
   getInvoicesPaginated: (
     page: number,

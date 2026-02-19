@@ -86,10 +86,10 @@ const Categories: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Gestion des Catégories
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             {categories.length} catégorie(s) au total
           </p>
         </div>
@@ -142,14 +142,14 @@ const Categories: React.FC = () => {
                 </button>
               </div>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
               {category.nom}
             </h3>
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
               {category.description || "Aucune description"}
             </p>
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Créée le{" "}
                 {new Date(category.created_at!).toLocaleDateString("fr-FR")}
               </p>
@@ -161,10 +161,10 @@ const Categories: React.FC = () => {
       {categories.length === 0 && (
         <div className="card text-center py-12">
           <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             Aucune catégorie
           </h3>
-          <p className="text-gray-600 mb-4">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
             Commencez par créer votre première catégorie
           </p>
           <button onClick={handleAdd} className="btn-primary mx-auto">
@@ -177,7 +177,7 @@ const Categories: React.FC = () => {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full modal-content">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full modal-content">
             <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 rounded-t-xl">
               <h2 className="text-2xl font-bold">
                 {editingCategory
@@ -188,7 +188,7 @@ const Categories: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Nom de la catégorie *
                 </label>
                 <input
@@ -205,7 +205,7 @@ const Categories: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Description
                 </label>
                 <textarea

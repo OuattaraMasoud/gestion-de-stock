@@ -8,6 +8,7 @@ import {
   Download,
   FileSpreadsheet,
   Upload,
+  X,
 } from "lucide-react";
 import { Product, Category } from "../types";
 import ProductModal from "../components/ProductModal";
@@ -28,7 +29,12 @@ const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategorieId, setSelectedCategorieId] = useState<number | "">("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [categorySearch, setCategorySearch] = useState("");
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,11 +57,26 @@ const Products: React.FC = () => {
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       setCurrentPage(1);
-      loadData();
+      loadData(1, itemsPerPage, searchQuery);
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    loadData(1, itemsPerPage, searchQuery, selectedCategorieId, selectedStatus);
+  }, [selectedCategorieId, selectedStatus]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+        setShowCategoryDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const loadCategories = async () => {
     try {
@@ -70,12 +91,16 @@ const Products: React.FC = () => {
     page: number = currentPage,
     limit: number = itemsPerPage,
     search: string = searchQuery,
+    categorieId: number | "" = selectedCategorieId,
+    status: string = selectedStatus,
   ) => {
     try {
       const result = await window.electronAPI.getProductsPaginated(
         page,
         limit,
         search,
+        categorieId || undefined,
+        status || undefined,
       );
       setProducts(result.data);
       setTotalItems(result.total);
@@ -362,10 +387,10 @@ const Products: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Gestion des Produits
           </h1>
-          <p className="text-gray-600 mt-1">{totalItems} produit(s) au total</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{totalItems} produit(s) au total</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -418,24 +443,121 @@ const Products: React.FC = () => {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Filtres */}
       <div className="card">
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-0 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <div className="flex flex-wrap gap-3">
+          {/* Recherche */}
+          <div className="flex-1 min-w-48 relative border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 shrink-0" />
             <input
               type="text"
-              placeholder="Rechercher un produit par nom, code-barre..."
+              placeholder="Rechercher par nom, code-barre..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-field pl-10"
+              className="w-full py-2 pl-10 pr-3 text-sm outline-none bg-transparent"
             />
           </div>
-          {searchQuery && (
+
+          {/* Filtre catégorie */}
+          <div ref={categoryDropdownRef} className="relative min-w-48">
+            <div className="flex items-center gap-2 border border-gray-300 dark:border-gray-600 rounded-lg px-3 bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+              <Search className="text-gray-400 w-4 h-4 shrink-0" />
+              <input
+                type="text"
+                placeholder={
+                  selectedCategorieId !== ""
+                    ? (categories.find((c) => c.id === selectedCategorieId)?.nom ?? "Catégorie")
+                    : "Toutes les catégories"
+                }
+                value={categorySearch}
+                onChange={(e) => {
+                  setCategorySearch(e.target.value);
+                  setShowCategoryDropdown(true);
+                }}
+                onFocus={() => setShowCategoryDropdown(true)}
+                className="flex-1 py-2 text-sm outline-none bg-transparent"
+              />
+              {selectedCategorieId !== "" && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCategorieId("");
+                    setCategorySearch("");
+                    setShowCategoryDropdown(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {showCategoryDropdown && (
+              <div className="absolute z-50 top-full mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <button
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 text-gray-500 dark:text-gray-400"
+                  onClick={() => {
+                    setSelectedCategorieId("");
+                    setCategorySearch("");
+                    setShowCategoryDropdown(false);
+                  }}
+                >
+                  Toutes les catégories
+                </button>
+                {categories
+                  .filter((cat) =>
+                    cat.nom.toLowerCase().includes(categorySearch.toLowerCase())
+                  )
+                  .map((cat) => (
+                    <button
+                      key={cat.id}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 ${
+                        selectedCategorieId === cat.id
+                          ? "bg-blue-50 text-blue-700 font-medium"
+                          : "text-gray-700 dark:text-gray-300"
+                      }`}
+                      onClick={() => {
+                        setSelectedCategorieId(cat.id!);
+                        setCategorySearch("");
+                        setShowCategoryDropdown(false);
+                      }}
+                    >
+                      {cat.nom}
+                    </button>
+                  ))}
+                {categories.filter((cat) =>
+                  cat.nom.toLowerCase().includes(categorySearch.toLowerCase())
+                ).length === 0 && (
+                  <p className="px-4 py-2 text-sm text-gray-400">Aucun résultat</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Filtre statut */}
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="input-field cursor-pointer"
+          >
+            <option value="">Tous les statuts</option>
+            <option value="en_stock">En stock</option>
+            <option value="stock_faible">Stock faible</option>
+            <option value="epuise">Épuisé</option>
+          </select>
+
+          {/* Bouton réinitialiser */}
+          {(searchQuery || selectedCategorieId !== "" || selectedStatus !== "") && (
             <button
-              onClick={() => setSearchQuery("")}
-              className="btn-secondary"
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedCategorieId("");
+                setCategorySearch("");
+                setSelectedStatus("");
+              }}
+              className="btn-secondary flex items-center gap-1"
             >
+              <X className="w-4 h-4" />
               Réinitialiser
             </button>
           )}
@@ -445,38 +567,38 @@ const Products: React.FC = () => {
       {/* Products Table */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Produit
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Code-barre
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Catégorie
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Prix Achat
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Prix Vente
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Stock
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Statut
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {paginatedProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
+                <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 rounded-lg overflow-hidden bg-blue-100 flex items-center justify-center">
@@ -491,18 +613,18 @@ const Products: React.FC = () => {
                         )}
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
                           {product.nom}
                         </div>
                         {product.description && (
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
                             {product.description.substring(0, 30)}...
                           </div>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {product.code_barre || "N/A"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -510,10 +632,10 @@ const Products: React.FC = () => {
                       {product.categorie_nom || "Sans catégorie"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {formatCurrency(product.prix_achat || 0)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
                     {formatCurrency(product.prix_vente || 0)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -533,7 +655,7 @@ const Products: React.FC = () => {
                         Stock faible
                       </span>
                     ) : product.quantite_stock === 0 ? (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800">
                         Épuisé
                       </span>
                     ) : (
@@ -568,10 +690,10 @@ const Products: React.FC = () => {
           {products.length === 0 && (
             <div className="text-center py-12">
               <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Aucun produit trouvé
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Commencez par ajouter votre premier produit.
               </p>
             </div>

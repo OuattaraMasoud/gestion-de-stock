@@ -24,6 +24,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
     prix_vente: 0,
     quantite_stock: 0,
     stock_min: 5,
+    sans_stock: false,
     categorie_id: undefined,
     image_url: undefined,
   });
@@ -130,9 +131,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
+        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b px-6 py-4 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
             {product ? "Modifier le produit" : "Nouveau produit"}
           </h2>
           <button
@@ -147,7 +148,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Image Upload */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Image du produit
               </label>
               <div className="flex items-center gap-4">
@@ -156,7 +157,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     <img
                       src={imagePreview}
                       alt="Aperçu du produit"
-                      className="w-32 h-32 object-cover rounded-lg border border-gray-300"
+                      className="w-32 h-32 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
                     />
                     <button
                       type="button"
@@ -167,9 +168,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-blue-500 transition-colors">
+                  <div className="w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center hover:border-blue-500 transition-colors">
                     <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
-                    <span className="text-xs text-gray-500">Pas d'image</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Pas d'image</span>
                   </div>
                 )}
                 <div className="flex-1">
@@ -184,7 +185,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       disabled={uploadingImage}
                     />
                   </label>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     JPG, PNG jusqu'à 5 Mo
                   </p>
                 </div>
@@ -193,7 +194,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
             {/* Nom */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Nom du produit *
               </label>
               <input
@@ -209,7 +210,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
             {/* Description */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Description
               </label>
               <textarea
@@ -224,7 +225,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
             {/* Code-barre */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Code-barre
               </label>
               <input
@@ -239,7 +240,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
             {/* Catégorie */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Catégorie
               </label>
               <select
@@ -259,7 +260,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
             {/* Prix d'achat */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Prix d'achat (FCFA) *
               </label>
               <input
@@ -277,7 +278,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
             {/* Prix de vente */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Prix de vente (FCFA) *
               </label>
               <input
@@ -293,10 +294,30 @@ const ProductModal: React.FC<ProductModalProps> = ({
               />
             </div>
 
+            {/* Option sans suivi de stock */}
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.sans_stock || false}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, sans_stock: e.target.checked }))}
+                  className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Produit sans suivi de stock
+                  </span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Pour les services, frais, ou articles qui figurent sur la facture sans gestion de stock
+                  </p>
+                </div>
+              </label>
+            </div>
+
             {/* Quantité en stock */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quantité en stock *
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Quantité en stock {formData.sans_stock ? "" : "*"}
               </label>
               <input
                 type="number"
@@ -304,16 +325,17 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 value={formData.quantite_stock}
                 onChange={handleChange}
                 min="0"
-                required
-                className="input-field"
-                placeholder="0"
+                required={!formData.sans_stock}
+                disabled={formData.sans_stock}
+                className="input-field disabled:bg-gray-100 disabled:dark:bg-gray-700 disabled:cursor-not-allowed"
+                placeholder={formData.sans_stock ? "Non applicable" : "0"}
               />
             </div>
 
             {/* Stock minimum */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Stock minimum *
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Stock minimum {formData.sans_stock ? "" : "*"}
               </label>
               <input
                 type="number"
@@ -321,9 +343,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 value={formData.stock_min}
                 onChange={handleChange}
                 min="0"
-                required
-                className="input-field"
-                placeholder="5"
+                required={!formData.sans_stock}
+                disabled={formData.sans_stock}
+                className="input-field disabled:bg-gray-100 disabled:dark:bg-gray-700 disabled:cursor-not-allowed"
+                placeholder={formData.sans_stock ? "Non applicable" : "5"}
               />
             </div>
           </div>

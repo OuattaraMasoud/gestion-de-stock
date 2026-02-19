@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   body {
     background-color: #f9fafb;
@@ -122,6 +124,50 @@
     font-size: 0.875rem;
     color: #111827;
   }
+}
+
+/* Dark mode overrides for global utilities */
+.dark body {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+.dark .card {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.dark .stat-card {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.dark .btn-secondary {
+  background-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark .btn-secondary:hover {
+  background-color: #475569;
+}
+
+.dark .input-field {
+  background-color: #1e293b;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+.dark .input-field:focus {
+  border-color: #3b82f6;
+}
+
+.dark .table-header {
+  background-color: #0f172a;
+  color: #94a3b8;
+}
+
+.dark .table-cell {
+  color: #e2e8f0;
 }
 
 /* Scrollbar personnalisé */

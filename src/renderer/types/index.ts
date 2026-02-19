@@ -7,6 +7,7 @@ export interface Product {
   prix_vente: number;
   quantite_stock: number;
   stock_min: number;
+  sans_stock?: boolean;
   categorie_id?: number;
   categorie_nom?: string;
   image_url?: string;
@@ -217,6 +218,20 @@ export interface AccountingEntry {
   created_at?: string;
 }
 
+export interface Expense {
+  id?: number;
+  categorie: "restauration" | "energie" | "carburant" | "transport" | "fournitures" | "salaire" | "loyer" | "communication" | "don" | "maintenance" | "autre";
+  description: string;
+  montant: number;
+  date_depense: string;
+  methode_paiement?: "especes" | "carte" | "virement" | "cheque" | "mobile";
+  reference?: string;
+  utilisateur_id?: number;
+  utilisateur_nom?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface InvoiceArticle {
   produit_id?: number;
   designation: string;
@@ -349,6 +364,7 @@ declare global {
         utilisateur_nom?: string,
       ) => Promise<any>;
       getDashboardStats: () => Promise<DashboardStats>;
+      getDashboardStatsByDate: (startDate: string, endDate: string) => Promise<DashboardStatsByDate>;
       getLowStockProducts: () => Promise<Product[]>;
       // Utilisateurs
       login: (email: string, password: string) => Promise<User | null>;
@@ -440,6 +456,15 @@ declare global {
         totalSorties: number;
       }>;
       getTreasury: () => Promise<{ total: number; entries: AccountingEntry[] }>;
+      getProfitStats: (startDate?: string, endDate?: string) => Promise<{
+        chiffreAffaires: number;
+        coutMarchandises: number;
+        beneficeBrut: number;
+        margePercent: number;
+        nbVentes: number;
+        nbProduitsVendus: number;
+        totalAchats: number;
+      }>;
       // Factures
       createInvoice: (invoice: Invoice) => Promise<Invoice>;
       getInvoices: () => Promise<Invoice[]>;
@@ -562,6 +587,8 @@ declare global {
         page: number,
         limit: number,
         search?: string,
+        categorieId?: number,
+        status?: string,
       ) => Promise<{
         data: any[];
         total: number;
@@ -697,6 +724,49 @@ declare global {
           accounting: number;
         };
       }>;
+      // Dépenses
+      getExpenses: (startDate?: string, endDate?: string) => Promise<Expense[]>;
+      getExpensesPaginated: (
+        page: number,
+        limit: number,
+        startDate?: string,
+        endDate?: string,
+        categorie?: string,
+      ) => Promise<{
+        data: Expense[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+        totalMontant: number;
+      }>;
+      createExpense: (expense: Expense) => Promise<any>;
+      updateExpense: (id: number, expense: Expense) => Promise<any>;
+      deleteExpense: (
+        id: number,
+        utilisateur_id?: number,
+        utilisateur_nom?: string,
+      ) => Promise<any>;
+      getExpenseStats: (startDate?: string, endDate?: string) => Promise<{
+        total: number;
+        byCategorie: { categorie: string; total: number; count: number }[];
+      }>;
+      // Top produits et clients
+      getTopProducts: (limit?: number, startDate?: string, endDate?: string) => Promise<{
+        product_id: number;
+        nom: string;
+        quantite_vendue: number;
+        chiffre_affaires: number;
+        marge: number;
+      }[]>;
+      getTopClients: (limit?: number, startDate?: string, endDate?: string) => Promise<{
+        client_id: number;
+        nom: string;
+        telephone?: string;
+        chiffre_affaires: number;
+        nb_achats: number;
+        solde_du: number;
+      }[]>;
       importProductsCSV: (csvContent: string) => Promise<{
         success: boolean;
         message: string;

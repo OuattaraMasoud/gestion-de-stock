@@ -20,6 +20,7 @@ import Users from "./pages/Users";
 import Suppliers from "./pages/Suppliers";
 import Clients from "./pages/Clients";
 import Accounting from "./pages/Accounting";
+import Expenses from "./pages/Expenses";
 import Invoices from "./pages/Invoices";
 import ProformaInvoices from "./pages/ProformaInvoices";
 import Servers from "./pages/Servers";
@@ -71,6 +72,7 @@ const App: React.FC = () => {
                       <Route path="/dettes-clients" element={<CustomerDebts />} />
                       <Route path="/serveurs" element={<Servers />} />
                       <Route path="/comptabilite" element={<Accounting />} />
+                      <Route path="/depenses" element={<Expenses />} />
                       <Route path="/factures" element={<Invoices />} />
                       <Route path="/proforma" element={<ProformaInvoices />} />
                       <Route path="/parametres" element={<Settings />} />

@@ -103,7 +103,7 @@ const Audit: React.FC = () => {
     if (action.includes("supprimer") || action.includes("delete")) {
       return <AlertTriangle className="w-5 h-5 text-red-600" />;
     }
-    return <Info className="w-5 h-5 text-gray-600" />;
+    return <Info className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
   };
 
   const getActionBadge = (action: string) => {
@@ -120,7 +120,7 @@ const Audit: React.FC = () => {
     if (action.includes("supprimer") || action.includes("delete")) {
       return "bg-red-100 text-red-700 border-red-200";
     }
-    return "bg-gray-100 text-gray-700 border-gray-200";
+    return "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700";
   };
 
   const tables = [
@@ -150,10 +150,10 @@ const Audit: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               Journal d'Audit
             </h1>
-            <p className="mt-2 text-gray-600">
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
               {auditLogs.length} action(s) enregistrée(s)
             </p>
           </div>
@@ -172,7 +172,7 @@ const Audit: React.FC = () => {
         <div className="card">
           <div className="flex gap-4 items-end flex-wrap">
             <div className="flex-1 min-w-50">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Rechercher
               </label>
               <div className="relative">
@@ -187,7 +187,7 @@ const Audit: React.FC = () => {
               </div>
             </div>
             <div className="flex-1 min-w-37.5">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Table
               </label>
               <select
@@ -204,7 +204,7 @@ const Audit: React.FC = () => {
               </select>
             </div>
             <div className="flex-1 min-w-37.5">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Date de début
               </label>
               <input
@@ -215,7 +215,7 @@ const Audit: React.FC = () => {
               />
             </div>
             <div className="flex-1 min-w-[150px]">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Date de fin
               </label>
               <input
@@ -240,46 +240,46 @@ const Audit: React.FC = () => {
         {/* Liste des logs */}
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Utilisateur
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Action
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Table
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     ID Enregistrement
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Détails
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {paginatedLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                       {new Date(log.created_at || "").toLocaleString("fr-FR")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4 text-gray-400" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
                             {log.utilisateur_nom}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
                             {log.utilisateur_email} • {log.utilisateur_role}
                           </p>
                         </div>
@@ -298,16 +298,16 @@ const Audit: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Database className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900 font-medium">
+                        <span className="text-sm text-gray-900 dark:text-white font-medium">
                           {log.table_cible || "-"}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-mono">
                       {log.enregistrement_id || "-"}
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-600 max-w-xs truncate">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
                         {log.details || "-"}
                       </p>
                     </td>
@@ -328,10 +328,10 @@ const Audit: React.FC = () => {
             {auditLogs.length === 0 && (
               <div className="text-center py-12">
                 <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                   Aucun log d'audit
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-600 dark:text-gray-400">
                   Les actions effectuées sur la plateforme apparaîtront ici.
                 </p>
               </div>
@@ -355,7 +355,7 @@ const Audit: React.FC = () => {
         {/* Modal détails du log */}
         {selectedLog && (
           <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content">
               <div className="bg-blue-600 f text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold">Détails de l'action</h2>
@@ -384,66 +384,75 @@ const Audit: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
                       Utilisateur
                     </p>
-                    <p className="font-semibold text-gray-900">
+                    <p className="font-semibold text-gray-900 dark:text-white">
                       {selectedLog.utilisateur_nom}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       {selectedLog.utilisateur_email}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       {selectedLog.utilisateur_role}
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
                       Table cible
                     </p>
                     <div className="flex items-center gap-2">
                       <Database className="w-4 h-4 text-gray-400" />
-                      <span className="font-semibold text-gray-900">
+                      <span className="font-semibold text-gray-900 dark:text-white">
                         {selectedLog.table_cible || "-"}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       ID: {selectedLog.enregistrement_id || "-"}
                     </p>
                   </div>
                 </div>
 
                 {selectedLog.adresse_ip && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
                       Adresse IP
                     </p>
-                    <p className="font-mono text-sm text-gray-900">
+                    <p className="font-mono text-sm text-gray-900 dark:text-white">
                       {selectedLog.adresse_ip}
                     </p>
                   </div>
                 )}
 
                 {selectedLog.user_agent && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
                       User Agent
                     </p>
-                    <p className="text-sm text-gray-600 break-all">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 break-all">
                       {selectedLog.user_agent}
                     </p>
                   </div>
                 )}
 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
                     Détails complets
                   </p>
-                  <p className="text-sm text-gray-900 whitespace-pre-wrap font-mono bg-white p-4 rounded border">
-                    {selectedLog.details || "Aucun détail disponible"}
-                  </p>
+                  <div className="text-sm text-gray-900 dark:text-white font-mono bg-white dark:bg-gray-800 p-4 rounded border max-h-64 overflow-auto">
+                    <pre className="whitespace-pre-wrap break-all text-xs">
+                      {(() => {
+                        if (!selectedLog.details) return "Aucun détail disponible";
+                        try {
+                          return JSON.stringify(JSON.parse(selectedLog.details), null, 2);
+                        } catch {
+                          return selectedLog.details;
+                        }
+                      })()}
+                    </pre>
+                  </div>
                 </div>
 
                 <button

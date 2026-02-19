@@ -174,6 +174,43 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getProfitStats: (startDate?: string, endDate?: string) =>
     ipcRenderer.invoke("get-profit-stats", startDate, endDate),
 
+  // Dépenses
+  getExpenses: (startDate?: string, endDate?: string) =>
+    ipcRenderer.invoke("get-expenses", startDate, endDate),
+  getExpensesPaginated: (
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+    categorie?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "get-expenses-paginated",
+      page,
+      limit,
+      startDate,
+      endDate,
+      categorie,
+    ),
+  createExpense: (expense: any) =>
+    ipcRenderer.invoke("create-expense", expense),
+  updateExpense: (id: number, expense: any) =>
+    ipcRenderer.invoke("update-expense", id, expense),
+  deleteExpense: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) =>
+    ipcRenderer.invoke("delete-expense", id, utilisateur_id, utilisateur_nom),
+  getExpenseStats: (startDate?: string, endDate?: string) =>
+    ipcRenderer.invoke("get-expense-stats", startDate, endDate),
+
+  // Top Produits et Clients
+  getTopProducts: (limit?: number, startDate?: string, endDate?: string) =>
+    ipcRenderer.invoke("get-top-products", limit, startDate, endDate),
+  getTopClients: (limit?: number, startDate?: string, endDate?: string) =>
+    ipcRenderer.invoke("get-top-clients", limit, startDate, endDate),
+
   // Factures
   createInvoice: (invoice: any) =>
     ipcRenderer.invoke("create-invoice", invoice),
@@ -335,8 +372,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ),
 
   // Server-Side Pagination
-  getProductsPaginated: (page: number, limit: number, search?: string) =>
-    ipcRenderer.invoke("get-products-paginated", page, limit, search),
+  getProductsPaginated: (page: number, limit: number, search?: string, categorieId?: number, status?: string) =>
+    ipcRenderer.invoke("get-products-paginated", page, limit, search, categorieId, status),
   getInvoicesPaginated: (page: number, limit: number, search?: string) =>
     ipcRenderer.invoke("get-invoices-paginated", page, limit, search),
   getSalesPaginated: (

@@ -186,20 +186,20 @@ const Accounting: React.FC = () => {
       {/* Header avec filtre de période */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Comptabilité</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Comptabilité</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             {selectedPeriod === "custom" && customStartDate && customEndDate
               ? `Du ${new Date(customStartDate).toLocaleDateString("fr-FR")} au ${new Date(customEndDate).toLocaleDateString("fr-FR")}`
               : periodLabels[selectedPeriod]}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 bg-white rounded-lg shadow-sm border border-gray-200 p-1">
-            <Calendar className="w-4 h-4 text-gray-500 ml-2" />
+          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-1">
+            <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400 ml-2" />
             <select
               value={selectedPeriod}
               onChange={(e) => handlePeriodChange(e.target.value as PeriodType)}
-              className="bg-transparent border-none text-sm font-medium text-gray-700 focus:outline-none cursor-pointer pr-8"
+              className="bg-transparent border-none text-sm font-medium text-gray-700 dark:text-gray-300 focus:outline-none cursor-pointer pr-8"
             >
               {Object.entries(periodLabels).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -214,14 +214,14 @@ const Accounting: React.FC = () => {
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <span className="text-gray-500">-</span>
+              <span className="text-gray-500 dark:text-gray-400">-</span>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           )}
@@ -313,35 +313,35 @@ const Accounting: React.FC = () => {
 
       {/* Journal des mouvements */}
       <div className="card overflow-hidden">
-        <h2 className="text-xl font-bold text-gray-900 mb-4 px-6 pt-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 px-6 pt-6">
           Journal des mouvements
-          {loading && <span className="ml-2 text-sm font-normal text-gray-500">Chargement...</span>}
+          {loading && <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">Chargement...</span>}
         </h2>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Description
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Méthode
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Montant
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {entries.map((entry) => (
-                <tr key={entry.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {new Date(entry.created_at!).toLocaleString('fr-FR')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -353,10 +353,10 @@ const Accounting: React.FC = () => {
                       {getTypeLabel(entry.type)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
+                  <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
                     {entry.description}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {entry.methode_paiement || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-right">
