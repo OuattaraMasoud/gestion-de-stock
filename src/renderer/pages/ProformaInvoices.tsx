@@ -623,7 +623,7 @@ const ProformaInvoices: React.FC = () => {
               .company-logo { display: flex; align-items: center; }
               .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
               .company-info { flex: 1; padding: 0 12px; text-align: center; }
-              .company-info h1 { font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; }
+              .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .company-info .slogan { font-size: 10px; color: #1e3a8a; margin: 0; }
               .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
               .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
@@ -699,20 +699,26 @@ const ProformaInvoices: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  ${selectedProforma.articles.map((a) => `
+                  ${selectedProforma.articles
+                    .map(
+                      (a) => `
                     <tr>
                       <td>${a.designation}</td>
                       <td class="text-right">${a.quantite}</td>
                       <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
                       <td class="text-right">${formatCurrency(a.total)}</td>
                     </tr>
-                  `).join("")}
+                  `,
+                    )
+                    .join("")}
                 </tbody>
               </table>
 
               <div class="totals-section">
                 <div class="totals-box">
-                  ${selectedProforma.total_avant_remise ? `
+                  ${
+                    selectedProforma.total_avant_remise
+                      ? `
                     <div class="totals-row subtotal">
                       <span>Sous-total:</span>
                       <span>${formatCurrency(selectedProforma.total_avant_remise)}</span>
@@ -721,7 +727,9 @@ const ProformaInvoices: React.FC = () => {
                       <span>Remise (${selectedProforma.remise_type === "pourcentage" ? selectedProforma.remise_valeur + "%" : formatCurrency(selectedProforma.remise_valeur)}):</span>
                       <span>-${formatCurrency(selectedProforma.total_avant_remise - selectedProforma.total_ttc)}</span>
                     </div>
-                  ` : ""}
+                  `
+                      : ""
+                  }
                   <div class="totals-row grand-total">
                     <span>Total TTC:</span>
                     <span>${formatCurrency(selectedProforma.total_ttc)}</span>
@@ -732,7 +740,7 @@ const ProformaInvoices: React.FC = () => {
               ${selectedProforma.notes ? `<div class="notes"><strong>Notes:</strong> ${selectedProforma.notes}</div>` : ""}
               ${selectedProforma.date_validite ? `<div class="validity-notice"><strong>Important:</strong> Offre valable jusqu'au ${selectedProforma.date_validite}</div>` : ""}
 
-              <div class="amount-words">
+              <div style="margin-top: 3mm">
                 Arrêté à : <strong>${montantEnLettres(selectedProforma.total_ttc, "francs CFA")}</strong>
               </div>
 
@@ -745,22 +753,45 @@ const ProformaInvoices: React.FC = () => {
               <div class="footer">
                 ${[
                   [
-                    config?.telephone ? `<strong>Tél:</strong> ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}` : "",
-                    config?.email ? `<strong>Email:</strong> ${config.email}` : "",
-                    config?.adresse ? `<strong>Adresse:</strong> ${config.adresse}${config?.ville ? " " + config.ville : ""}` : "",
-                  ].filter(Boolean).join("&nbsp;&nbsp;"),
+                    config?.telephone
+                      ? `<strong>Tél:</strong> ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}`
+                      : "",
+                    config?.email
+                      ? `<strong>Email:</strong> ${config.email}`
+                      : "",
+                    config?.adresse
+                      ? `<strong>Adresse:</strong> ${config.adresse}${config?.ville ? " " + config.ville : ""}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("&nbsp;&nbsp;"),
                   [
                     config?.secteur || "",
                     config?.nif ? `<strong>IFU:</strong> ${config.nif}` : "",
                     config?.rccm ? `<strong>RCCM:</strong> ${config.rccm}` : "",
-                    config?.regime_fiscal ? `<strong>Régime fiscal:</strong> ${config.regime_fiscal}` : "",
-                  ].filter(Boolean).join("&nbsp;&nbsp;"),
+                    config?.regime_fiscal
+                      ? `<strong>Régime fiscal:</strong> ${config.regime_fiscal}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("&nbsp;&nbsp;"),
                   [
-                    config?.division_fiscale ? `<strong>Division fiscale:</strong> ${config.division_fiscale}` : "",
-                    config?.numero_compte_uba ? `<strong>N° Compte UBA:</strong> ${config.numero_compte_uba}` : "",
-                  ].filter(Boolean).join("&nbsp;&nbsp;"),
-                  config?.reference_cadastrale ? `<strong>Réf. cadastrales:</strong> ${config.reference_cadastrale}` : "",
-                ].filter(Boolean).map(line => `<p>${line}</p>`).join("")}
+                    config?.division_fiscale
+                      ? `<strong>Division fiscale:</strong> ${config.division_fiscale}`
+                      : "",
+                    config?.numero_compte_uba
+                      ? `<strong>N° Compte UBA:</strong> ${config.numero_compte_uba}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("&nbsp;&nbsp;"),
+                  config?.reference_cadastrale
+                    ? `<strong>Réf. cadastrales:</strong> ${config.reference_cadastrale}`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .map((line) => `<p>${line}</p>`)
+                  .join("")}
               </div>
             </div>
             <script>window.onload = function() { setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500); };</script>
@@ -1674,7 +1705,11 @@ const ProformaInvoices: React.FC = () => {
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2"
               >
                 <Printer className="w-4 h-4" />
-                {format === "A4" ? "Imprimer A4" : format === "A5" ? "Imprimer A5" : "Imprimer ticket"}
+                {format === "A4"
+                  ? "Imprimer A4"
+                  : format === "A5"
+                    ? "Imprimer A5"
+                    : "Imprimer ticket"}
               </button>
               <button
                 onClick={() => setSelectedProforma(null)}

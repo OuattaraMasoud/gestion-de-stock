@@ -509,7 +509,7 @@ const Invoices: React.FC = () => {
               .company-logo { display: flex; align-items: center; }
               .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
               .company-info { flex: 1; padding: 0 12px; text-align: center; }
-              .company-info h1 { font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; }
+              .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .company-info .slogan { font-size: 10px; color: #1e3a8a; margin: 0; }
               .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
               .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
@@ -584,20 +584,26 @@ const Invoices: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  ${selectedInvoice.articles.map((a) => `
+                  ${selectedInvoice.articles
+                    .map(
+                      (a) => `
                     <tr>
                       <td>${a.designation}</td>
                       <td class="text-right">${a.quantite}</td>
                       <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
                       <td class="text-right">${formatCurrency(a.total)}</td>
                     </tr>
-                  `).join("")}
+                  `,
+                    )
+                    .join("")}
                 </tbody>
               </table>
 
               <div class="totals-section">
                 <div class="totals-box">
-                  ${selectedInvoice.total_avant_remise ? `
+                  ${
+                    selectedInvoice.total_avant_remise
+                      ? `
                     <div class="totals-row subtotal">
                       <span>Sous-total:</span>
                       <span>${formatCurrency(selectedInvoice.total_avant_remise)}</span>
@@ -606,7 +612,9 @@ const Invoices: React.FC = () => {
                       <span>Remise (${selectedInvoice.remise_type === "pourcentage" ? selectedInvoice.remise_valeur + "%" : formatCurrency(selectedInvoice.remise_valeur || 0)}):</span>
                       <span>-${formatCurrency(selectedInvoice.total_avant_remise - selectedInvoice.total_ttc)}</span>
                     </div>
-                  ` : ""}
+                  `
+                      : ""
+                  }
                   <div class="totals-row grand-total">
                     <span>Total TTC:</span>
                     <span>${formatCurrency(selectedInvoice.total_ttc)}</span>
@@ -616,7 +624,7 @@ const Invoices: React.FC = () => {
                 </div>
               </div>
 
-              <div class="amount-words">
+              <div>
                 Arrêté à : <strong>${montantEnLettres(selectedInvoice.total_ttc, "francs CFA")}</strong>
               </div>
 
@@ -1051,12 +1059,12 @@ const Invoices: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">
-                    {format !== "80mm" ? "Facture" : "Ticket"} {selectedInvoice.numero}
+                    {format !== "80mm" ? "Facture" : "Ticket"}{" "}
+                    {selectedInvoice.numero}
                   </h2>
                   <p className="text-white/80 text-sm">
                     {selectedInvoice.date_facture} a{" "}
-                    {selectedInvoice.heure_facture} - Format{" "}
-                    {format}
+                    {selectedInvoice.heure_facture} - Format {format}
                   </p>
                 </div>
               </div>

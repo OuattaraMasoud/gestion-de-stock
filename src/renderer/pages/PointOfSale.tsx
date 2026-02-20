@@ -300,7 +300,7 @@ const ReceiptPreview: React.FC<{
               .company-logo { display: flex; align-items: center; }
               .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
               .company-info { flex: 1; padding: 0 12px; text-align: center; }
-              .company-info h1 { font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; }
+              .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .company-info .slogan { font-size: 10px; color: #1e3a8a; margin: 0; }
               .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
               .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
@@ -375,20 +375,26 @@ const ReceiptPreview: React.FC<{
                   </tr>
                 </thead>
                 <tbody>
-                  ${receipt.articles.map((a) => `
+                  ${receipt.articles
+                    .map(
+                      (a) => `
                     <tr>
                       <td>${a.designation}</td>
                       <td class="text-right">${a.quantite}</td>
                       <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
                       <td class="text-right">${formatCurrency(a.total)}</td>
                     </tr>
-                  `).join("")}
+                  `,
+                    )
+                    .join("")}
                 </tbody>
               </table>
 
               <div class="totals-section">
                 <div class="totals-box">
-                  ${receipt.remiseValeur != null && receipt.remiseValeur > 0 ? `
+                  ${
+                    receipt.remiseValeur != null && receipt.remiseValeur > 0
+                      ? `
                     <div class="totals-row subtotal">
                       <span>Sous-total:</span>
                       <span>${formatCurrency(receipt.totalAvantRemise || 0)}</span>
@@ -397,7 +403,9 @@ const ReceiptPreview: React.FC<{
                       <span>Remise (${receipt.remiseType === "pourcentage" ? receipt.remiseValeur + "%" : "fixe"}):</span>
                       <span>-${formatCurrency(remiseAmountA5)}</span>
                     </div>
-                  ` : ""}
+                  `
+                      : ""
+                  }
                   <div class="totals-row grand-total">
                     <span>Total TTC:</span>
                     <span>${formatCurrency(receipt.totalTTC)}</span>
@@ -410,7 +418,7 @@ const ReceiptPreview: React.FC<{
                 </div>
               </div>
 
-              <div class="amount-words">
+              <div>
                 Arrêté à : <strong>${montantEnLettres(receipt.totalTTC, "francs CFA")}</strong>
               </div>
 
