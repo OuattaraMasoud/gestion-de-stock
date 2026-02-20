@@ -544,6 +544,7 @@ const Products: React.FC = () => {
             <option value="en_stock">En stock</option>
             <option value="stock_faible">Stock faible</option>
             <option value="epuise">Épuisé</option>
+            <option value="sans_stock">Sans gestion stock</option>
           </select>
 
           {/* Bouton réinitialiser */}
@@ -639,24 +640,32 @@ const Products: React.FC = () => {
                     {formatCurrency(product.prix_vente || 0)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span
-                      className={`font-semibold ${
-                        product.quantite_stock <= product.stock_min
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }`}
-                    >
-                      {product.quantite_stock}
-                    </span>
+                    {product.sans_stock ? (
+                      <span className="font-semibold text-purple-600">∞</span>
+                    ) : (
+                      <span
+                        className={`font-semibold ${
+                          product.quantite_stock <= product.stock_min
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {product.quantite_stock}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {product.quantite_stock <= product.stock_min ? (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                        Stock faible
+                    {product.sans_stock ? (
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                        Sans gestion stock
                       </span>
                     ) : product.quantite_stock === 0 ? (
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800">
                         Épuisé
+                      </span>
+                    ) : product.quantite_stock <= product.stock_min ? (
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                        Stock faible
                       </span>
                     ) : (
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">

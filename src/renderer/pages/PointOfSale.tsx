@@ -1349,14 +1349,16 @@ const ProductCard = React.memo<{
           <div className="flex items-center justify-between">
             <p
               className={`text-[10px] font-medium ${
-                isOutOfStock
-                  ? "text-red-600"
-                  : isAtAlertThreshold
-                    ? "text-orange-600"
-                    : "text-green-600"
+                product.sans_stock
+                  ? "text-purple-600"
+                  : isOutOfStock
+                    ? "text-red-600"
+                    : isAtAlertThreshold
+                      ? "text-orange-600"
+                      : "text-green-600"
               }`}
             >
-              stock: {product.quantite_stock}
+              {product.sans_stock ? "∞" : `stock: ${product.quantite_stock}`}
             </p>
             {!isDisabled && (
               <button
@@ -1367,7 +1369,7 @@ const ProductCard = React.memo<{
               </button>
             )}
           </div>
-          {isAtAlertThreshold && !isOutOfStock && (
+          {isAtAlertThreshold && !isOutOfStock && !product.sans_stock && (
             <p className="text-[9px] text-orange-600 font-medium mt-0.5">
               Seuil: {product.stock_min}
             </p>
@@ -1419,12 +1421,17 @@ const ProductRow = React.memo<{
           <h3 className="font-semibold text-gray-900 dark:text-white truncate">
             {product.nom}
           </h3>
-          {isOutOfStock && (
+          {product.sans_stock && (
+            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+              Sans stock
+            </span>
+          )}
+          {!product.sans_stock && isOutOfStock && (
             <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
               Rupture
             </span>
           )}
-          {!isOutOfStock && isAtAlertThreshold && (
+          {!product.sans_stock && !isOutOfStock && isAtAlertThreshold && (
             <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
               Stock bas
             </span>
@@ -1442,14 +1449,16 @@ const ProductRow = React.memo<{
         </p>
         <p
           className={`text-xs ${
-            isOutOfStock
-              ? "text-red-600"
-              : isAtAlertThreshold
-                ? "text-orange-600"
-                : "text-green-600"
+            product.sans_stock
+              ? "text-purple-600"
+              : isOutOfStock
+                ? "text-red-600"
+                : isAtAlertThreshold
+                  ? "text-orange-600"
+                  : "text-green-600"
           }`}
         >
-          Stock: {product.quantite_stock}
+          {product.sans_stock ? "Stock: ∞" : `Stock: ${product.quantite_stock}`}
         </p>
       </div>
 
@@ -1631,6 +1640,16 @@ const PointOfSale: React.FC = () => {
   }, [selectedClientId]);
 
   const handleAddToCart = (product: Product) => {
+    if (!product.sans_stock) {
+      const cartItem = cart.find((item) => item.id === product.id);
+      const currentQty = cartItem ? cartItem.quantity : 0;
+      if (currentQty >= product.quantite_stock) {
+        showErrorToast(
+          `Stock insuffisant pour "${product.nom}" (disponible : ${product.quantite_stock})`,
+        );
+        return;
+      }
+    }
     const customPrice = clientPrices.get(product.id!);
     addToCart(product, customPrice);
   };
@@ -3087,18 +3106,22 @@ const PointOfSale: React.FC = () => {
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                     Stock disponible
                   </p>
-                  <p
-                    className={`text-3xl font-bold ${
-                      selectedProduct.quantite_stock <=
-                      selectedProduct.stock_min
-                        ? "text-orange-600"
-                        : selectedProduct.quantite_stock === 0
-                          ? "text-red-600"
-                          : "text-green-600"
-                    }`}
-                  >
-                    {selectedProduct.quantite_stock}
-                  </p>
+                  {selectedProduct.sans_stock ? (
+                    <p className="text-3xl font-bold text-purple-600">∞</p>
+                  ) : (
+                    <p
+                      className={`text-3xl font-bold ${
+                        selectedProduct.quantite_stock <=
+                        selectedProduct.stock_min
+                          ? "text-orange-600"
+                          : selectedProduct.quantite_stock === 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                      }`}
+                    >
+                      {selectedProduct.quantite_stock}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -3127,7 +3150,7 @@ const PointOfSale: React.FC = () => {
                     Stock minimum
                   </p>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {selectedProduct.stock_min}
+                    {selectedProduct.sans_stock ? "—" : selectedProduct.stock_min}
                   </p>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
@@ -3152,7 +3175,8 @@ const PointOfSale: React.FC = () => {
                 </div>
               </div>
 
-              {selectedProduct.quantite_stock > selectedProduct.stock_min && (
+              {(selectedProduct.sans_stock ||
+                selectedProduct.quantite_stock > selectedProduct.stock_min) && (
                 <button
                   onClick={() => {
                     handleAddToCart(selectedProduct);
@@ -3165,7 +3189,8 @@ const PointOfSale: React.FC = () => {
                 </button>
               )}
 
-              {selectedProduct.quantite_stock <= selectedProduct.stock_min && (
+              {!selectedProduct.sans_stock &&
+                selectedProduct.quantite_stock <= selectedProduct.stock_min && (
                 <div className="text-center">
                   <p className="text-orange-600 font-semibold mb-2">
                     Stock insuffisant

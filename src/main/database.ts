@@ -1600,8 +1600,8 @@ export function createProduct(product: any) {
   try {
     const stmt = db.prepare(`
       INSERT INTO produits (nom, description, code_barre, prix_achat, prix_vente,
-       quantite_stock, stock_min, categorie_id, image_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       quantite_stock, stock_min, categorie_id, image_url, sans_stock)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -1614,6 +1614,7 @@ export function createProduct(product: any) {
       product.stock_min || 5,
       product.categorie_id || null,
       product.image_url || null,
+      product.sans_stock ? 1 : 0,
     );
 
     const productId = result.lastInsertRowid;
@@ -1648,7 +1649,7 @@ export function updateProduct(id: number, product: any) {
       UPDATE produits SET
        nom = ?, description = ?, code_barre = ?, prix_achat = ?,
        prix_vente = ?, quantite_stock = ?, stock_min = ?,
-       categorie_id = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP
+       categorie_id = ?, image_url = ?, sans_stock = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
 
@@ -1662,6 +1663,7 @@ export function updateProduct(id: number, product: any) {
       product.stock_min,
       product.categorie_id,
       product.image_url,
+      product.sans_stock ? 1 : 0,
       id,
     );
 
@@ -1990,6 +1992,12 @@ export function createSale(sale: any) {
         UPDATE produits SET quantite_stock = quantite_stock - ? WHERE id = ?
       `);
 
+      const getSansStockStmt = db.prepare(`
+        SELECT sans_stock FROM produits WHERE id = ?
+      `);
+
+      let totalSansStock = 0;
+
       for (const item of sale.produits) {
         prodStmt.run(
           venteId,
@@ -1999,8 +2007,14 @@ export function createSale(sale: any) {
           item.sous_total,
         );
 
-        // Décrémenter le stock
-        updateStockStmt.run(item.quantite, item.produit_id);
+        // Ne pas décrémenter le stock pour les produits sans_stock
+        const prodRow = getSansStockStmt.get(item.produit_id) as any;
+        const isSansStock = prodRow && prodRow.sans_stock;
+        if (isSansStock) {
+          totalSansStock += item.sous_total;
+        } else {
+          updateStockStmt.run(item.quantite, item.produit_id);
+        }
       }
 
       // Mettre à jour le solde du client si vente à crédit
@@ -2014,21 +2028,29 @@ export function createSale(sale: any) {
       // Enregistrer dans la comptabilité uniquement le montant réellement encaissé
       // Pour les ventes à crédit, seul le montant payé (acompte) est une entrée de caisse
       // Le reste sera enregistré lors du paiement de la dette
-      const montantEncaisse =
-        montantRestant > 0 ? sale.montant_paye : sale.total;
-      if (montantEncaisse > 0) {
-        const comptaStmt = db.prepare(`
-          INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `);
-        comptaStmt.run(
-          "vente",
-          venteId,
-          `Vente #${venteId}${montantRestant > 0 ? " (à crédit)" : ""}${sale.remise_valeur ? ` (remise: ${sale.remise_type === "pourcentage" ? sale.remise_valeur + "%" : sale.remise_valeur + " FCFA"})` : ""}`,
-          montantEncaisse,
-          "entree",
-          sale.methode_paiement,
-        );
+      // Les produits sans_stock sont exclus de la comptabilité
+      const montantComptabilisable = sale.total - totalSansStock;
+      if (montantComptabilisable > 0) {
+        const montantEncaisseBrut =
+          montantRestant > 0 ? sale.montant_paye : sale.total;
+        const montantEncaisseComptabilisable =
+          sale.total > 0
+            ? montantEncaisseBrut * (montantComptabilisable / sale.total)
+            : 0;
+        if (montantEncaisseComptabilisable > 0) {
+          const comptaStmt = db.prepare(`
+            INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `);
+          comptaStmt.run(
+            "vente",
+            venteId,
+            `Vente #${venteId}${montantRestant > 0 ? " (à crédit)" : ""}${sale.remise_valeur ? ` (remise: ${sale.remise_type === "pourcentage" ? sale.remise_valeur + "%" : sale.remise_valeur + " FCFA"})` : ""}`,
+            montantEncaisseComptabilisable,
+            "entree",
+            sale.methode_paiement,
+          );
+        }
       }
 
       // Enregistrer dans les audits
@@ -2431,46 +2453,58 @@ export function updateSale(
 
 export function getDashboardStats() {
   try {
-    // Total des ventes aujourd'hui
+    // Total des ventes aujourd'hui (hors produits sans_stock)
     const ventesJour = db
       .prepare(
         `
-      SELECT COALESCE(SUM(total), 0) as total
-      FROM ventes
-      WHERE DATE(date_vente) = DATE('now')
+      SELECT COALESCE(SUM(vp.sous_total), 0) as total
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE DATE(v.date_vente) = DATE('now')
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get() as { total: number };
 
-    // Total des ventes hier
+    // Total des ventes hier (hors produits sans_stock)
     const ventesHier = db
       .prepare(
         `
-      SELECT COALESCE(SUM(total), 0) as total
-      FROM ventes
-      WHERE DATE(date_vente) = DATE('now', '-1 day')
+      SELECT COALESCE(SUM(vp.sous_total), 0) as total
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE DATE(v.date_vente) = DATE('now', '-1 day')
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get() as { total: number };
 
-    // Total des ventes ce mois
+    // Total des ventes ce mois (hors produits sans_stock)
     const ventesMois = db
       .prepare(
         `
-      SELECT COALESCE(SUM(total), 0) as total
-      FROM ventes
-      WHERE strftime('%Y-%m', date_vente) = strftime('%Y-%m', 'now')
+      SELECT COALESCE(SUM(vp.sous_total), 0) as total
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE strftime('%Y-%m', v.date_vente) = strftime('%Y-%m', 'now')
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get() as { total: number };
 
-    // Total des ventes le mois précédent
+    // Total des ventes le mois précédent (hors produits sans_stock)
     const ventesMoisPrecedent = db
       .prepare(
         `
-      SELECT COALESCE(SUM(total), 0) as total
-      FROM ventes
-      WHERE strftime('%Y-%m', date_vente) = strftime('%Y-%m', 'now', '-1 month')
+      SELECT COALESCE(SUM(vp.sous_total), 0) as total
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE strftime('%Y-%m', v.date_vente) = strftime('%Y-%m', 'now', '-1 month')
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get() as { total: number };
@@ -2484,23 +2518,25 @@ export function getDashboardStats() {
       )
       .get() as { count: number };
 
-    // Produits en stock faible
+    // Produits en stock faible (hors produits sans_stock)
     const stockFaible = db
       .prepare(
         `
       SELECT COUNT(*) as count
       FROM produits
       WHERE quantite_stock <= stock_min
+        AND COALESCE(sans_stock, 0) = 0
     `,
       )
       .get() as { count: number };
 
-    // Valeur totale du stock
+    // Valeur totale du stock (hors produits sans_stock)
     const valeurStock = db
       .prepare(
         `
       SELECT COALESCE(SUM(prix_achat * quantite_stock), 0) as valeur
       FROM produits
+      WHERE COALESCE(sans_stock, 0) = 0
     `,
       )
       .get() as { valeur: number };
@@ -2516,7 +2552,7 @@ export function getDashboardStats() {
       )
       .get() as { count: number };
 
-    // Profit total ce mois (somme des marges)
+    // Profit total ce mois (somme des marges, hors produits sans_stock)
     const profitMois = db
       .prepare(
         `
@@ -2525,11 +2561,12 @@ export function getDashboardStats() {
       JOIN ventes v ON vp.vente_id = v.id
       JOIN produits p ON vp.produit_id = p.id
       WHERE strftime('%Y-%m', v.date_vente) = strftime('%Y-%m', 'now')
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get() as { profit: number };
 
-    // Coûts ce mois (prix d'achat des produits vendus)
+    // Coûts ce mois (prix d'achat des produits vendus, hors produits sans_stock)
     const coutsMois = db
       .prepare(
         `
@@ -2538,6 +2575,7 @@ export function getDashboardStats() {
       JOIN ventes v ON vp.vente_id = v.id
       JOIN produits p ON vp.produit_id = p.id
       WHERE strftime('%Y-%m', v.date_vente) = strftime('%Y-%m', 'now')
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get() as { couts: number };
@@ -2591,24 +2629,30 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
     const prevStartStr = prevStart.toISOString().split("T")[0];
     const prevEndStr = prevEnd.toISOString().split("T")[0];
 
-    // Total des ventes pour la période sélectionnée
+    // Total des ventes pour la période sélectionnée (hors produits sans_stock)
     const ventesPeriode = db
       .prepare(
         `
-      SELECT COALESCE(SUM(total), 0) as total
-      FROM ventes
-      WHERE DATE(date_vente) BETWEEN DATE(?) AND DATE(?)
+      SELECT COALESCE(SUM(vp.sous_total), 0) as total
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get(startDate, endDate) as { total: number };
 
-    // Total des ventes pour la période précédente
+    // Total des ventes pour la période précédente (hors produits sans_stock)
     const ventesPeriodePrecedente = db
       .prepare(
         `
-      SELECT COALESCE(SUM(total), 0) as total
-      FROM ventes
-      WHERE DATE(date_vente) BETWEEN DATE(?) AND DATE(?)
+      SELECT COALESCE(SUM(vp.sous_total), 0) as total
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get(prevStartStr, prevEndStr) as { total: number };
@@ -2624,7 +2668,7 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
       )
       .get(startDate, endDate) as { count: number };
 
-    // Profit pour la période
+    // Profit pour la période (hors produits sans_stock)
     const profitPeriode = db
       .prepare(
         `
@@ -2633,11 +2677,12 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
       JOIN ventes v ON vp.vente_id = v.id
       JOIN produits p ON vp.produit_id = p.id
       WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get(startDate, endDate) as { profit: number };
 
-    // Profit période précédente
+    // Profit période précédente (hors produits sans_stock)
     const profitPeriodePrecedente = db
       .prepare(
         `
@@ -2646,11 +2691,12 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
       JOIN ventes v ON vp.vente_id = v.id
       JOIN produits p ON vp.produit_id = p.id
       WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get(prevStartStr, prevEndStr) as { profit: number };
 
-    // Coûts pour la période
+    // Coûts pour la période (hors produits sans_stock)
     const coutsPeriode = db
       .prepare(
         `
@@ -2659,11 +2705,12 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
       JOIN ventes v ON vp.vente_id = v.id
       JOIN produits p ON vp.produit_id = p.id
       WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get(startDate, endDate) as { couts: number };
 
-    // Coûts période précédente
+    // Coûts période précédente (hors produits sans_stock)
     const coutsPeriodePrecedente = db
       .prepare(
         `
@@ -2672,6 +2719,7 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
       JOIN ventes v ON vp.vente_id = v.id
       JOIN produits p ON vp.produit_id = p.id
       WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+        AND COALESCE(p.sans_stock, 0) = 0
     `,
       )
       .get(prevStartStr, prevEndStr) as { couts: number };
@@ -2681,17 +2729,17 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
       .prepare(`SELECT COUNT(*) as count FROM produits`)
       .get() as { count: number };
 
-    // Produits en stock faible (inchangé)
+    // Produits en stock faible (hors produits sans_stock)
     const stockFaible = db
       .prepare(
-        `SELECT COUNT(*) as count FROM produits WHERE quantite_stock <= stock_min`,
+        `SELECT COUNT(*) as count FROM produits WHERE quantite_stock <= stock_min AND COALESCE(sans_stock, 0) = 0`,
       )
       .get() as { count: number };
 
-    // Valeur totale du stock (inchangé)
+    // Valeur totale du stock (hors produits sans_stock)
     const valeurStock = db
       .prepare(
-        `SELECT COALESCE(SUM(prix_achat * quantite_stock), 0) as valeur FROM produits`,
+        `SELECT COALESCE(SUM(prix_achat * quantite_stock), 0) as valeur FROM produits WHERE COALESCE(sans_stock, 0) = 0`,
       )
       .get() as { valeur: number };
 
@@ -2734,6 +2782,7 @@ export function getLowStockProducts() {
       FROM produits p
       LEFT JOIN categories c ON p.categorie_id = c.id
       WHERE p.quantite_stock <= p.stock_min
+        AND COALESCE(p.sans_stock, 0) = 0
       ORDER BY p.quantite_stock ASC
       LIMIT 100
     `);
@@ -4394,11 +4443,11 @@ export function getExpenseStats(startDate?: string, endDate?: string) {
 
 export function getTopProducts(limit: number = 10, startDate?: string, endDate?: string) {
   try {
-    let whereClause = "";
+    let whereClause = "WHERE COALESCE(p.sans_stock, 0) = 0";
     const params: any[] = [limit];
 
     if (startDate && endDate) {
-      whereClause = "WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)";
+      whereClause = "WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?) AND COALESCE(p.sans_stock, 0) = 0";
       params.unshift(startDate, endDate);
     }
 
@@ -4471,23 +4520,25 @@ export function getProfitStats(startDate?: string, endDate?: string) {
       params.push(startDate, endDate);
     }
 
-    // Chiffre d'affaires = Total des ventes (ce que le client paie, APRÈS remise)
+    // Chiffre d'affaires = Total des ventes hors produits sans_stock
     const caQuery = db.prepare(`
-      SELECT COALESCE(SUM(v.total), 0) as chiffre_affaires
-      FROM ventes v
-      ${venteWhereClause}
+      SELECT COALESCE(SUM(vp.sous_total), 0) as chiffre_affaires
+      FROM ventes_produits vp
+      JOIN ventes v ON vp.vente_id = v.id
+      JOIN produits p ON vp.produit_id = p.id
+      ${venteWhereClause ? venteWhereClause + " AND COALESCE(p.sans_stock, 0) = 0" : "WHERE COALESCE(p.sans_stock, 0) = 0"}
     `);
     const caResult = (
       params.length > 0 ? caQuery.get(...params) : caQuery.get()
     ) as { chiffre_affaires: number };
 
-    // Coût des marchandises vendues = Prix d'achat des produits vendus
+    // Coût des marchandises vendues = Prix d'achat des produits vendus (hors sans_stock)
     const coutQuery = db.prepare(`
       SELECT COALESCE(SUM(p.prix_achat * vp.quantite), 0) as cout_marchandises
       FROM ventes_produits vp
       JOIN ventes v ON vp.vente_id = v.id
       JOIN produits p ON vp.produit_id = p.id
-      ${venteWhereClause}
+      ${venteWhereClause ? venteWhereClause + " AND COALESCE(p.sans_stock, 0) = 0" : "WHERE COALESCE(p.sans_stock, 0) = 0"}
     `);
     const coutResult = (
       params.length > 0 ? coutQuery.get(...params) : coutQuery.get()
@@ -5527,11 +5578,13 @@ export function getProductsPaginated(
 
     // Filtre par statut (calculé depuis quantite_stock et stock_min)
     if (status === "epuise") {
-      conditions.push("p.quantite_stock = 0");
+      conditions.push("p.quantite_stock = 0 AND COALESCE(p.sans_stock, 0) = 0");
     } else if (status === "stock_faible") {
-      conditions.push("p.quantite_stock > 0 AND p.quantite_stock <= p.stock_min");
+      conditions.push("p.quantite_stock > 0 AND p.quantite_stock <= p.stock_min AND COALESCE(p.sans_stock, 0) = 0");
     } else if (status === "en_stock") {
-      conditions.push("p.quantite_stock > p.stock_min");
+      conditions.push("p.quantite_stock > p.stock_min AND COALESCE(p.sans_stock, 0) = 0");
+    } else if (status === "sans_stock") {
+      conditions.push("COALESCE(p.sans_stock, 0) = 1");
     }
 
     // Optimisation FTS5 pour recherche rapide (uniquement si pas de filtre catégorie/statut)
@@ -7326,12 +7379,13 @@ export function getInventoryData(
     const data = dataStmt.all(...mainParams);
 
     // Stats globales (sur tous les produits filtrés, pas seulement la page)
+    // Les produits sans_stock sont exclus des agrégats de valeur et alertes
     const statsQuery = `
       SELECT
-        COALESCE(SUM(p.quantite_stock * p.prix_achat), 0) as valeur_stock_achat,
-        COALESCE(SUM(p.quantite_stock * p.prix_vente), 0) as valeur_stock_vente,
-        COALESCE(SUM(CASE WHEN p.quantite_stock = 0 THEN 1 ELSE 0 END), 0) as produits_rupture,
-        COALESCE(SUM(CASE WHEN p.quantite_stock > 0 AND p.quantite_stock <= p.stock_min THEN 1 ELSE 0 END), 0) as produits_stock_bas
+        COALESCE(SUM(CASE WHEN COALESCE(p.sans_stock,0)=0 THEN p.quantite_stock * p.prix_achat ELSE 0 END), 0) as valeur_stock_achat,
+        COALESCE(SUM(CASE WHEN COALESCE(p.sans_stock,0)=0 THEN p.quantite_stock * p.prix_vente ELSE 0 END), 0) as valeur_stock_vente,
+        COALESCE(SUM(CASE WHEN COALESCE(p.sans_stock,0)=0 AND p.quantite_stock=0 THEN 1 ELSE 0 END), 0) as produits_rupture,
+        COALESCE(SUM(CASE WHEN COALESCE(p.sans_stock,0)=0 AND p.quantite_stock>0 AND p.quantite_stock<=p.stock_min THEN 1 ELSE 0 END), 0) as produits_stock_bas
       FROM produits p
       ${whereClause}
     `;
