@@ -7,7 +7,7 @@ let db: Database.Database;
 
 // Version actuelle du schéma de la base de données
 // Incrémentez ce numéro à chaque nouveau changement de schéma
-const CURRENT_SCHEMA_VERSION = 11;
+const CURRENT_SCHEMA_VERSION = 13;
 
 // Vérifier l'intégrité de la base de données
 function checkAndRepairDatabase(): { success: boolean; message: string } {
@@ -762,6 +762,66 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 12,
+    description: "Ajout champs légaux/fiscaux dans configuration",
+    up: () => {
+      const cols = ["rccm", "regime_fiscal", "division_fiscale",
+                    "numero_compte_uba", "reference_cadastrale", "secteur"];
+      for (const col of cols) {
+        if (!columnExists("configuration", col)) {
+          db.exec(`ALTER TABLE configuration ADD COLUMN ${col} TEXT DEFAULT ''`);
+        }
+      }
+      console.log("✓ Migration 12 terminée");
+    },
+  },
+  {
+    version: 13,
+    description: "Ajout format A5 dans la contrainte CHECK de configuration",
+    up: () => {
+      console.log("Migration 13: Mise à jour contrainte CHECK format_facture...");
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS configuration_new (
+          id INTEGER PRIMARY KEY,
+          nom_entreprise TEXT NOT NULL DEFAULT 'Mon Entreprise',
+          description_entreprise TEXT,
+          logo_url TEXT,
+          adresse TEXT,
+          telephone TEXT,
+          telephone2 TEXT,
+          email TEXT,
+          nif TEXT,
+          rccm TEXT DEFAULT '',
+          regime_fiscal TEXT DEFAULT '',
+          division_fiscale TEXT DEFAULT '',
+          numero_compte_uba TEXT DEFAULT '',
+          reference_cadastrale TEXT DEFAULT '',
+          secteur TEXT DEFAULT '',
+          ville TEXT,
+          pays TEXT,
+          devise TEXT DEFAULT 'FCFA',
+          message_pied TEXT DEFAULT 'Merci de votre visite !',
+          support_text TEXT,
+          format_facture TEXT DEFAULT '80mm' CHECK(format_facture IN ('80mm', 'A4', 'A5'))
+        )
+      `);
+      db.exec(`
+        INSERT INTO configuration_new
+          SELECT id, nom_entreprise, description_entreprise, logo_url, adresse,
+                 telephone, telephone2, email, nif,
+                 COALESCE(rccm, ''), COALESCE(regime_fiscal, ''),
+                 COALESCE(division_fiscale, ''), COALESCE(numero_compte_uba, ''),
+                 COALESCE(reference_cadastrale, ''), COALESCE(secteur, ''),
+                 ville, pays, devise, message_pied, support_text,
+                 CASE WHEN format_facture IN ('80mm','A4','A5') THEN format_facture ELSE '80mm' END
+          FROM configuration
+      `);
+      db.exec(`DROP TABLE configuration`);
+      db.exec(`ALTER TABLE configuration_new RENAME TO configuration`);
+      console.log("✓ Migration 13 terminée");
+    },
+  },
 ];
 
 function runMigrations() {
@@ -1120,7 +1180,7 @@ function createTables() {
       devise TEXT DEFAULT 'FCFA',
       message_pied TEXT DEFAULT 'Merci de votre visite !',
       support_text TEXT,
-      format_facture TEXT DEFAULT '80mm' CHECK(format_facture IN ('80mm', 'A4'))
+      format_facture TEXT DEFAULT '80mm' CHECK(format_facture IN ('80mm', 'A4', 'A5'))
     )
   `);
 
@@ -4760,6 +4820,12 @@ export function getConfiguration() {
         telephone2: "",
         email: "",
         nif: "",
+        rccm: "",
+        regime_fiscal: "",
+        division_fiscale: "",
+        numero_compte_uba: "",
+        reference_cadastrale: "",
+        secteur: "",
         ville: "",
         pays: "",
         devise: "FCFA",
@@ -4784,7 +4850,7 @@ export function updateConfiguration(config: any) {
     if (exists) {
       const stmt = db.prepare(`
         UPDATE configuration
-        SET nom_entreprise = ?, description_entreprise = ?, logo_url = ?, adresse = ?, telephone = ?, telephone2 = ?, email = ?, nif = ?, ville = ?, pays = ?, devise = ?, message_pied = ?, support_text = ?, format_facture = ?
+        SET nom_entreprise = ?, description_entreprise = ?, logo_url = ?, adresse = ?, telephone = ?, telephone2 = ?, email = ?, nif = ?, rccm = ?, regime_fiscal = ?, division_fiscale = ?, numero_compte_uba = ?, reference_cadastrale = ?, secteur = ?, ville = ?, pays = ?, devise = ?, message_pied = ?, support_text = ?, format_facture = ?
         WHERE id = 1
       `);
       stmt.run(
@@ -4796,6 +4862,12 @@ export function updateConfiguration(config: any) {
         config.telephone2 || "",
         config.email || "",
         config.nif || "",
+        config.rccm || "",
+        config.regime_fiscal || "",
+        config.division_fiscale || "",
+        config.numero_compte_uba || "",
+        config.reference_cadastrale || "",
+        config.secteur || "",
         config.ville || "",
         config.pays || "",
         config.devise || "FCFA",
@@ -4805,8 +4877,8 @@ export function updateConfiguration(config: any) {
       );
     } else {
       const stmt = db.prepare(`
-        INSERT INTO configuration (id, nom_entreprise, description_entreprise, logo_url, adresse, telephone, telephone2, email, nif, ville, pays, devise, message_pied, support_text, format_facture)
-        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO configuration (id, nom_entreprise, description_entreprise, logo_url, adresse, telephone, telephone2, email, nif, rccm, regime_fiscal, division_fiscale, numero_compte_uba, reference_cadastrale, secteur, ville, pays, devise, message_pied, support_text, format_facture)
+        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       stmt.run(
         config.nom_entreprise,
@@ -4817,6 +4889,12 @@ export function updateConfiguration(config: any) {
         config.telephone2 || "",
         config.email || "",
         config.nif || "",
+        config.rccm || "",
+        config.regime_fiscal || "",
+        config.division_fiscale || "",
+        config.numero_compte_uba || "",
+        config.reference_cadastrale || "",
+        config.secteur || "",
         config.ville || "",
         config.pays || "",
         config.devise || "FCFA",

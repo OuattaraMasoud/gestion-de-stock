@@ -274,12 +274,18 @@ export interface Configuration {
   telephone2?: string;
   email?: string;
   nif?: string;
+  rccm?: string;
+  regime_fiscal?: string;
+  division_fiscale?: string;
+  numero_compte_uba?: string;
+  reference_cadastrale?: string;
+  secteur?: string;
   ville?: string;
   pays?: string;
   devise?: string;
   message_pied?: string;
   support_text?: string;
-  format_facture?: "80mm" | "A4";
+  format_facture?: "80mm" | "A4" | "A5";
 }
 
 export interface AuditLog {

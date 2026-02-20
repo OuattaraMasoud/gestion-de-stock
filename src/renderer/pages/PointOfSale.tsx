@@ -71,7 +71,8 @@ const ReceiptPreview: React.FC<{
   logoBase64: string | null;
 }> = ({ receipt, onClose, onPrint, config, logoBase64 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
-  const isA4 = config?.format_facture === "A4";
+  const format = config?.format_facture || "80mm";
+  const isA4 = format === "A4";
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
 
   // Générer le QR code
@@ -277,6 +278,161 @@ const ReceiptPreview: React.FC<{
           </body>
         </html>
       `);
+    } else if (format === "A5") {
+      // Format A5 - Facture compacte
+      const remiseAmountA5 =
+        receipt.remiseValeur && receipt.remiseValeur > 0
+          ? receipt.remiseType === "pourcentage"
+            ? ((receipt.totalAvantRemise || 0) * receipt.remiseValeur) / 100
+            : receipt.remiseValeur
+          : 0;
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Facture - ${receipt.numero}</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; line-height: 1.3; color: #333; }
+              .invoice { max-width: 136mm; margin: 0 auto; }
+              .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 8px; }
+              .company-logo { display: flex; align-items: center; }
+              .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
+              .company-info { flex: 1; padding: 0 12px; text-align: center; }
+              .company-info h1 { font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; }
+              .company-info .slogan { font-size: 10px; color: #1e3a8a; margin: 0; }
+              .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
+              .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+              .info-box { width: 48%; background: #f8fafc; padding: 6px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
+              .info-box h3 { font-size: 8px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 1px 0; font-size: 9px; }
+              .info-box strong { color: #1e293b; }
+              table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+              thead th { background: #1e40af; color: white; padding: 5px 6px; text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: 0.2px; }
+              thead th:first-child { border-radius: 4px 0 0 0; }
+              thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
+              thead th.text-right { text-align: right; }
+              tbody td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 9px; }
+              tbody tr:nth-child(even) { background: #f8fafc; }
+              tbody td.text-right { text-align: right; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 6px; }
+              .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 6px 8px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
+              .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
+              .totals-row.discount { color: #dc2626; }
+              .totals-row.grand-total { font-size: 11px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 4px; margin-top: 3px; }
+              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 4px; margin-top: 3px; font-size: 8px; }
+              .totals-row.remaining { color: #dc2626; font-weight: bold; }
+              .amount-words { margin-top: 6px; padding: 4px 8px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 8px; color: #92400e; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 8px; padding-top: 6px; }
+              .qr-code { text-align: center; }
+              .qr-code img { width: 60px; height: 60px; }
+              .qr-code p { font-size: 7px; color: #64748b; margin-top: 2px; }
+              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 7.5px; color: #1e40af; line-height: 1.5; }
+              .footer p { margin: 1px 0; }
+              .footer strong { font-weight: 700; }
+              @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            </style>
+          </head>
+          <body>
+            <div class="invoice">
+              <div class="header">
+                <div class="company-logo">
+                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
+                </div>
+                <div class="company-info">
+                  <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
+                  ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
+                </div>
+                <div class="invoice-badge">
+                  FACTURE
+                  <div class="numero">N° ${receipt.numero}</div>
+                </div>
+              </div>
+
+              <div class="info-grid">
+                <div class="info-box">
+                  <h3>Client</h3>
+                  <p><strong>${receipt.client_nom}</strong></p>
+                  ${receipt.client_telephone ? `<p>Tel: ${receipt.client_telephone}</p>` : ""}
+                  ${receipt.client_email ? `<p>${receipt.client_email}</p>` : ""}
+                </div>
+                <div class="info-box">
+                  <h3>Facture</h3>
+                  <p><strong>Date:</strong> ${receipt.date} | <strong>Heure:</strong> ${receipt.heure}</p>
+                </div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Designation</th>
+                    <th class="text-right" style="width: 35px;">Qte</th>
+                    <th class="text-right" style="width: 70px;">P.U.</th>
+                    <th class="text-right" style="width: 70px;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${receipt.articles.map((a) => `
+                    <tr>
+                      <td>${a.designation}</td>
+                      <td class="text-right">${a.quantite}</td>
+                      <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
+                      <td class="text-right">${formatCurrency(a.total)}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+
+              <div class="totals-section">
+                <div class="totals-box">
+                  ${receipt.remiseValeur != null && receipt.remiseValeur > 0 ? `
+                    <div class="totals-row subtotal">
+                      <span>Sous-total:</span>
+                      <span>${formatCurrency(receipt.totalAvantRemise || 0)}</span>
+                    </div>
+                    <div class="totals-row discount">
+                      <span>Remise (${receipt.remiseType === "pourcentage" ? receipt.remiseValeur + "%" : "fixe"}):</span>
+                      <span>-${formatCurrency(remiseAmountA5)}</span>
+                    </div>
+                  ` : ""}
+                  <div class="totals-row grand-total">
+                    <span>Total TTC:</span>
+                    <span>${formatCurrency(receipt.totalTTC)}</span>
+                  </div>
+                  <div class="totals-row payment-info">
+                    <span>Reglement: ${receipt.methodePaiement} | Recu: ${formatCurrency(receipt.montantPaye)}</span>
+                  </div>
+                  ${receipt.monnaieRendue > 0 ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(receipt.monnaieRendue)}</span></div>` : ""}
+                  ${receipt.montantRestant != null && receipt.montantRestant > 0 ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(receipt.montantRestant)}</span></div>` : ""}
+                </div>
+              </div>
+
+              <div class="amount-words">
+                Arrêté à : <strong>${montantEnLettres(receipt.totalTTC, "francs CFA")}</strong>
+              </div>
+
+              <div class="qr-stamp-section">
+                <div class="qr-code">
+                  ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
+                </div>
+              </div>
+
+              <div class="footer">
+                <p>${config?.message_pied || "Merci de votre confiance !"}</p>
+                ${config?.support_text ? `<p>${config.support_text}</p>` : ""}
+              </div>
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
     } else {
       // Format ticket 80mm
       printWindow.document.write(`
@@ -339,10 +495,10 @@ const ReceiptPreview: React.FC<{
             </div>
             <div>
               <h2 className="text-2xl font-bold">
-                {isA4 ? "Facture" : "Ticket de caisse"}
+                {format !== "80mm" ? "Facture" : "Ticket de caisse"}
               </h2>
               <p className="text-white/80 text-sm">
-                Apercu avant impression - Format {isA4 ? "A4" : "80mm"}
+                Apercu avant impression - Format {format}
               </p>
             </div>
           </div>
@@ -350,8 +506,8 @@ const ReceiptPreview: React.FC<{
 
         {/* Contenu */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-200 dark:bg-gray-600 flex justify-center">
-          {isA4 ? (
-            /* Format A4 - Facture professionnelle */
+          {format !== "80mm" ? (
+            /* Format A4/A5 - Facture professionnelle */
             <div
               ref={receiptRef}
               className="bg-white shadow-xl dark:text-gray-900"
@@ -363,6 +519,10 @@ const ReceiptPreview: React.FC<{
                 fontSize: "12px",
                 lineHeight: "1.5",
                 color: "#333",
+                ...(format === "A5" && {
+                  transform: "scale(0.703)",
+                  transformOrigin: "top center",
+                }),
               }}
             >
               {/* Header */}
@@ -402,10 +562,11 @@ const ReceiptPreview: React.FC<{
                   {config?.description_entreprise && (
                     <p
                       style={{
-                        fontSize: "10px",
+                        fontSize: "13px",
                         color: "#666",
                         fontStyle: "italic",
                         marginBottom: "4px",
+                        textAlign: "center",
                       }}
                     >
                       {config.description_entreprise}
@@ -2011,7 +2172,10 @@ const PointOfSale: React.FC = () => {
           prix_personnalise:
             item.customPrice !== undefined ? item.customPrice : item.prix_vente,
         }));
-        await window.electronAPI.bulkCreateClientPrices(selectedClientId, prices);
+        await window.electronAPI.bulkCreateClientPrices(
+          selectedClientId,
+          prices,
+        );
       }
 
       // Creer et afficher la facture
@@ -3150,7 +3314,9 @@ const PointOfSale: React.FC = () => {
                     Stock minimum
                   </p>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {selectedProduct.sans_stock ? "—" : selectedProduct.stock_min}
+                    {selectedProduct.sans_stock
+                      ? "—"
+                      : selectedProduct.stock_min}
                   </p>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
@@ -3191,17 +3357,17 @@ const PointOfSale: React.FC = () => {
 
               {!selectedProduct.sans_stock &&
                 selectedProduct.quantite_stock <= selectedProduct.stock_min && (
-                <div className="text-center">
-                  <p className="text-orange-600 font-semibold mb-2">
-                    Stock insuffisant
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {selectedProduct.quantite_stock === 0
-                      ? "Ce produit est épuisé"
-                      : `Seuil d'alerte atteint (minimum: ${selectedProduct.stock_min})`}
-                  </p>
-                </div>
-              )}
+                  <div className="text-center">
+                    <p className="text-orange-600 font-semibold mb-2">
+                      Stock insuffisant
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {selectedProduct.quantite_stock === 0
+                        ? "Ce produit est épuisé"
+                        : `Seuil d'alerte atteint (minimum: ${selectedProduct.stock_min})`}
+                    </p>
+                  </div>
+                )}
             </div>
           </div>
         </div>

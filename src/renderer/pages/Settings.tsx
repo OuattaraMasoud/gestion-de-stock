@@ -26,6 +26,12 @@ const Settings: React.FC = () => {
     telephone2: "",
     email: "",
     nif: "",
+    rccm: "",
+    regime_fiscal: "",
+    division_fiscale: "",
+    numero_compte_uba: "",
+    reference_cadastrale: "",
+    secteur: "",
     ville: "",
     pays: "",
     devise: "FCFA",
@@ -232,7 +238,7 @@ const Settings: React.FC = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-blue-600" />
-                    NIF (Numéro d'Identification Fiscale)
+                    IFU / NIF
                   </label>
                   <input
                     type="text"
@@ -389,12 +395,13 @@ const Settings: React.FC = () => {
                     onChange={(e) =>
                       setConfig({
                         ...config,
-                        format_facture: e.target.value as "80mm" | "A4",
+                        format_facture: e.target.value as "80mm" | "A4" | "A5",
                       })
                     }
                     className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none"
                   >
                     <option value="80mm">Ticket (80mm)</option>
+                    <option value="A5">A5</option>
                     <option value="A4">A4</option>
                   </select>
                 </div>
@@ -449,6 +456,97 @@ const Settings: React.FC = () => {
               </div>
             </div>
           </div>
+
+          <div className="card shadow-lg">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
+                <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-3 rounded-xl shadow-lg">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Informations légales &amp; fiscales
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    RCCM
+                  </label>
+                  <input
+                    type="text"
+                    value={config.rccm || ""}
+                    onChange={(e) => setConfig({ ...config, rccm: e.target.value })}
+                    placeholder="ex: BFOUA2022B1787"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Régime fiscal
+                  </label>
+                  <input
+                    type="text"
+                    value={config.regime_fiscal || ""}
+                    onChange={(e) => setConfig({ ...config, regime_fiscal: e.target.value })}
+                    placeholder="ex: CME"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Division fiscale
+                  </label>
+                  <input
+                    type="text"
+                    value={config.division_fiscale || ""}
+                    onChange={(e) => setConfig({ ...config, division_fiscale: e.target.value })}
+                    placeholder="ex: DCI OUAGA I"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    N° de Compte UBA
+                  </label>
+                  <input
+                    type="text"
+                    value={config.numero_compte_uba || ""}
+                    onChange={(e) => setConfig({ ...config, numero_compte_uba: e.target.value })}
+                    placeholder="ex: 401140001047"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Référence cadastrale
+                  </label>
+                  <input
+                    type="text"
+                    value={config.reference_cadastrale || ""}
+                    onChange={(e) => setConfig({ ...config, reference_cadastrale: e.target.value })}
+                    placeholder="ex: Parcelle: 01 - Lot: 1138 - Section: AH"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Secteur / Quartier
+                  </label>
+                  <input
+                    type="text"
+                    value={config.secteur || ""}
+                    onChange={(e) => setConfig({ ...config, secteur: e.target.value })}
+                    placeholder="ex: Secteur 03 - Koulouba/Ouagadougou"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                  />
+                </div>
+              </div>
+            </div>
 
           <div className="flex justify-end gap-3">
             <button

@@ -495,7 +495,7 @@ const ProformaInvoices: React.FC = () => {
     }
   };
 
-  const isA4 = config?.format_facture === "A4";
+  const format = config?.format_facture || "80mm";
 
   // Générer le QR code quand une proforma est sélectionnée
   useEffect(() => {
@@ -527,7 +527,7 @@ const ProformaInvoices: React.FC = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    if (!isA4) {
+    if (format !== "A4" && format !== "A5") {
       // Format ticket 80mm
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -607,8 +607,8 @@ const ProformaInvoices: React.FC = () => {
           </body>
         </html>
       `);
-    } else {
-      // Format A4 - Facture Proforma professionnelle compacte
+    } else if (format === "A5") {
+      // Format A5 - Facture Proforma compacte
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -616,48 +616,46 @@ const ProformaInvoices: React.FC = () => {
             <title>Proforma - ${selectedProforma.numero}</title>
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
-              @page { size: A4; margin: 8mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
-              .invoice { max-width: 194mm; margin: 0 auto; }
-              .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #f59e0b; margin-bottom: 10px; }
-              .company-logo { width: 150px; display: flex; align-items: center; }
-              .company-logo img { max-height: 110px; max-width: 150px; object-fit: contain; }
-              .company-info { flex: 1; text-align: center; padding: 0 15px; }
-              .company-info h1 { font-size: 18px; color: #92400e; margin-bottom: 2px; }
-              .company-info p { font-size: 9px; color: #555; margin: 1px 0; }
-              .invoice-badge { background: #f59e0b; color: white; padding: 6px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; text-align: center; min-width: 80px; }
-              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
-              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
-              .info-box { width: 48%; background: #fffbeb; padding: 8px 10px; border-radius: 4px; border: 1px solid #fde68a; }
-              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #92400e; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #fde68a; }
-              .info-box p { margin: 2px 0; font-size: 10px; }
+              @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; line-height: 1.3; color: #333; }
+              .invoice { max-width: 136mm; margin: 0 auto; }
+              .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 8px; }
+              .company-logo { display: flex; align-items: center; }
+              .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
+              .company-info { flex: 1; padding: 0 12px; text-align: center; }
+              .company-info h1 { font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; }
+              .company-info .slogan { font-size: 10px; color: #1e3a8a; margin: 0; }
+              .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
+              .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+              .info-box { width: 48%; background: #eff6ff; padding: 6px 8px; border-radius: 4px; border: 1px solid #bfdbfe; }
+              .info-box h3 { font-size: 8px; text-transform: uppercase; color: #1e3a8a; letter-spacing: 0.3px; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #bfdbfe; }
+              .info-box p { margin: 1px 0; font-size: 9px; }
               .info-box strong { color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-              thead th { background: #92400e; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
+              table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+              thead th { background: #1e3a8a; color: white; padding: 5px 6px; text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: 0.2px; }
               thead th:first-child { border-radius: 4px 0 0 0; }
               thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
               thead th.text-right { text-align: right; }
-              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
-              tbody tr:nth-child(even) { background: #fffbeb; }
+              tbody td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 9px; }
+              tbody tr:nth-child(even) { background: #eff6ff; }
               tbody td.text-right { text-align: right; }
-              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
-              .totals-box { width: 240px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 6px; }
+              .totals-box { width: 200px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
               .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
               .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #92400e; border-top: 2px solid #92400e; padding-top: 6px; margin-top: 4px; }
-              .notes { margin-top: 8px; padding: 6px 10px; background: #f9f9f9; border-radius: 4px; font-size: 9px; }
-              .validity-notice { background: #fef3c7; border: 1px solid #f59e0b; padding: 6px 10px; margin-top: 8px; border-radius: 4px; font-size: 9px; }
-              .amount-words { margin-top: 8px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 9px; color: #92400e; }
-              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
+              .totals-row.grand-total { font-size: 11px; font-weight: bold; color: #1e3a8a; border-top: 2px solid #1e3a8a; padding-top: 4px; margin-top: 3px; }
+              .notes { margin-top: 6px; padding: 4px 8px; background: #f9f9f9; border-radius: 4px; font-size: 8px; }
+              .validity-notice { background: #eff6ff; border: 1px solid #bfdbfe; padding: 4px 8px; margin-top: 6px; border-radius: 4px; font-size: 8px; }
+              .amount-words { margin-top: 6px; padding: 4px 8px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; font-style: italic; font-size: 8px; color: #1e3a8a; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 8px; padding-top: 6px; }
               .qr-code { text-align: center; }
-              .qr-code img { width: 80px; height: 80px; }
-              .qr-code p { font-size: 8px; color: #64748b; margin-top: 2px; }
-              .stamp-area { width: 150px; height: 80px; border: 1px dashed #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
-              .stamp-area p { font-size: 9px; color: #94a3b8; text-align: center; }
-              .footer { margin-top: 15px; text-align: center; padding-top: 8px; border-top: 1px solid #e2e8f0; }
-              .footer .message { font-size: 11px; font-weight: 500; color: #92400e; margin-bottom: 2px; }
-              .footer .sub { font-size: 8px; color: #94a3b8; }
+              .qr-code img { width: 60px; height: 60px; }
+              .qr-code p { font-size: 7px; color: #64748b; margin-top: 2px; }
+              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #1e3a8a; padding-top: 4px; text-align: center; font-size: 7.5px; color: #1e3a8a; line-height: 1.5; }
+              .footer p { margin: 1px 0; }
+              .footer strong { font-weight: 700; }
               @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
             </style>
           </head>
@@ -669,10 +667,169 @@ const ProformaInvoices: React.FC = () => {
                 </div>
                 <div class="company-info">
                   <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-                  ${config?.description_entreprise ? `<p style="font-size: 11px; color: #666; font-style: italic;">${config.description_entreprise}</p>` : ""}
-                  ${config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
-                  ${config?.telephone ? `<p>Tel: ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}${config?.nif ? " | NIF: " + config.nif : ""}</p>` : ""}
-                  ${config?.email && !config?.telephone ? `<p>${config.email}</p>` : ""}
+                  ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
+                </div>
+                <div class="invoice-badge">
+                  PROFORMA
+                  <div class="numero">N° ${selectedProforma.numero}</div>
+                </div>
+              </div>
+
+              <div class="info-grid">
+                <div class="info-box">
+                  <h3>Client</h3>
+                  <p><strong>${selectedProforma.client_nom}</strong></p>
+                  ${selectedProforma.client_telephone ? `<p>Tel: ${selectedProforma.client_telephone}</p>` : ""}
+                  ${selectedProforma.client_email ? `<p>${selectedProforma.client_email}</p>` : ""}
+                </div>
+                <div class="info-box">
+                  <h3>Document</h3>
+                  <p><strong>N°:</strong> ${selectedProforma.numero} | <strong>Date:</strong> ${selectedProforma.date_proforma}</p>
+                  ${selectedProforma.date_validite ? `<p><strong>Valide jusqu'au:</strong> ${selectedProforma.date_validite}</p>` : ""}
+                </div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Designation</th>
+                    <th class="text-right" style="width: 35px;">Qte</th>
+                    <th class="text-right" style="width: 70px;">P.U.</th>
+                    <th class="text-right" style="width: 70px;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${selectedProforma.articles.map((a) => `
+                    <tr>
+                      <td>${a.designation}</td>
+                      <td class="text-right">${a.quantite}</td>
+                      <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
+                      <td class="text-right">${formatCurrency(a.total)}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+
+              <div class="totals-section">
+                <div class="totals-box">
+                  ${selectedProforma.total_avant_remise ? `
+                    <div class="totals-row subtotal">
+                      <span>Sous-total:</span>
+                      <span>${formatCurrency(selectedProforma.total_avant_remise)}</span>
+                    </div>
+                    <div class="totals-row discount">
+                      <span>Remise (${selectedProforma.remise_type === "pourcentage" ? selectedProforma.remise_valeur + "%" : formatCurrency(selectedProforma.remise_valeur)}):</span>
+                      <span>-${formatCurrency(selectedProforma.total_avant_remise - selectedProforma.total_ttc)}</span>
+                    </div>
+                  ` : ""}
+                  <div class="totals-row grand-total">
+                    <span>Total TTC:</span>
+                    <span>${formatCurrency(selectedProforma.total_ttc)}</span>
+                  </div>
+                </div>
+              </div>
+
+              ${selectedProforma.notes ? `<div class="notes"><strong>Notes:</strong> ${selectedProforma.notes}</div>` : ""}
+              ${selectedProforma.date_validite ? `<div class="validity-notice"><strong>Important:</strong> Offre valable jusqu'au ${selectedProforma.date_validite}</div>` : ""}
+
+              <div class="amount-words">
+                Arrêté à : <strong>${montantEnLettres(selectedProforma.total_ttc, "francs CFA")}</strong>
+              </div>
+
+              <div class="qr-stamp-section">
+                <div class="qr-code">
+                  ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
+                </div>
+              </div>
+
+              <div class="footer">
+                ${[
+                  [
+                    config?.telephone ? `<strong>Tél:</strong> ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}` : "",
+                    config?.email ? `<strong>Email:</strong> ${config.email}` : "",
+                    config?.adresse ? `<strong>Adresse:</strong> ${config.adresse}${config?.ville ? " " + config.ville : ""}` : "",
+                  ].filter(Boolean).join("&nbsp;&nbsp;"),
+                  [
+                    config?.secteur || "",
+                    config?.nif ? `<strong>IFU:</strong> ${config.nif}` : "",
+                    config?.rccm ? `<strong>RCCM:</strong> ${config.rccm}` : "",
+                    config?.regime_fiscal ? `<strong>Régime fiscal:</strong> ${config.regime_fiscal}` : "",
+                  ].filter(Boolean).join("&nbsp;&nbsp;"),
+                  [
+                    config?.division_fiscale ? `<strong>Division fiscale:</strong> ${config.division_fiscale}` : "",
+                    config?.numero_compte_uba ? `<strong>N° Compte UBA:</strong> ${config.numero_compte_uba}` : "",
+                  ].filter(Boolean).join("&nbsp;&nbsp;"),
+                  config?.reference_cadastrale ? `<strong>Réf. cadastrales:</strong> ${config.reference_cadastrale}` : "",
+                ].filter(Boolean).map(line => `<p>${line}</p>`).join("")}
+              </div>
+            </div>
+            <script>window.onload = function() { setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500); };</script>
+          </body>
+        </html>
+      `);
+    } else {
+      // Format A4 - Facture Proforma professionnelle compacte
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Proforma - ${selectedProforma.numero}</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              @page { size: A4; margin: 8mm 8mm 30mm 8mm; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
+              .invoice { max-width: 194mm; margin: 0 auto; }
+              .header { display: flex; align-items: center; padding-bottom: 12px; border-bottom: 3px solid #1e3a8a; margin-bottom: 10px; }
+              .company-logo { display: flex; align-items: center; }
+              .company-logo img { max-height: 90px; max-width: 120px; object-fit: contain; }
+              .company-info { flex: 1; padding: 0 20px; text-align: center; }
+              .company-info h1 { font-size: 20px; font-weight: bold; color: #1e3a8a; margin-bottom: 4px; }
+              .company-info .slogan { font-size: 13px; color: #1e3a8a; margin: 0; }
+              .invoice-badge { background: #1e3a8a; color: white; padding: 6px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; text-align: center; min-width: 80px; }
+              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
+              .info-box { width: 48%; background: #eff6ff; padding: 8px 10px; border-radius: 4px; border: 1px solid #bfdbfe; }
+              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #1e3a8a; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #bfdbfe; }
+              .info-box p { margin: 2px 0; font-size: 10px; }
+              .info-box strong { color: #1e293b; }
+              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+              thead th { background: #1e3a8a; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
+              thead th:first-child { border-radius: 4px 0 0 0; }
+              thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
+              thead th.text-right { text-align: right; }
+              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+              tbody tr:nth-child(even) { background: #eff6ff; }
+              tbody td.text-right { text-align: right; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
+              .totals-box { width: 240px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
+              .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
+              .totals-row.discount { color: #dc2626; }
+              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #1e3a8a; border-top: 2px solid #1e3a8a; padding-top: 6px; margin-top: 4px; }
+              .notes { margin-top: 8px; padding: 6px 10px; background: #f9f9f9; border-radius: 4px; font-size: 9px; }
+              .validity-notice { background: #eff6ff; border: 1px solid #bfdbfe; padding: 6px 10px; margin-top: 8px; border-radius: 4px; font-size: 9px; }
+              .amount-words { margin-top: 8px; padding: 6px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; font-style: italic; font-size: 9px; color: #1e3a8a; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
+              .qr-code { text-align: center; }
+              .qr-code img { width: 80px; height: 80px; }
+              .qr-code p { font-size: 8px; color: #64748b; margin-top: 2px; }
+              .stamp-area { width: 150px; height: 80px; border: 1px dashed #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+              .stamp-area p { font-size: 9px; color: #94a3b8; text-align: center; }
+              .footer { position: fixed; bottom: 8mm; left: 8mm; right: 8mm; border-top: 1px solid #1e3a8a; padding-top: 6px; text-align: center; font-size: 8.5px; color: #1e3a8a; line-height: 1.6; }
+              .footer p { margin: 1px 0; }
+              .footer strong { font-weight: 700; }
+              @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            </style>
+          </head>
+          <body>
+            <div class="invoice">
+              <div class="header">
+                <div class="company-logo">
+                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
+                </div>
+                <div class="company-info">
+                  <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
+                  ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
                 </div>
                 <div class="invoice-badge">
                   PROFORMA
@@ -759,8 +916,47 @@ const ProformaInvoices: React.FC = () => {
               </div>
 
               <div class="footer">
-                <p class="message">${config?.message_pied || "Merci de votre confiance !"}</p>
-                ${config?.support_text ? `<p class="sub">${config.support_text}</p>` : ""}
+                ${[
+                  [
+                    config?.telephone
+                      ? `<strong>Téléphones:</strong> ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}`
+                      : "",
+                    config?.email
+                      ? `<strong>Email:</strong> ${config.email}`
+                      : "",
+                    config?.adresse
+                      ? `<strong>Adresse:</strong> ${config.adresse}${config?.ville ? " " + config.ville : ""}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("&nbsp;&nbsp;&nbsp;&nbsp;"),
+                  [
+                    config?.secteur || "",
+                    config?.nif ? `<strong>IFU:</strong> ${config.nif}` : "",
+                    config?.rccm ? `<strong>RCCM:</strong> ${config.rccm}` : "",
+                    config?.regime_fiscal
+                      ? `<strong>Régime fiscal:</strong> ${config.regime_fiscal}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("&nbsp;&nbsp;&nbsp;&nbsp;"),
+                  [
+                    config?.division_fiscale
+                      ? `<strong>Division fiscale:</strong> ${config.division_fiscale}`
+                      : "",
+                    config?.numero_compte_uba
+                      ? `<strong>N° de Compte UBA:</strong> ${config.numero_compte_uba}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("&nbsp;&nbsp;&nbsp;&nbsp;"),
+                  config?.reference_cadastrale
+                    ? `<strong>Référence cadastrales:</strong> ${config.reference_cadastrale}`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .map((line) => `<p>${line}</p>`)
+                  .join("")}
               </div>
             </div>
             <script>window.onload = function() { setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500); };</script>
@@ -1478,7 +1674,7 @@ const ProformaInvoices: React.FC = () => {
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2"
               >
                 <Printer className="w-4 h-4" />
-                {isA4 ? "Imprimer A4" : "Imprimer ticket"}
+                {format === "A4" ? "Imprimer A4" : format === "A5" ? "Imprimer A5" : "Imprimer ticket"}
               </button>
               <button
                 onClick={() => setSelectedProforma(null)}
