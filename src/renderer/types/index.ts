@@ -37,6 +37,7 @@ export interface Sale {
   id?: number;
   client_id?: number;
   client_nom?: string;
+  client_adresse?: string;
   serveur_id?: number;
   serveur_nom?: string;
   total: number;
@@ -53,6 +54,12 @@ export interface Sale {
   paiements?: CustomerPayment[];
   utilisateur_id?: number;
   utilisateur_nom?: string;
+  delivered?: boolean;
+  locked?: boolean;
+  livraison_differee?: number;
+  adresse_livraison?: string;
+  livreur?: string;
+  notes_livraison?: string;
 }
 
 export interface DashboardStats {
@@ -122,6 +129,7 @@ export interface PurchaseItem {
   nom_produit?: string;
   quantite: number;
   prix_unitaire: number;
+  prix_achat_ref?: number;
   sous_total: number;
 }
 
@@ -317,6 +325,7 @@ export interface PurchaseItem {
   nom_produit?: string;
   quantite: number;
   prix_unitaire: number;
+  prix_achat_ref?: number;
   sous_total: number;
 }
 
@@ -783,6 +792,31 @@ declare global {
           productsSkipped: number;
         };
       }>;
+      // Caisse (ouverture/fermeture)
+      getOpenCaisse: () => Promise<any>;
+      openCaisse: (caisse: any) => Promise<any>;
+      closeCaisse: (caisseId: number, data: any) => Promise<any>;
+      getCaisses: (page: number, limit: number) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      getCaisseStats: (caisseId: number) => Promise<any>;
+      // Livraisons
+      getLivraisons: (page: number, limit: number, statut?: string) => Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>;
+      createLivraison: (livraison: any) => Promise<any>;
+      updateLivraison: (id: number, livraison: any) => Promise<any>;
+      markAsDelivered: (venteId: number) => Promise<any>;
+      // Statistiques Client
+      getClientStats: (clientId: number) => Promise<any>;
     };
   }
 }

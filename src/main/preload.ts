@@ -424,4 +424,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // App Info
   getAppInfo: () => ipcRenderer.invoke("get-app-info"),
+
+  // Caisse (ouverture/fermeture)
+  getOpenCaisse: () => ipcRenderer.invoke("get-open-caisse"),
+  openCaisse: (caisse: any) => ipcRenderer.invoke("open-caisse", caisse),
+  closeCaisse: (caisseId: number, data: any) => ipcRenderer.invoke("close-caisse", caisseId, data),
+  getCaisses: (page: number, limit: number) => ipcRenderer.invoke("get-caisses", page, limit),
+  getCaisseStats: (caisseId: number) => ipcRenderer.invoke("get-caisse-stats", caisseId),
+
+  // Livraisons
+  getLivraisons: (page: number, limit: number, statut?: string) =>
+    ipcRenderer.invoke("get-livraisons", page, limit, statut),
+  createLivraison: (livraison: any) => ipcRenderer.invoke("create-livraison", livraison),
+  updateLivraison: (id: number, livraison: any) => ipcRenderer.invoke("update-livraison", id, livraison),
+  markAsDelivered: (venteId: number) => ipcRenderer.invoke("mark-as-delivered", venteId),
+
+  // Statistiques Client
+  getClientStats: (clientId: number, startDate?: string, endDate?: string) => ipcRenderer.invoke("get-client-stats", clientId, startDate, endDate),
+  getVenteDetails: (venteId: number) => ipcRenderer.invoke("get-vente-details", venteId),
+
+  // Verrou automatique des factures
+  lockOldInvoices: () => ipcRenderer.invoke("lock-old-invoices"),
 });

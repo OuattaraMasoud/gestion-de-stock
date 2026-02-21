@@ -199,6 +199,12 @@ export interface ElectronAPI {
     startDate?: string,
     endDate?: string,
   ) => Promise<any[]>;
+  getAccountingEntriesPaginated: (
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+  ) => Promise<PaginatedResponse<any>>;
   getTreasury: () => Promise<any>;
   getProfitStats: (
     startDate?: string,
@@ -395,6 +401,46 @@ export interface ElectronAPI {
     buildNumber: string;
     buildDate: string;
   }>;
+
+  // Dépenses
+  getExpenses: (startDate?: string, endDate?: string) => Promise<any[]>;
+  getExpensesPaginated: (
+    page: number,
+    limit: number,
+    startDate?: string,
+    endDate?: string,
+    categorie?: string,
+  ) => Promise<PaginatedResponse<any>>;
+  createExpense: (expense: any) => Promise<any>;
+  updateExpense: (id: number, expense: any) => Promise<any>;
+  deleteExpense: (
+    id: number,
+    utilisateur_id?: number,
+    utilisateur_nom?: string,
+  ) => Promise<boolean>;
+  getExpenseStats: (startDate?: string, endDate?: string) => Promise<any>;
+
+  // Top statistiques
+  getTopProducts: (limit?: number, startDate?: string, endDate?: string) => Promise<any[]>;
+  getTopClients: (limit?: number, startDate?: string, endDate?: string) => Promise<any[]>;
+  getClientStats: (clientId: number, startDate?: string, endDate?: string) => Promise<any>;
+  getVenteDetails: (venteId: number) => Promise<any>;
+
+  // Caisse
+  getOpenCaisse: () => Promise<any>;
+  openCaisse: (caisse: any) => Promise<any>;
+  closeCaisse: (caisseId: number, data: any) => Promise<any>;
+  getCaisses: (page: number, limit: number) => Promise<PaginatedResponse<any>>;
+  getCaisseStats: (caisseId: number) => Promise<any>;
+
+  // Livraisons
+  getLivraisons: (page: number, limit: number, statut?: string) => Promise<PaginatedResponse<any>>;
+  createLivraison: (livraison: any) => Promise<any>;
+  updateLivraison: (id: number, livraison: any) => Promise<any>;
+  markAsDelivered: (venteId: number) => Promise<any>;
+
+  // Verrou automatique factures
+  lockOldInvoices: () => Promise<void>;
 }
 
 declare global {

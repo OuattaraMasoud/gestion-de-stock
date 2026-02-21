@@ -10,6 +10,7 @@ import {
   Edit,
   FileCheck,
   Package,
+  UserPlus,
 } from "lucide-react";
 import { Configuration } from "../types";
 import Pagination from "../components/Pagination";
@@ -93,6 +94,13 @@ const ProformaInvoices: React.FC = () => {
   const [productSearch, setProductSearch] = useState("");
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [articleTempId, setArticleTempId] = useState(1);
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [newClientData, setNewClientData] = useState({
+    nom: "",
+    telephone: "",
+    email: "",
+    adresse: "",
+  });
 
   useEffect(() => {
     loadConfig();
@@ -246,6 +254,46 @@ const ProformaInvoices: React.FC = () => {
       ...formData,
       articles: formData.articles.filter((a) => a.tempId !== tempId),
     });
+  };
+
+  const handleUpdatePrice = (tempId: number, newPrice: number) => {
+    setFormData({
+      ...formData,
+      articles: formData.articles.map((a) =>
+        a.tempId === tempId
+          ? {
+              ...a,
+              prixUnitaire: newPrice,
+              total: a.quantite * newPrice,
+            }
+          : a,
+      ),
+    });
+  };
+
+  const handleCreateClient = async () => {
+    if (!newClientData.nom.trim()) {
+      toast.error("Le nom du client est requis");
+      return;
+    }
+    try {
+      const client = await window.electronAPI.createClient(newClientData);
+      toast.success("Client créé avec succès");
+      const newClient = { ...newClientData, ...client };
+      setClients([...clients, newClient]);
+      setFormData({
+        ...formData,
+        client_id: newClient.id,
+        client_nom: newClient.nom,
+        client_telephone: newClient.telephone || "",
+        client_email: newClient.email || "",
+      });
+      setShowNewClientModal(false);
+      setNewClientData({ nom: "", telephone: "", email: "", adresse: "" });
+    } catch (error) {
+      console.error("Erreur création client:", error);
+      toast.error("Erreur lors de la création du client");
+    }
   };
 
   const calculateTotal = () => {
@@ -1067,6 +1115,14 @@ const ProformaInvoices: React.FC = () => {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => setShowNewClientModal(true)}
+            className="mt-2 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+          >
+            <Plus className="w-4 h-4" />
+            Créer un nouveau client
+          </button>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1176,7 +1232,7 @@ const ProformaInvoices: React.FC = () => {
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
                   Prix
                 </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-2 text-right text-xs w-40 font-medium text-gray-500 dark:text-gray-400">
                   Total
                 </th>
                 <th className="w-10"></th>
@@ -1231,7 +1287,17 @@ const ProformaInvoices: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right text-sm">
-                      {formatCurrency(article.prixUnitaire)}
+                      <input
+                        type="number"
+                        value={article.prixUnitaire}
+                        onChange={(e) =>
+                          handleUpdatePrice(
+                            article.tempId,
+                            parseInt(e.target.value) || 0,
+                          )
+                        }
+                        className="w-24 px-2 py-1 text-right border border-gray-300 dark:border-gray-600 rounded focus:border-blue-500 outline-none bg-white dark:bg-gray-800"
+                      />
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-blue-600">
                       {formatCurrency(article.total)}
@@ -1716,6 +1782,107 @@ const ProformaInvoices: React.FC = () => {
                 className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium"
               >
                 Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nouveau Client */}
+      {showNewClientModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="bg-green-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <UserPlus className="w-6 h-6" />
+                <h2 className="text-xl font-bold">Nouveau Client</h2>
+              </div>
+              <button
+                onClick={() => setShowNewClientModal(false)}
+                className="hover:bg-white/20 p-2 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Nom *
+                </label>
+                <input
+                  type="text"
+                  value={newClientData.nom}
+                  onChange={(e) =>
+                    setNewClientData({ ...newClientData, nom: e.target.value })
+                  }
+                  placeholder="Nom du client"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Téléphone
+                </label>
+                <input
+                  type="text"
+                  value={newClientData.telephone}
+                  onChange={(e) =>
+                    setNewClientData({
+                      ...newClientData,
+                      telephone: e.target.value,
+                    })
+                  }
+                  placeholder="Numéro de téléphone"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={newClientData.email}
+                  onChange={(e) =>
+                    setNewClientData({
+                      ...newClientData,
+                      email: e.target.value,
+                    })
+                  }
+                  placeholder="Adresse email"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Adresse
+                </label>
+                <input
+                  type="text"
+                  value={newClientData.adresse}
+                  onChange={(e) =>
+                    setNewClientData({
+                      ...newClientData,
+                      adresse: e.target.value,
+                    })
+                  }
+                  placeholder="Adresse"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-green-500 outline-none"
+                />
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t flex gap-3 rounded-b-2xl">
+              <button
+                onClick={() => setShowNewClientModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleCreateClient}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
+              >
+                Créer le client
               </button>
             </div>
           </div>

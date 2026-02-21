@@ -216,6 +216,21 @@ const Invoices: React.FC = () => {
     setEditArticles(editArticles.filter((a) => a.tempId !== tempId));
   };
 
+  const handleUpdatePrice = (tempId: number, newPrice: number) => {
+    if (newPrice < 0) return;
+    setEditArticles(
+      editArticles.map((a) =>
+        a.tempId === tempId
+          ? {
+              ...a,
+              prix_unitaire: newPrice,
+              sous_total: newPrice * a.quantite,
+            }
+          : a,
+      ),
+    );
+  };
+
   const editTotal = editArticles.reduce((sum, a) => sum + a.sous_total, 0);
 
   const handleSaveEdit = async () => {
@@ -966,7 +981,7 @@ const Invoices: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {invoice.serveur_nom || "-"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
                     {formatCurrency(invoice.total_ttc || 0)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -1001,7 +1016,7 @@ const Invoices: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleOpenEdit(invoice)}
-                        className="text-green-600 hover:text-green-900 flex items-center gap-1"
+                        className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
                         title="Modifier la facture (disponible 24h)"
                       >
                         <Edit className="w-4 h-4" />
@@ -2011,7 +2026,7 @@ const Invoices: React.FC = () => {
                   <h2 className="text-xl font-bold">
                     Modifier la facture {editInvoice.numero}
                   </h2>
-                  <p className="text-green-100 text-sm">
+                  <p className="text-blue-100 text-sm">
                     Ajoutez ou retirez des produits
                   </p>
                 </div>
@@ -2151,16 +2166,27 @@ const Invoices: React.FC = () => {
                                       article.quantite + 1,
                                     )
                                   }
-                                  className="w-7 h-7 bg-green-600 text-white rounded flex items-center justify-center hover:bg-green-700"
+                                  className="w-7 h-7 bg-blue-600 text-white rounded flex items-center justify-center hover:bg-blue-700"
                                 >
                                   <Plus className="w-4 h-4" />
                                 </button>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-right text-sm">
-                              {formatCurrency(article.prix_unitaire)}
+                            <td className="px-4 py-3 text-right">
+                              <input
+                                type="number"
+                                value={article.prix_unitaire}
+                                onChange={(e) =>
+                                  handleUpdatePrice(
+                                    article.tempId,
+                                    parseInt(e.target.value) || 0,
+                                  )
+                                }
+                                className="w-24 px-2 py-1 text-right text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                min="0"
+                              />
                             </td>
-                            <td className="px-4 py-3 text-right font-bold text-green-600">
+                            <td className="px-4 py-3 text-right font-bold text-blue-600">
                               {formatCurrency(article.sous_total)}
                             </td>
                             <td className="px-4 py-3">
@@ -2181,11 +2207,11 @@ const Invoices: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex justify-between items-center">
+              <div className="bg-blue-50 border border-blue-200 dark:border-gray-800 dark:bg-gray-700 rounded-lg p-4 flex justify-between items-center">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">
                   Nouveau total
                 </span>
-                <span className="text-2xl font-bold text-green-600">
+                <span className="text-2xl font-bold text-blue-600">
                   {formatCurrency(editTotal)}
                 </span>
               </div>
@@ -2194,7 +2220,7 @@ const Invoices: React.FC = () => {
             <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t flex gap-3 rounded-b-2xl">
               <button
                 onClick={() => setShowEditModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-500 hover:bg-gray-300 rounded-lg font-medium"
               >
                 Annuler
               </button>
@@ -2203,7 +2229,7 @@ const Invoices: React.FC = () => {
                 disabled={
                   saving || editArticles.length === 0 || !canModify.canModify
                 }
-                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Enregistrement..." : "Enregistrer les modifications"}
               </button>

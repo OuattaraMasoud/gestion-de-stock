@@ -26,6 +26,7 @@ import {
   UserPlus,
   LayoutGrid,
   LayoutList,
+  Lock,
 } from "lucide-react";
 import { Product, Sale, Configuration } from "../types";
 import { useStore } from "../store/useStore";
@@ -34,7 +35,11 @@ import { SidebarContext } from "../components/Layout";
 import Pagination from "../components/Pagination";
 import { formatCurrency } from "../utils/formatters";
 import { montantEnLettres } from "../utils/numberToWords";
-import { showSaleToast, showErrorToast } from "../utils/toast";
+import {
+  showSaleToast,
+  showErrorToast,
+  showWarningToast,
+} from "../utils/toast";
 import { generateInvoiceQR } from "../utils/qrcode";
 
 // Interface pour le ticket
@@ -1460,7 +1465,7 @@ const ProductCard = React.memo<{
   const isOutOfStock = !product.sans_stock && product.quantite_stock === 0;
   const isAtAlertThreshold =
     !product.sans_stock && product.quantite_stock <= product.stock_min;
-  const isDisabled = isOutOfStock || isAtAlertThreshold;
+  const isDisabled = isOutOfStock;
 
   return (
     <div
@@ -1501,7 +1506,7 @@ const ProductCard = React.memo<{
           )}
         </div>
 
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-0.5 text-xs line-clamp-1 group-hover:text-blue-600 transition-colors">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-0.5 text-xs line-clamp-2 group-hover:text-blue-600 transition-colors">
           {product.nom}
         </h3>
 
@@ -1560,7 +1565,7 @@ const ProductRow = React.memo<{
   const isOutOfStock = !product.sans_stock && product.quantite_stock === 0;
   const isAtAlertThreshold =
     !product.sans_stock && product.quantite_stock <= product.stock_min;
-  const isDisabled = isOutOfStock || isAtAlertThreshold;
+  const isDisabled = isOutOfStock;
 
   return (
     <div
@@ -1587,10 +1592,10 @@ const ProductRow = React.memo<{
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+          <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2">
             {product.nom}
           </h3>
-          {product.sans_stock && (
+          {product.sans_stock == true && (
             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
               Sans stock
             </span>
@@ -1677,6 +1682,9 @@ const PointOfSale: React.FC = () => {
   const [clientName, setClientName] = useState("");
   const [venteACredit, setVenteACredit] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [livraisonDifferee, setLivraisonDifferee] = useState(false);
+  const [adresseLivraison, setAdresseLivraison] = useState("");
+  const [livreur, setLivreur] = useState("");
   const [clients, setClients] = useState<any[]>([]);
   const [config, setConfig] = useState<Configuration | null>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
@@ -1699,6 +1707,13 @@ const PointOfSale: React.FC = () => {
   const [newClientTelephone, setNewClientTelephone] = useState("");
   const [newClientEmail, setNewClientEmail] = useState("");
   const [creatingClient, setCreatingClient] = useState(false);
+
+  // Caisse states
+  const [openCaisse, setOpenCaisse] = useState<any | null>(null);
+  const [caisseLoading, setCaisseLoading] = useState(true);
+  const [fondsRoulement, setFondsRoulement] = useState("0");
+  const [showBilanModal, setShowBilanModal] = useState(false);
+  const [bilanData, setBilanData] = useState<any | null>(null);
 
   const handleViewProductDetails = (product: Product) => {
     setSelectedProduct(product);
@@ -1739,6 +1754,70 @@ const PointOfSale: React.FC = () => {
     loadConfig();
     loadClients();
   }, [currentPage, itemsPerPage]);
+
+  // Vérifier la caisse au montage
+  useEffect(() => {
+    const checkCaisse = async () => {
+      try {
+        const caisse = await window.electronAPI.getOpenCaisse();
+        setOpenCaisse(caisse || null);
+      } catch (error) {
+        console.error("Erreur vérification caisse:", error);
+        setOpenCaisse(null);
+      } finally {
+        setCaisseLoading(false);
+      }
+    };
+    checkCaisse();
+  }, []);
+
+  const handleOpenCaisse = async () => {
+    const fonds = parseInt(fondsRoulement) || 0;
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const caisse = await window.electronAPI.openCaisse({
+        date_ouverture: today,
+        fonds_roulement: fonds,
+        utilisateur_id: user?.id,
+        utilisateur_nom: user?.nom,
+      });
+      setOpenCaisse(caisse);
+      setFondsRoulement("0");
+    } catch (error) {
+      console.error("Erreur ouverture caisse:", error);
+      showErrorToast("Impossible d'ouvrir la caisse");
+    }
+  };
+
+  const handleCloseCaisse = async () => {
+    if (!openCaisse) return;
+    try {
+      const stats = await window.electronAPI.getCaisseStats(openCaisse.id);
+      setBilanData(stats);
+      setShowBilanModal(true);
+    } catch (error) {
+      console.error("Erreur fermeture caisse:", error);
+      showErrorToast("Impossible de récupérer les statistiques de la caisse");
+    }
+  };
+
+  const handleConfirmCloseCaisse = async () => {
+    if (!openCaisse || !bilanData) return;
+    try {
+      await window.electronAPI.closeCaisse(openCaisse.id, {
+        ...bilanData,
+        utilisateur_id: user?.id,
+        utilisateur_nom: user?.nom,
+      });
+      setOpenCaisse(null);
+      setCaisseLoading(false);
+      setShowBilanModal(false);
+      setBilanData(null);
+    } catch (error) {
+      console.error("Erreur fermeture caisse:", error);
+      showErrorToast("Impossible de fermer la caisse");
+    }
+  };
 
   // Raccourcis clavier globaux
   useEffect(() => {
@@ -1817,6 +1896,14 @@ const PointOfSale: React.FC = () => {
           `Stock insuffisant pour "${product.nom}" (disponible : ${product.quantite_stock})`,
         );
         return;
+      }
+
+      // Avertissement si stock faible mais encore disponible
+      const remainingStock = product.quantite_stock - currentQty;
+      if (remainingStock > 0 && remainingStock <= product.stock_min) {
+        showWarningToast(
+          `⚠️ Stock faible pour "${product.nom}" (reste : ${remainingStock})`,
+        );
       }
     }
     const customPrice = clientPrices.get(product.id!);
@@ -2156,6 +2243,10 @@ const PointOfSale: React.FC = () => {
         remise_type: montantRemise > 0 ? remiseType : undefined,
         remise_valeur: montantRemise > 0 ? parseFloat(remiseValeur) : undefined,
         total_avant_remise: montantRemise > 0 ? sousTotal : undefined,
+        // Livraison différée
+        livraison_differee: livraisonDifferee ? 1 : 0,
+        adresse_livraison: livraisonDifferee ? adresseLivraison : undefined,
+        livreur: livraisonDifferee ? livreur : undefined,
         produits: cart.map((item) => {
           const effectivePrice =
             item.customPrice !== undefined ? item.customPrice : item.prix_vente;
@@ -2228,6 +2319,9 @@ const PointOfSale: React.FC = () => {
       setMethodePaiement("especes");
       setVenteACredit(false);
       setSelectedClientId(null);
+      setLivraisonDifferee(false);
+      setAdresseLivraison("");
+      setLivreur("");
 
       showSaleToast(total);
     } catch (error) {
@@ -2252,6 +2346,9 @@ const PointOfSale: React.FC = () => {
     venteACredit,
     selectedClientId,
     clients,
+    livraisonDifferee,
+    adresseLivraison,
+    livreur,
   ]);
 
   const handleReceiptClose = useCallback(() => {
@@ -2263,6 +2360,65 @@ const PointOfSale: React.FC = () => {
     setRemiseValeur("");
     loadProducts();
   }, [clearCart]);
+
+  // Overlay d'ouverture de caisse (bloquant)
+  if (caisseLoading || !openCaisse) {
+    const today = new Date().toLocaleDateString("fr-FR", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    return (
+      <div className="fixed inset-0 bg-blue-600 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4">
+          {caisseLoading ? (
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Vérification de la caisse...</p>
+            </div>
+          ) : (
+            <>
+              <div className="text-center mb-6">
+                <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                  <ShoppingCart className="w-8 h-8 text-blue-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Ouvrir la caisse
+                </h2>
+                <p className="text-gray-500 mt-1 text-sm capitalize">{today}</p>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fonds de roulement (FCFA)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={fondsRoulement}
+                    onChange={(e) => setFondsRoulement(e.target.value)}
+                    onFocus={(e) => {
+                      if (e.target.value === "0") e.target.select();
+                    }}
+                    className="w-full px-4 py-3 text-xl text-black font-bold border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                    placeholder="0"
+                    autoFocus
+                  />
+                </div>
+                <button
+                  onClick={handleOpenCaisse}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95"
+                >
+                  Ouvrir la caisse
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-4rem)] flex gap-6">
@@ -2348,8 +2504,8 @@ const PointOfSale: React.FC = () => {
                 <div
                   className={`grid gap-4 p-4 ${
                     sidebarContext?.isCollapsed
-                      ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-7"
-                      : "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-6"
+                      ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-6"
+                      : "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4"
                   }`}
                 >
                   {paginatedProducts.map((product) => (
@@ -2392,7 +2548,7 @@ const PointOfSale: React.FC = () => {
       </div>
 
       {/* Droite - Panier */}
-      <div className="w-130 flex flex-col space-y-4 shrink-0">
+      <div className="min-w-[38rem] flex-shrink-0 flex flex-col space-y-4">
         <div className="card flex-1 flex flex-col shadow-xl border-2 border-gray-100 dark:border-gray-700">
           {/* En-tête du panier avec toggle vue */}
           <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
@@ -2407,6 +2563,16 @@ const PointOfSale: React.FC = () => {
                 {cart.length} {cart.length > 1 ? "articles" : "article"}
               </p>
             </div>
+            {openCaisse && (
+              <button
+                onClick={handleCloseCaisse}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold transition-all"
+                title="Fermer la caisse"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                Fermer caisse
+              </button>
+            )}
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
               <button
                 onClick={() => setCartViewMode("list")}
@@ -2616,15 +2782,18 @@ const PointOfSale: React.FC = () => {
                           <input
                             type="number"
                             min="0"
-                            step="100"
+                            step="1"
                             value={
                               item.customPrice !== undefined
                                 ? item.customPrice
                                 : item.prix_vente || 0
                             }
                             onChange={(e) => {
-                              const newPrice = parseFloat(e.target.value) || 0;
+                              const newPrice = parseInt(e.target.value) || 0;
                               updateCartItemPrice(item.id!, newPrice);
+                            }}
+                            onFocus={(e) => {
+                              if (e.target.value === "0") e.target.select();
                             }}
                             className={`w-24 text-xs px-2 py-1 border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none ${
                               item.customPrice !== undefined
@@ -2691,14 +2860,14 @@ const PointOfSale: React.FC = () => {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                   <tr className="text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
-                    <th className="py-2 px-2 font-medium">Produit</th>
+                    <th className="py-2 px-2 font-medium w-50">Produit</th>
                     <th className="py-2 px-2 font-medium text-center w-20">
                       Qté
                     </th>
-                    <th className="py-2 px-2 font-medium text-center w-28">
+                    <th className="py-2 px-2 font-medium text-center w-24">
                       Prix U.
                     </th>
-                    <th className="py-2 px-2 font-medium text-right w-24">
+                    <th className="py-2 px-2 font-medium text-right w-40">
                       Total
                     </th>
                     <th className="w-8"></th>
@@ -2713,7 +2882,7 @@ const PointOfSale: React.FC = () => {
                     >
                       <td className="py-2 px-2">
                         <div
-                          className="font-medium text-gray-900 dark:text-white truncate"
+                          className="font-medium text-gray-900 dark:text-white whitespace-normal break-words"
                           title={item.nom}
                         >
                           {item.nom}
@@ -2750,15 +2919,18 @@ const PointOfSale: React.FC = () => {
                         <input
                           type="number"
                           min="0"
-                          step="100"
+                          step="1"
                           value={
                             item.customPrice !== undefined
                               ? item.customPrice
                               : item.prix_vente || 0
                           }
                           onChange={(e) => {
-                            const newPrice = parseFloat(e.target.value) || 0;
+                            const newPrice = parseInt(e.target.value) || 0;
                             updateCartItemPrice(item.id!, newPrice);
+                          }}
+                          onFocus={(e) => {
+                            if (e.target.value === "0") e.target.select();
                           }}
                           className={`w-full text-center text-xs px-1 py-1 border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none ${
                             item.customPrice !== undefined
@@ -2769,7 +2941,7 @@ const PointOfSale: React.FC = () => {
                         />
                       </td>
                       <td className="py-2 px-2 text-right">
-                        <span className="font-bold text-blue-600">
+                        <span className="font-bold text-blue-600 whitespace-nowrap">
                           {formatCurrency(
                             Number(
                               item.customPrice !== undefined
@@ -2881,6 +3053,52 @@ const PointOfSale: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Toggle livraison différée */}
+            <div className="flex items-center gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700">
+              <input
+                type="checkbox"
+                id="livraison-differee"
+                checked={livraisonDifferee}
+                onChange={(e) => setLivraisonDifferee(e.target.checked)}
+                className="w-4 h-4 accent-orange-600"
+              />
+              <label
+                htmlFor="livraison-differee"
+                className="text-sm font-medium text-orange-800 dark:text-orange-300 cursor-pointer select-none"
+              >
+                Livraison différée (stock décrémenté à la livraison)
+              </label>
+            </div>
+
+            {livraisonDifferee && (
+              <div className="space-y-2 pl-1">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Adresse de livraison
+                  </label>
+                  <textarea
+                    value={adresseLivraison}
+                    onChange={(e) => setAdresseLivraison(e.target.value)}
+                    className="input-field text-sm"
+                    rows={2}
+                    placeholder="Adresse complète..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Livreur (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={livreur}
+                    onChange={(e) => setLivreur(e.target.value)}
+                    className="input-field text-sm"
+                    placeholder="Nom du livreur"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Bouton de paiement */}
             <button
@@ -3049,17 +3267,20 @@ const PointOfSale: React.FC = () => {
                         type="number"
                         value={montantPaye}
                         onChange={(e) => setMontantPaye(e.target.value)}
+                        onFocus={(e) => {
+                          if (e.target.value === "0") e.target.select();
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             if (
                               venteACredit ||
-                              parseFloat(montantPaye) >= total
+                              parseInt(montantPaye) >= total
                             ) {
                               handlePayment();
                             }
                           }
                         }}
-                        step="0.01"
+                        step="1"
                         min={0}
                         max={venteACredit ? total : undefined}
                         className="w-full px-4 py-4 text-2xl font-bold border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
@@ -3184,12 +3405,12 @@ const PointOfSale: React.FC = () => {
                     setShowPayment(false);
                     setMontantPaye("");
                   }}
-                  className="flex-1 px-6 py-3 bg-gray-100 dark:bg-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-300 rounded-xl font-semibold transition-all hover:shadow-md active:scale-95 flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-gray-500 dark:bg-gray-500 hover:bg-gray-600 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-300 rounded-xl font-semibold transition-all hover:shadow-md active:scale-95 flex items-center justify-center gap-2"
                   disabled={processing}
                 >
                   <X className="w-4 h-4" />
                   Annuler
-                  <span className="text-xs bg-gray-200 dark:bg-gray-500 px-1.5 py-0.5 rounded">
+                  <span className="text-xs bg-gray-500 dark:bg-gray-500 px-1.5 py-0.5 rounded">
                     ESC
                   </span>
                 </button>
@@ -3470,6 +3691,119 @@ const PointOfSale: React.FC = () => {
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creatingClient ? "Création..." : "Créer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Bilan de la journée */}
+      {showBilanModal && bilanData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Receipt className="w-6 h-6 text-blue-600" />
+                Bilan de la journée
+              </h2>
+              <button
+                onClick={() => {
+                  setShowBilanModal(false);
+                  setBilanData(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Date d'ouverture
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {bilanData.date_ouverture}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Heure d'ouverture
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {bilanData.heure_ouverture}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Fonds de roulement
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {formatCurrency(bilanData.fonds_roulement || 0)}
+                </span>
+              </div>
+              <div className="border-t border-gray-200 dark:border-gray-700" />
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Nombre de ventes
+                </span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {bilanData.nb_ventes || 0}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold">
+                <span className="text-gray-800 dark:text-gray-200">
+                  Total des ventes
+                </span>
+                <span className="text-green-600 text-base">
+                  {formatCurrency(bilanData.total_ventes || 0)}
+                </span>
+              </div>
+              <div className="border-t border-gray-200 dark:border-gray-700" />
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Ventilation par paiement
+              </p>
+              <div className="flex justify-between text-sm">
+                <span className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                  <Banknote className="w-4 h-4 text-green-500" /> Espèces
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {formatCurrency(bilanData.total_especes || 0)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                  <CreditCard className="w-4 h-4 text-blue-500" /> Carte
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {formatCurrency(bilanData.total_carte || 0)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                  <Smartphone className="w-4 h-4 text-purple-500" /> Mobile
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {formatCurrency(bilanData.total_mobile || 0)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowBilanModal(false);
+                  setBilanData(null);
+                }}
+                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl font-semibold transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmCloseCaisse}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all"
+              >
+                Confirmer la fermeture
               </button>
             </div>
           </div>

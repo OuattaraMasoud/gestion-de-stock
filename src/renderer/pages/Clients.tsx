@@ -11,6 +11,13 @@ import {
   Tag,
   Search,
   Save,
+  Eye,
+  TrendingUp,
+  DollarSign,
+  ShoppingBag,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import { Client, ClientPrice, Product } from "../types";
 import Pagination from "../components/Pagination";
@@ -44,6 +51,11 @@ const Clients: React.FC = () => {
   const [editingPrices, setEditingPrices] = useState<Record<number, string>>(
     {},
   );
+
+  // Client details modal
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [clientStats, setClientStats] = useState<any>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   useEffect(() => {
     loadClients();
@@ -249,6 +261,27 @@ const Clients: React.FC = () => {
     }
   };
 
+  const handleOpenDetailsModal = async (client: Client) => {
+    setSelectedClient(client);
+    setShowDetailsModal(true);
+    setDetailsLoading(true);
+
+    try {
+      const stats = await window.electronAPI.getClientStats(client.id!);
+      setClientStats(stats);
+    } catch (error) {
+      console.error("Erreur chargement stats client:", error);
+      showErrorToast("Erreur lors du chargement des statistiques");
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const handleCloseDetailsModal = () => {
+    setShowDetailsModal(false);
+    setClientStats(null);
+  };
+
   const filteredProducts = products.filter(
     (product) =>
       product.nom.toLowerCase().includes(searchProduct.toLowerCase()) ||
@@ -356,13 +389,29 @@ const Clients: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`font-semibold ${(client.solde_du || 0) > 0 ? "text-red-600" : "text-gray-600 dark:text-gray-400"}`}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-semibold ${
+                        (client.solde_du || 0) > 0 
+                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" 
+                          : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      }`}
                     >
+                      {(client.solde_du || 0) > 0 ? (
+                        <AlertTriangle className="w-3 h-3" />
+                      ) : (
+                        <CheckCircle className="w-3 h-3" />
+                      )}
                       {formatCurrency(client.solde_du || 0)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleOpenDetailsModal(client)}
+                        className="text-green-600 hover:text-green-900"
+                        title="Voir les détails"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleOpenPricesModal(client)}
                         className="text-purple-600 hover:text-purple-900"
@@ -664,6 +713,170 @@ const Clients: React.FC = () => {
               <div className="mt-6 pt-4 border-t">
                 <button
                   onClick={handleClosePricesModal}
+                  className="btn-secondary w-full"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Détails Client */}
+      {showDetailsModal && selectedClient && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto modal-content">
+            <div className="bg-gradient-to-r from-green-600 to-green-800 text-white px-6 py-4 rounded-t-xl flex justify-between items-center sticky top-0">
+              <div className="flex items-center gap-3">
+                <UserCircle className="w-6 h-6" />
+                <div>
+                  <h2 className="text-xl font-bold">{selectedClient.nom}</h2>
+                  <p className="text-green-100 text-sm">Détails du client</p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseDetailsModal}
+                className="text-white hover:text-gray-200"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {detailsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                </div>
+              ) : clientStats ? (
+                <div className="space-y-6">
+                  {/* Informations de contact */}
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase">
+                      Informations de contact
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedClient.telephone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-gray-400" />
+                          <span>{selectedClient.telephone}</span>
+                        </div>
+                      )}
+                      {selectedClient.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          <span>{selectedClient.email}</span>
+                        </div>
+                      )}
+                      {selectedClient.adresse && (
+                        <div className="flex items-center gap-2 col-span-2">
+                          <MapPin className="w-4 h-4 text-gray-400" />
+                          <span>{selectedClient.adresse} {selectedClient.ville}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Statistiques */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-blue-600 mb-2">
+                        <ShoppingBag className="w-5 h-5" />
+                        <span className="text-sm font-medium">Ventes</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                        {clientStats.nb_ventes || 0}
+                      </p>
+                    </div>
+                    <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-green-600 mb-2">
+                        <TrendingUp className="w-5 h-5" />
+                        <span className="text-sm font-medium">Total achats</span>
+                      </div>
+                      <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                        {formatCurrency(clientStats.total_achats || 0)}
+                      </p>
+                    </div>
+                    <div className="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-purple-600 mb-2">
+                        <DollarSign className="w-5 h-5" />
+                        <span className="text-sm font-medium">Total payé</span>
+                      </div>
+                      <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                        {formatCurrency(clientStats.total_paye || 0)}
+                      </p>
+                    </div>
+                    <div className={`rounded-lg p-4 ${(clientStats.reste_a_payer || 0) > 0 ? 'bg-red-50 dark:bg-red-900/30' : 'bg-gray-50 dark:bg-gray-900'}`}>
+                      <div className={`flex items-center gap-2 mb-2 ${(clientStats.reste_a_payer || 0) > 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                        <AlertTriangle className="w-5 h-5" />
+                        <span className="text-sm font-medium">Reste à payer</span>
+                      </div>
+                      <p className={`text-lg font-bold ${(clientStats.reste_a_payer || 0) > 0 ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {formatCurrency(clientStats.reste_a_payer || 0)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Dernières ventes */}
+                  {clientStats.recentSales && clientStats.recentSales.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Dernières ventes
+                      </h3>
+                      <div className="space-y-2">
+                        {clientStats.recentSales.map((sale: any) => (
+                          <div
+                            key={sale.id}
+                            className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full ${sale.statut_paiement === 'paye' ? 'bg-green-500' : sale.statut_paiement === 'partiel' ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+                              <div>
+                                <p className="font-medium text-sm">
+                                  Vente #{sale.id}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(sale.date_vente).toLocaleDateString('fr-FR', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-blue-600">
+                                {formatCurrency(sale.total)}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {sale.nb_articles} article(s)
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(!clientStats.recentSales || clientStats.recentSales.length === 0) && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <ShoppingBag className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>Aucune vente enregistrée</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  Erreur lors du chargement des données
+                </div>
+              )}
+
+              <div className="mt-6 pt-4 border-t">
+                <button
+                  onClick={handleCloseDetailsModal}
                   className="btn-secondary w-full"
                 >
                   Fermer

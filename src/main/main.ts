@@ -106,6 +106,9 @@ app.whenReady().then(() => {
   try {
     // Initialiser la base de données
     db.initDatabase();
+    // Verrouiller les factures > 24h au démarrage et toutes les heures
+    db.lockOldInvoices();
+    setInterval(() => db.lockOldInvoices(), 3600000);
     // Démarrer le scheduler de synchronisation quotidienne
     const database = db.getDatabase();
 
@@ -1059,4 +1062,57 @@ ipcMain.handle("get-app-info", async () => {
     console.error("Erreur get app info:", error);
     throw error;
   }
+});
+
+// IPC Handlers pour la caisse
+ipcMain.handle("get-open-caisse", async () => {
+  return db.getOpenCaisse();
+});
+
+ipcMain.handle("open-caisse", async (_, caisse: any) => {
+  return db.openCaisse(caisse);
+});
+
+ipcMain.handle("close-caisse", async (_, caisseId: number, data: any) => {
+  return db.closeCaisse(caisseId, data);
+});
+
+ipcMain.handle("get-caisses", async (_, page: number, limit: number) => {
+  return db.getCaisses(page, limit);
+});
+
+ipcMain.handle("get-caisse-stats", async (_, caisseId: number) => {
+  return db.getCaisseStats(caisseId);
+});
+
+// IPC Handlers pour les livraisons
+ipcMain.handle("get-livraisons", async (_, page: number, limit: number, statut?: string) => {
+  return db.getLivraisons(page, limit, statut);
+});
+
+ipcMain.handle("create-livraison", async (_, livraison: any) => {
+  return db.createLivraison(livraison);
+});
+
+ipcMain.handle("update-livraison", async (_, id: number, livraison: any) => {
+  return db.updateLivraison(id, livraison);
+});
+
+ipcMain.handle("mark-as-delivered", async (_, venteId: number) => {
+  return db.markAsDelivered(venteId);
+});
+
+// IPC Handler pour les stats client
+ipcMain.handle("get-client-stats", async (_, clientId: number, startDate?: string, endDate?: string) => {
+  return db.getClientStats(clientId, startDate, endDate);
+});
+
+// IPC Handler pour les détails d'une vente
+ipcMain.handle("get-vente-details", async (_, venteId: number) => {
+  return db.getVenteDetails(venteId);
+});
+
+// IPC Handler pour le verrouillage auto des factures
+ipcMain.handle("lock-old-invoices", async () => {
+  return db.lockOldInvoices();
 });

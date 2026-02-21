@@ -1,4 +1,4 @@
-import { BanIcon, CircleCheck, Info } from "lucide-react";
+import { BanIcon, CircleCheck, Info, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatCurrency } from "./formatters";
 
@@ -104,6 +104,21 @@ export const showSaleToast = (total: number) => {
       fontWeight: "700",
       padding: "20px",
       fontSize: "16px",
+    },
+  });
+};
+
+export const showWarningToast = (message: string) => {
+  toast(message, {
+    icon: <AlertTriangle size={20} />,
+    duration: 4000,
+    style: {
+      borderRadius: "10px",
+      background: "#f59e0b",
+      color: "#fff",
+      fontWeight: "600",
+      padding: "16px",
+      fontSize: "15px",
     },
   });
 };

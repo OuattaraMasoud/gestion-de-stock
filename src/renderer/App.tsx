@@ -32,6 +32,7 @@ import DatabaseMaintenance from "./pages/DatabaseMaintenance";
 import SupplierDebts from "./pages/SupplierDebts";
 import CustomerDebts from "./pages/CustomerDebts";
 import Inventory from "./pages/Inventory";
+import Livraisons from "./pages/Livraisons";
 
 const App: React.FC = () => {
   return (
@@ -77,6 +78,7 @@ const App: React.FC = () => {
                       <Route path="/proforma" element={<ProformaInvoices />} />
                       <Route path="/parametres" element={<Settings />} />
                       <Route path="/achats" element={<Purchases />} />
+                      <Route path="/livraisons" element={<Livraisons />} />
                       <Route path="/audit" element={<Audit />} />
                       <Route path="/sauvegardes" element={<Backup />} />
                       <Route path="/inventaire" element={<Inventory />} />

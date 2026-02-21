@@ -7,7 +7,7 @@ let db: Database.Database;
 
 // Version actuelle du schéma de la base de données
 // Incrémentez ce numéro à chaque nouveau changement de schéma
-const CURRENT_SCHEMA_VERSION = 13;
+const CURRENT_SCHEMA_VERSION = 17;
 
 // Vérifier l'intégrité de la base de données
 function checkAndRepairDatabase(): { success: boolean; message: string } {
@@ -820,6 +820,103 @@ const migrations: Migration[] = [
       db.exec(`DROP TABLE configuration`);
       db.exec(`ALTER TABLE configuration_new RENAME TO configuration`);
       console.log("✓ Migration 13 terminée");
+    },
+  },
+  {
+    version: 14,
+    description: "Création table caisses pour ouverture/fermeture caisse",
+    up: () => {
+      if (!tableExists("caisses")) {
+        console.log("Migration 14: Création table caisses...");
+        db.exec(`
+          CREATE TABLE caisses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date_ouverture DATE NOT NULL,
+            heure_ouverture TEXT NOT NULL,
+            fonds_roulement REAL NOT NULL DEFAULT 0,
+            date_fermeture DATE,
+            heure_fermeture TEXT,
+            vendeur_id INTEGER,
+            vendeur_nom TEXT,
+            total_ventes REAL DEFAULT 0,
+            total_especes REAL DEFAULT 0,
+            total_carte REAL DEFAULT 0,
+            total_mobile REAL DEFAULT 0,
+            statut TEXT DEFAULT 'ouverte' CHECK(statut IN ('ouverte', 'fermee')),
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (vendeur_id) REFERENCES utilisateurs(id) ON DELETE SET NULL
+          )
+        `);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_caisses_date ON caisses(date_ouverture)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_caisses_statut ON caisses(statut)`);
+        console.log("✓ Migration 14 terminée");
+      }
+    },
+  },
+  {
+    version: 15,
+    description: "Ajout champs locked et delivered sur factures et ventes",
+    up: () => {
+      if (!columnExists("factures", "locked")) {
+        console.log("Migration 15: Ajout champ locked sur factures...");
+        db.exec(`ALTER TABLE factures ADD COLUMN locked INTEGER DEFAULT 0`);
+      }
+      if (!columnExists("ventes", "locked")) {
+        console.log("Migration 15: Ajout champ locked sur ventes...");
+        db.exec(`ALTER TABLE ventes ADD COLUMN locked INTEGER DEFAULT 0`);
+      }
+      if (!columnExists("ventes", "delivered")) {
+        console.log("Migration 15: Ajout champ delivered sur ventes...");
+        db.exec(`ALTER TABLE ventes ADD COLUMN delivered INTEGER DEFAULT 1`);
+      }
+      if (!columnExists("ventes", "date_livraison")) {
+        console.log("Migration 15: Ajout champ date_livraison sur ventes...");
+        db.exec(`ALTER TABLE ventes ADD COLUMN date_livraison DATETIME`);
+      }
+      console.log("✓ Migration 15 terminée");
+    },
+  },
+  {
+    version: 16,
+    description: "Création table livraisons pour suivi des livraisons",
+    up: () => {
+      if (!tableExists("livraisons")) {
+        console.log("Migration 16: Création table livraisons...");
+        db.exec(`
+          CREATE TABLE livraisons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vente_id INTEGER NOT NULL,
+            client_id INTEGER,
+            client_nom TEXT,
+            adresse_livraison TEXT,
+            date_prevue DATE,
+            date_livraison DATETIME,
+            statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'en_cours', 'livree', 'annulee')),
+            notes TEXT,
+            livreur TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (vente_id) REFERENCES ventes(id) ON DELETE CASCADE,
+            FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+          )
+        `);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_livraisons_vente ON livraisons(vente_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_livraisons_client ON livraisons(client_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_livraisons_statut ON livraisons(statut)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_livraisons_date ON livraisons(date_prevue)`);
+        console.log("✓ Migration 16 terminée");
+      }
+    },
+  },
+  {
+    version: 17,
+    description: "Ajout champ livraison_differee sur ventes",
+    up: () => {
+      if (!columnExists("ventes", "livraison_differee")) {
+        db.exec(`ALTER TABLE ventes ADD COLUMN livraison_differee INTEGER DEFAULT 0`);
+        console.log("✓ Migration 17 terminée");
+      }
     },
   },
 ];
@@ -2011,8 +2108,8 @@ export function createSale(sale: any) {
 
       // Créer la vente avec remise
       const saleStmt = db.prepare(`
-        INSERT INTO ventes (client_id, client_nom, serveur_id, total, montant_paye, montant_restant, monnaie_rendue, statut_paiement, methode_paiement, remise_type, remise_valeur, total_avant_remise)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ventes (client_id, client_nom, serveur_id, total, montant_paye, montant_restant, monnaie_rendue, statut_paiement, methode_paiement, remise_type, remise_valeur, total_avant_remise, livraison_differee, delivered)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const montantRestant =
@@ -2024,6 +2121,8 @@ export function createSale(sale: any) {
           : montantRestant < sale.total
             ? "partiel"
             : "impaye");
+
+      const livraisonDifferee = sale.livraison_differee ? 1 : 0;
 
       const result = saleStmt.run(
         sale.client_id || null,
@@ -2038,6 +2137,8 @@ export function createSale(sale: any) {
         sale.remise_type || null,
         sale.remise_valeur || 0,
         sale.total_avant_remise || null,
+        livraisonDifferee,
+        livraisonDifferee ? 0 : 1,
       );
 
       const venteId = result.lastInsertRowid;
@@ -2068,13 +2169,29 @@ export function createSale(sale: any) {
         );
 
         // Ne pas décrémenter le stock pour les produits sans_stock
+        // Ne pas décrémenter le stock si livraison différée (sera fait à la livraison)
         const prodRow = getSansStockStmt.get(item.produit_id) as any;
         const isSansStock = prodRow && prodRow.sans_stock;
         if (isSansStock) {
           totalSansStock += item.sous_total;
-        } else {
+        } else if (!sale.livraison_differee) {
           updateStockStmt.run(item.quantite, item.produit_id);
         }
+      }
+
+      // Créer automatiquement une livraison en_attente si livraison différée
+      if (sale.livraison_differee) {
+        db.prepare(`
+          INSERT INTO livraisons (vente_id, client_id, client_nom, adresse_livraison, statut, livreur, notes)
+          VALUES (?, ?, ?, ?, 'en_attente', ?, ?)
+        `).run(
+          venteId,
+          sale.client_id || null,
+          sale.client_nom || null,
+          sale.adresse_livraison || null,
+          sale.livreur || null,
+          sale.notes_livraison || null,
+        );
       }
 
       // Mettre à jour le solde du client si vente à crédit
@@ -3548,7 +3665,7 @@ export function createClient(client: any) {
       client.utilisateur_nom,
     );
 
-    return result;
+    return db.prepare("SELECT * FROM clients WHERE id = ?").get(clientId);
   } catch (error) {
     console.error("Erreur create client:", error);
     throw error;
@@ -7706,5 +7823,397 @@ export function importProductsFromCSV(csvContent: string): {
         productsSkipped: 0,
       },
     };
+  }
+}
+
+// ===== FONCTIONS CAISSE (OUVERTURE/FERMETURE) =====
+
+export function getOpenCaisse(): any {
+  try {
+    const stmt = db.prepare(`
+      SELECT * FROM caisses 
+      WHERE statut = 'ouverte' 
+      ORDER BY date_ouverture DESC 
+      LIMIT 1
+    `);
+    return stmt.get();
+  } catch (error) {
+    console.error("Erreur getOpenCaisse:", error);
+    return null;
+  }
+}
+
+export function openCaisse(caisse: any): any {
+  try {
+    return db.transaction(() => {
+      const openCaisse = getOpenCaisse();
+      if (openCaisse) {
+        throw new Error("Une caisse est déjà ouverte. Veuillez la fermer d'abord.");
+      }
+
+      const stmt = db.prepare(`
+        INSERT INTO caisses (date_ouverture, heure_ouverture, fonds_roulement, vendeur_id, vendeur_nom, statut)
+        VALUES (DATE('now'), TIME('now'), ?, ?, ?, 'ouverte')
+      `);
+      const result = stmt.run(
+        caisse.fonds_roulement || 0,
+        caisse.vendeur_id || null,
+        caisse.vendeur_nom || null
+      );
+
+      logAudit(
+        "ouvrir caisse",
+        "caisses",
+        Number(result.lastInsertRowid),
+        `Caisse ouverte - Fonds de roulement: ${caisse.fonds_roulement || 0}`,
+        caisse.vendeur_id,
+        caisse.vendeur_nom
+      );
+
+      return { id: result.lastInsertRowid, ...caisse, statut: 'ouverte' };
+    })();
+  } catch (error) {
+    console.error("Erreur openCaisse:", error);
+    throw error;
+  }
+}
+
+export function closeCaisse(caisseId: number, data: any): any {
+  try {
+    return db.transaction(() => {
+      const caisse = db.prepare("SELECT * FROM caisses WHERE id = ?").get(caisseId) as any;
+      if (!caisse) {
+        throw new Error("Caisse non trouvée");
+      }
+
+      const stmt = db.prepare(`
+        UPDATE caisses 
+        SET date_fermeture = DATE('now'),
+            heure_fermeture = TIME('now'),
+            total_ventes = ?,
+            total_especes = ?,
+            total_carte = ?,
+            total_mobile = ?,
+            statut = 'fermee',
+            notes = ?
+        WHERE id = ?
+      `);
+      stmt.run(
+        data.total_ventes || 0,
+        data.total_especes || 0,
+        data.total_carte || 0,
+        data.total_mobile || 0,
+        data.notes || null,
+        caisseId
+      );
+
+      // Lock all invoices from this day
+      db.prepare(`
+        UPDATE factures 
+        SET locked = 1 
+        WHERE DATE(created_at) = DATE(?) AND locked = 0
+      `).run(caisse.date_ouverture);
+
+      db.prepare(`
+        UPDATE ventes 
+        SET locked = 1 
+        WHERE DATE(date_vente) = DATE(?) AND locked = 0
+      `).run(caisse.date_ouverture);
+
+      logAudit(
+        "fermer caisse",
+        "caisses",
+        caisseId,
+        `Caisse fermée - Total ventes: ${data.total_ventes || 0}`,
+        data.vendeur_id,
+        data.vendeur_nom
+      );
+
+      return { id: caisseId, statut: 'fermee' };
+    })();
+  } catch (error) {
+    console.error("Erreur closeCaisse:", error);
+    throw error;
+  }
+}
+
+export function lockOldInvoices(): void {
+  try {
+    db.prepare(`
+      UPDATE factures SET locked = 1
+      WHERE locked = 0 AND datetime(created_at) < datetime('now', '-24 hours')
+    `).run();
+    db.prepare(`
+      UPDATE ventes SET locked = 1
+      WHERE locked = 0 AND datetime(date_vente) < datetime('now', '-24 hours')
+    `).run();
+  } catch (error) {
+    console.error("Erreur lockOldInvoices:", error);
+  }
+}
+
+export function getCaisses(page: number = 1, limit: number = 20): any {
+  try {
+    const offset = (page - 1) * limit;
+    const countStmt = db.prepare("SELECT COUNT(*) as total FROM caisses");
+    const { total } = countStmt.get() as { total: number };
+
+    const dataStmt = db.prepare(`
+      SELECT * FROM caisses 
+      ORDER BY date_ouverture DESC, id DESC 
+      LIMIT ? OFFSET ?
+    `);
+    const data = dataStmt.all(limit, offset);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  } catch (error) {
+    console.error("Erreur getCaisses:", error);
+    return { data: [], total: 0, page, limit, totalPages: 0 };
+  }
+}
+
+export function getCaisseStats(caisseId: number): any {
+  try {
+    const caisse = db.prepare("SELECT * FROM caisses WHERE id = ?").get(caisseId) as any;
+    if (!caisse) return null;
+
+    const stats = db.prepare(`
+      SELECT 
+        COUNT(*) as nb_ventes,
+        COALESCE(SUM(total), 0) as total_ventes,
+        COALESCE(SUM(CASE WHEN methode_paiement = 'especes' THEN total ELSE 0 END), 0) as total_especes,
+        COALESCE(SUM(CASE WHEN methode_paiement = 'carte' THEN total ELSE 0 END), 0) as total_carte,
+        COALESCE(SUM(CASE WHEN methode_paiement = 'mobile' THEN total ELSE 0 END), 0) as total_mobile
+      FROM ventes 
+      WHERE DATE(date_vente) = DATE(?)
+    `).get(caisse.date_ouverture) as any;
+
+    return { ...caisse, ...stats };
+  } catch (error) {
+    console.error("Erreur getCaisseStats:", error);
+    return null;
+  }
+}
+
+// ===== FONCTIONS LIVRAISONS =====
+
+export function getLivraisons(page: number = 1, limit: number = 20, statut?: string): any {
+  try {
+    const offset = (page - 1) * limit;
+    let whereClause = "";
+    let params: any[] = [];
+
+    if (statut) {
+      whereClause = "WHERE l.statut = ?";
+      params.push(statut);
+    }
+
+    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM livraisons l ${whereClause}`);
+    const { total } = countStmt.get(...params) as { total: number };
+
+    const dataStmt = db.prepare(`
+      SELECT l.*, c.nom as client_nom_full, v.total as vente_total
+      FROM livraisons l
+      LEFT JOIN clients c ON l.client_id = c.id
+      LEFT JOIN ventes v ON l.vente_id = v.id
+      ${whereClause}
+      ORDER BY l.created_at DESC
+      LIMIT ? OFFSET ?
+    `);
+    const data = dataStmt.all(...params, limit, offset);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  } catch (error) {
+    console.error("Erreur getLivraisons:", error);
+    return { data: [], total: 0, page, limit, totalPages: 0 };
+  }
+}
+
+export function createLivraison(livraison: any): any {
+  try {
+    return db.transaction(() => {
+      const stmt = db.prepare(`
+        INSERT INTO livraisons (vente_id, client_id, client_nom, adresse_livraison, date_prevue, statut, notes, livreur)
+        VALUES (?, ?, ?, ?, ?, 'en_attente', ?, ?)
+      `);
+      const result = stmt.run(
+        livraison.vente_id,
+        livraison.client_id || null,
+        livraison.client_nom || null,
+        livraison.adresse_livraison || null,
+        livraison.date_prevue || null,
+        livraison.notes || null,
+        livraison.livreur || null
+      );
+
+      // Mark sale as not delivered
+      db.prepare("UPDATE ventes SET delivered = 0 WHERE id = ?").run(livraison.vente_id);
+
+      logAudit(
+        "créer livraison",
+        "livraisons",
+        Number(result.lastInsertRowid),
+        `Livraison créée pour vente #${livraison.vente_id}`,
+        livraison.utilisateur_id,
+        livraison.utilisateur_nom
+      );
+
+      return { id: result.lastInsertRowid, ...livraison };
+    })();
+  } catch (error) {
+    console.error("Erreur createLivraison:", error);
+    throw error;
+  }
+}
+
+export function updateLivraison(id: number, livraison: any): any {
+  try {
+    const stmt = db.prepare(`
+      UPDATE livraisons 
+      SET adresse_livraison = ?, date_prevue = ?, statut = ?, notes = ?, livreur = ?, 
+          date_livraison = CASE WHEN statut = 'en_cours' AND ? = 'livree' THEN DATETIME('now') ELSE date_livraison END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    stmt.run(
+      livraison.adresse_livraison,
+      livraison.date_prevue,
+      livraison.statut,
+      livraison.notes,
+      livraison.livreur,
+      livraison.statut,
+      id
+    );
+
+    // If delivered, update the sale
+    if (livraison.statut === 'livree') {
+      const livr = db.prepare("SELECT vente_id FROM livraisons WHERE id = ?").get(id) as any;
+      if (livr) {
+        const vente = db.prepare("SELECT * FROM ventes WHERE id = ?").get(livr.vente_id) as any;
+        db.prepare("UPDATE ventes SET delivered = 1, date_livraison = DATETIME('now') WHERE id = ?").run(livr.vente_id);
+
+        // Si livraison différée → décrémenter le stock maintenant
+        if (vente?.livraison_differee === 1) {
+          const items = db.prepare(
+            "SELECT produit_id, quantite FROM ventes_produits WHERE vente_id = ?"
+          ).all(livr.vente_id) as any[];
+
+          const updateStockStmt = db.prepare(
+            "UPDATE produits SET quantite_stock = quantite_stock - ? WHERE id = ? AND sans_stock = 0"
+          );
+          for (const item of items) {
+            updateStockStmt.run(item.quantite, item.produit_id);
+          }
+        }
+      }
+    }
+
+    logAudit(
+      "modifier livraison",
+      "livraisons",
+      id,
+      `Livraison modifiée - Statut: ${livraison.statut}`,
+      livraison.utilisateur_id,
+      livraison.utilisateur_nom
+    );
+
+    return { id, ...livraison };
+  } catch (error) {
+    console.error("Erreur updateLivraison:", error);
+    throw error;
+  }
+}
+
+export function markAsDelivered(venteId: number): any {
+  try {
+    return db.transaction(() => {
+      db.prepare("UPDATE ventes SET delivered = 1, date_livraison = DATETIME('now') WHERE id = ?").run(venteId);
+      
+      db.prepare(`
+        UPDATE livraisons 
+        SET statut = 'livree', date_livraison = DATETIME('now'), updated_at = CURRENT_TIMESTAMP 
+        WHERE vente_id = ?
+      `).run(venteId);
+
+      logAudit(
+        "marquer livrée",
+        "ventes",
+        venteId,
+        `Vente #${venteId} marquée comme livrée`,
+        undefined,
+        undefined
+      );
+
+      return { venteId, delivered: true };
+    })();
+  } catch (error) {
+    console.error("Erreur markAsDelivered:", error);
+    throw error;
+  }
+}
+
+// ===== STATISTIQUES CLIENT =====
+
+export function getClientStats(clientId: number, startDate?: string, endDate?: string): any {
+  try {
+    const client = db.prepare("SELECT * FROM clients WHERE id = ?").get(clientId) as any;
+    if (!client) return null;
+
+    const dateFilter = startDate && endDate ? "AND DATE(date_vente) BETWEEN DATE(?) AND DATE(?)" : "";
+    const dateParams: any[] = startDate && endDate ? [startDate, endDate] : [];
+
+    const salesStats = db.prepare(`
+      SELECT
+        COUNT(*) as nb_ventes,
+        COALESCE(SUM(total), 0) as total_achats,
+        COALESCE(SUM(montant_paye), 0) as total_paye,
+        COALESCE(SUM(montant_restant), 0) as total_dettes,
+        COALESCE(SUM(CASE WHEN delivered = 1 THEN 1 ELSE 0 END), 0) as nb_livrees
+      FROM ventes
+      WHERE client_id = ? ${dateFilter}
+    `).get(clientId, ...dateParams) as any;
+
+    const paymentsStats = db.prepare(`
+      SELECT COALESCE(SUM(montant), 0) as total_rembourse
+      FROM paiements_clients
+      WHERE client_id = ?
+    `).get(clientId) as any;
+
+    const recentDateFilter = startDate && endDate ? "AND DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)" : "";
+    const recentSales = db.prepare(`
+      SELECT v.*,
+        (SELECT COUNT(*) FROM ventes_produits vp WHERE vp.vente_id = v.id) as nb_articles
+      FROM ventes v
+      WHERE v.client_id = ? ${recentDateFilter}
+      ORDER BY v.date_vente DESC
+      LIMIT 10
+    `).all(clientId, ...dateParams);
+
+    return {
+      ...client,
+      ...salesStats,
+      total_rembourse: paymentsStats.total_rembourse,
+      reste_a_payer: Math.max(0, salesStats.total_dettes - paymentsStats.total_rembourse),
+      recentSales
+    };
+  } catch (error) {
+    console.error("Erreur getClientStats:", error);
+    return null;
+  }
+}
+
+export function getVenteDetails(venteId: number): any {
+  try {
+    const vente = db.prepare("SELECT * FROM ventes WHERE id = ?").get(venteId);
+    const items = db.prepare(`
+      SELECT vp.quantite, vp.prix_unitaire, vp.sous_total, p.nom as nom_produit
+      FROM ventes_produits vp
+      JOIN produits p ON vp.produit_id = p.id
+      WHERE vp.vente_id = ?
+    `).all(venteId);
+    return { ...(vente as any), items };
+  } catch (error) {
+    console.error("Erreur getVenteDetails:", error);
+    return null;
   }
 }

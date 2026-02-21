@@ -90,6 +90,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     allowedRoles: ["admin", "gestionnaire", "caissier"],
   },
   {
+    path: "/livraisons",
+    label: "Livraisons",
+    icon: "Truck",
+    allowedRoles: ["admin", "gestionnaire"],
+  },
+  {
     path: "/statistiques",
     label: "Statistiques",
     icon: "BarChart3",
@@ -105,7 +111,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     path: "/depenses",
     label: "Dépenses",
     icon: "DollarSign",
-    allowedRoles: ["admin", "gestionnaire"],
+    allowedRoles: ["admin", "gestionnaire", "caissier"],
   },
   {
     path: "/audit",

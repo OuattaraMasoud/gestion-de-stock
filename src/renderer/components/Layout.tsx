@@ -42,16 +42,22 @@ export const SidebarContext = createContext<{
 
 const MENU_GROUPS = [
   {
-    key: "catalogue",
-    label: "Catalogue & Stock",
-    icon: Package,
-    paths: ["/categories", "/produits", "/achats", "/inventaire"],
-  },
-  {
     key: "ventes",
     label: "Ventes",
     icon: ShoppingCart,
-    paths: ["/caisse", "/factures", "/proforma", "/ventes"],
+    paths: ["/caisse", "/factures", "/proforma", "/ventes", "/livraisons"],
+  },
+  {
+    key: "finance",
+    label: "Finances",
+    icon: BarChart3,
+    paths: ["/statistiques", "/comptabilite", "/depenses"],
+  },
+  {
+    key: "catalogue",
+    label: "Catalogue",
+    icon: Package,
+    paths: ["/categories", "/produits", "/achats", "/inventaire"],
   },
   {
     key: "partenaires",
@@ -69,12 +75,6 @@ const MENU_GROUPS = [
     label: "Équipe",
     icon: Users,
     paths: ["/utilisateurs"],
-  },
-  {
-    key: "finance",
-    label: "Finance & Rapports",
-    icon: BarChart3,
-    paths: ["/statistiques", "/comptabilite", "/depenses"],
   },
   {
     key: "admin",
