@@ -720,7 +720,7 @@ const migrations: Migration[] = [
     version: 10,
     description: "Ajout colonne sans_stock pour produits sans suivi de stock",
     up: () => {
-      if (!columnExists("produits", "sans_stock")) {
+      if (tableExists("produits") && !columnExists("produits", "sans_stock")) {
         console.log("Migration 10: Ajout colonne sans_stock...");
         db.exec(`ALTER TABLE produits ADD COLUMN sans_stock INTEGER DEFAULT 0`);
         console.log("✓ Migration 10 terminée");
@@ -1030,6 +1030,7 @@ function createTables() {
       stock_min INTEGER NOT NULL DEFAULT 5,
       categorie_id INTEGER,
       image_url TEXT,
+      sans_stock INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (categorie_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -3740,6 +3741,13 @@ export function deleteClient(
     const client = db
       .prepare("SELECT * FROM clients WHERE id = ?")
       .get(id) as any;
+
+    if (client && client.solde_du > 0) {
+      throw new Error(
+        `Impossible de supprimer ce client : il a une dette de ${client.solde_du} FCFA. Réglez d'abord la dette.`,
+      );
+    }
+
     const stmt = db.prepare("DELETE FROM clients WHERE id = ?");
     const result = stmt.run(id);
 
@@ -4261,6 +4269,75 @@ export function createCustomerPayment(payment: any) {
   }
 }
 
+export function payClientDebtByAmount(
+  clientId: number,
+  montant: number,
+  methode: string,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
+  try {
+    return db.transaction(() => {
+      const unpaidSales = db
+        .prepare(
+          `SELECT id, montant_restant FROM ventes
+           WHERE client_id = ? AND statut_paiement IN ('impaye', 'partiel') AND montant_restant > 0
+           ORDER BY date_vente ASC`,
+        )
+        .all(clientId) as any[];
+
+      let remaining = montant;
+      const updatedSales: number[] = [];
+
+      for (const sale of unpaidSales) {
+        if (remaining <= 0) break;
+        const toPay = Math.min(remaining, sale.montant_restant);
+        remaining -= toPay;
+
+        db.prepare(
+          `UPDATE ventes SET montant_paye = montant_paye + ?, montant_restant = montant_restant - ?,
+           statut_paiement = CASE WHEN montant_restant - ? <= 0 THEN 'paye' ELSE 'partiel' END
+           WHERE id = ?`,
+        ).run(toPay, toPay, toPay, sale.id);
+
+        db.prepare(
+          `UPDATE factures SET montant_paye = montant_paye + ? WHERE vente_id = ?`,
+        ).run(toPay, sale.id);
+
+        db.prepare(
+          `INSERT INTO paiements_clients (vente_id, client_id, montant, methode_paiement)
+           VALUES (?, ?, ?, ?)`,
+        ).run(sale.id, clientId, toPay, methode);
+
+        db.prepare(
+          `INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
+           VALUES ('paiement_client', ?, ?, ?, 'entree', ?)`,
+        ).run(sale.id, `Paiement global dette client #${clientId} - Vente #${sale.id}`, toPay, methode);
+
+        updatedSales.push(sale.id);
+      }
+
+      db.prepare(
+        `UPDATE clients SET solde_du = MAX(0, solde_du - ?) WHERE id = ?`,
+      ).run(montant, clientId);
+
+      logAudit(
+        "paiement global dette client",
+        "paiements_clients",
+        clientId,
+        `Paiement global de ${montant} pour client #${clientId} - ${updatedSales.length} vente(s) touchée(s)`,
+        utilisateur_id,
+        utilisateur_nom,
+      );
+
+      return { success: true, updatedSales };
+    })();
+  } catch (error) {
+    console.error("Erreur payClientDebtByAmount:", error);
+    throw error;
+  }
+}
+
 // ===== COMPTABILITÉ =====
 
 export function getAccountingEntries(startDate?: string, endDate?: string) {
@@ -4384,6 +4461,41 @@ export function getTreasury() {
     };
   } catch (error) {
     console.error("Erreur get treasury:", error);
+    throw error;
+  }
+}
+
+export function getTreasuryByPeriod(startDate: string, endDate: string) {
+  try {
+    const entrees = db
+      .prepare(
+        `
+      SELECT COALESCE(SUM(montant), 0) as total
+      FROM comptabilite
+      WHERE type_mouvement = 'entree'
+      AND DATE(created_at) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(startDate, endDate) as { total: number };
+
+    const sorties = db
+      .prepare(
+        `
+      SELECT COALESCE(SUM(montant), 0) as total
+      FROM comptabilite
+      WHERE type_mouvement = 'sortie'
+      AND DATE(created_at) BETWEEN DATE(?) AND DATE(?)
+    `,
+      )
+      .get(startDate, endDate) as { total: number };
+
+    return {
+      total: entrees.total - sorties.total,
+      entrees: entrees.total,
+      sorties: sorties.total,
+    };
+  } catch (error) {
+    console.error("Erreur get treasury by period:", error);
     throw error;
   }
 }
@@ -4845,7 +4957,7 @@ export function getInvoices() {
 export function getInvoice(id: number) {
   try {
     const stmt = db.prepare(`
-      SELECT f.*, v.client_id, v.montant_restant, v.statut_paiement
+      SELECT f.*, v.client_id, v.montant_restant, v.statut_paiement, v.livraison_differee
       FROM factures f
       LEFT JOIN ventes v ON f.vente_id = v.id
       WHERE f.id = ?
@@ -4866,7 +4978,7 @@ export function getInvoice(id: number) {
 export function getInvoiceByVenteId(venteId: number) {
   try {
     const stmt = db.prepare(`
-      SELECT f.*, v.montant_restant, v.statut_paiement
+      SELECT f.*, v.montant_restant, v.statut_paiement, v.client_id, v.livraison_differee
       FROM factures f
       LEFT JOIN ventes v ON f.vente_id = v.id
       WHERE f.vente_id = ?
@@ -5881,7 +5993,7 @@ export function getInvoicesPaginated(
       const total = getFastCount("factures f", whereClause, params);
 
       const dataStmt = db.prepare(`
-        SELECT f.*, v.montant_restant, v.statut_paiement FROM factures f
+        SELECT f.*, v.montant_restant, v.statut_paiement, v.client_id, v.livraison_differee FROM factures f
         LEFT JOIN ventes v ON f.vente_id = v.id
         ${whereClause}
         ORDER BY f.created_at DESC, f.id DESC
@@ -5904,7 +6016,7 @@ export function getInvoicesPaginated(
     const total = getFastCount("factures");
 
     const dataStmt = db.prepare(`
-      SELECT f.*, v.montant_restant, v.statut_paiement FROM factures f
+      SELECT f.*, v.montant_restant, v.statut_paiement, v.client_id, v.livraison_differee FROM factures f
       LEFT JOIN ventes v ON f.vente_id = v.id
       ORDER BY f.created_at DESC, f.id DESC
       LIMIT ? OFFSET ?
@@ -8215,5 +8327,88 @@ export function getVenteDetails(venteId: number): any {
   } catch (error) {
     console.error("Erreur getVenteDetails:", error);
     return null;
+  }
+}
+
+export function getTotalCustomerDebtsByPeriod(startDate: string, endDate: string): number {
+  try {
+    const stmt = db.prepare(`
+      SELECT COALESCE(SUM(montant_restant), 0) as total
+      FROM ventes
+      WHERE montant_restant > 0
+      AND DATE(date_vente) BETWEEN DATE(?) AND DATE(?)
+    `);
+    const result = stmt.get(startDate, endDate) as { total: number };
+    return result.total;
+  } catch (error) {
+    console.error("Erreur getTotalCustomerDebtsByPeriod:", error);
+    return 0;
+  }
+}
+
+export function getTotalSupplierDebtsByPeriod(startDate: string, endDate: string): number {
+  try {
+    const stmt = db.prepare(`
+      SELECT COALESCE(SUM(montant_restant), 0) as total
+      FROM achats
+      WHERE montant_restant > 0
+      AND DATE(date_achat) BETWEEN DATE(?) AND DATE(?)
+    `);
+    const result = stmt.get(startDate, endDate) as { total: number };
+    return result.total;
+  } catch (error) {
+    console.error("Erreur getTotalSupplierDebtsByPeriod:", error);
+    return 0;
+  }
+}
+
+export function getCaissesByPeriod(startDate: string, endDate: string): any[] {
+  try {
+    const stmt = db.prepare(`
+      SELECT * FROM caisses
+      WHERE DATE(date_ouverture) BETWEEN DATE(?) AND DATE(?)
+      ORDER BY date_ouverture DESC, heure_ouverture DESC
+    `);
+    return stmt.all(startDate, endDate);
+  } catch (error) {
+    console.error("Erreur getCaissesByPeriod:", error);
+    return [];
+  }
+}
+
+export function getTreasuryEvolution(startDate: string, endDate: string): any[] {
+  try {
+    const stmt = db.prepare(`
+      WITH RECURSIVE dates(date) AS (
+        SELECT DATE(?) as date
+        UNION ALL
+        SELECT DATE(date, '+1 day')
+        FROM dates
+        WHERE date < DATE(?)
+      )
+      SELECT 
+        d.date,
+        COALESCE((
+          SELECT SUM(total)
+          FROM ventes
+          WHERE DATE(date_vente) = d.date
+        ), 0) as ca_jour,
+        (
+          SELECT COALESCE(SUM(
+            CASE 
+              WHEN type_mouvement = 'entree' THEN montant
+              ELSE -montant
+            END
+          ), 0)
+          FROM comptabilite
+          WHERE DATE(created_at) <= d.date
+        ) as tresorerie_cumulee
+      FROM dates d
+      ORDER BY d.date ASC
+    `);
+    return stmt.all(startDate, endDate);
+  } catch (error) {
+    console.error("Erreur getTreasuryEvolution:", error);
+    return [];
   }
 }

@@ -742,8 +742,8 @@ const ProformaInvoices: React.FC = () => {
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width: 35px;">Qte</th>
-                    <th class="text-right" style="width: 70px;">P.U.</th>
-                    <th class="text-right" style="width: 70px;">Total</th>
+                    <th class="text-right" style="width: 85px;">P.U.</th>
+                    <th class="text-right" style="width: 85px;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -935,8 +935,8 @@ const ProformaInvoices: React.FC = () => {
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width: 40px;">Qte</th>
-                    <th class="text-right" style="width: 80px;">P.U.</th>
-                    <th class="text-right" style="width: 80px;">Total</th>
+                    <th class="text-right" style="width: 85px;">P.U.</th>
+                    <th class="text-right" style="width: 85px;">Total</th>
                   </tr>
                 </thead>
                 <tbody>

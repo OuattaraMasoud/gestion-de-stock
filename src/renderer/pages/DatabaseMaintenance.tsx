@@ -181,7 +181,9 @@ const DatabaseMaintenance: React.FC = () => {
                 <HardDrive className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Taille totale</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Taille totale
+                </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {formatBytes(stats?.totalSize || 0)}
                 </p>
@@ -195,7 +197,9 @@ const DatabaseMaintenance: React.FC = () => {
                 <Database className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Nombre de tables</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Nombre de tables
+                </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {stats?.tables.length || 0}
                 </p>
@@ -209,7 +213,9 @@ const DatabaseMaintenance: React.FC = () => {
                 <Database className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Audit logs</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Audit logs
+                </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {getTableCount("audit_logs").toLocaleString()}
                 </p>
@@ -223,7 +229,9 @@ const DatabaseMaintenance: React.FC = () => {
                 <Database className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Ventes</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Ventes
+                </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {getTableCount("ventes").toLocaleString()}
                 </p>
@@ -328,7 +336,10 @@ const DatabaseMaintenance: React.FC = () => {
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {stats?.tables.map((table) => (
-                  <tr key={table.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <tr
+                    key={table.name}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {table.name}
                     </td>
@@ -509,72 +520,6 @@ const DatabaseMaintenance: React.FC = () => {
             </div>
           </div>
         )}
-        {/* Zone Danger */}
-        <div className="card shadow-lg border-2 border-red-200">
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-red-100">
-            <div className="bg-gradient-to-br from-red-600 to-red-700 p-3 rounded-xl shadow-lg">
-              <AlertTriangle className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-red-900">Zone Danger</h2>
-              <p className="text-sm text-red-600">Actions irréversibles</p>
-            </div>
-          </div>
-
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <p className="text-sm text-red-800">
-              <strong>Attention :</strong> Cette action supprimera
-              définitivement toutes les données : produits, catégories, ventes,
-              factures, factures proforma, achats, paiements et écritures
-              comptables. Cette opération est irréversible.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            disabled={clearing}
-            onClick={async () => {
-              if (
-                !confirm(
-                  "⚠️ ATTENTION : Vous êtes sur le point de supprimer TOUTES les données (produits, ventes, factures, etc.).\n\nCette action est IRRÉVERSIBLE.\n\nÊtes-vous sûr de vouloir continuer ?",
-                )
-              ) {
-                return;
-              }
-              if (
-                !confirm(
-                  "Dernière confirmation : Toutes les données seront perdues définitivement. Continuer ?",
-                )
-              ) {
-                return;
-              }
-              setClearing(true);
-              try {
-                const result = await window.electronAPI.clearAllData();
-                if (result.success) {
-                  showSuccessToast(result.message);
-                } else {
-                  showErrorToast(result.message);
-                }
-              } catch (error) {
-                console.error("Erreur suppression:", error);
-                showErrorToast("Erreur lors de la suppression des données");
-              } finally {
-                setClearing(false);
-              }
-            }}
-            className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            {clearing ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            ) : (
-              <>
-                <Trash2 className="w-5 h-5" />
-                Réinitialiser toutes les données
-              </>
-            )}
-          </button>
-        </div>
       </div>
     </ProtectedRoute>
   );

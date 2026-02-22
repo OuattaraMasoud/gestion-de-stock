@@ -101,12 +101,18 @@ const Livraisons: React.FC = () => {
   }, [currentPage, itemsPerPage, statutFilter]);
 
   useEffect(() => {
-    window.electronAPI.getConfiguration().then((data: any) => {
-      setConfig(data);
-    }).catch(() => {});
-    window.electronAPI.getCompanyLogo().then((logo: any) => {
-      setLogoBase64(logo);
-    }).catch(() => {});
+    window.electronAPI
+      .getConfiguration()
+      .then((data: any) => {
+        setConfig(data);
+      })
+      .catch(() => {});
+    window.electronAPI
+      .getCompanyLogo()
+      .then((logo: any) => {
+        setLogoBase64(logo);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -194,39 +200,42 @@ const Livraisons: React.FC = () => {
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               @page { size: A4; margin: 8mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.3; color: #111; }
               .invoice { max-width: 194mm; max-height: 500px; margin: 0 auto; }
               .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #2563eb; margin-bottom: 10px; }
               .company-logo { width: 150px; display: flex; align-items: center; }
               .company-logo img { max-height: 110px; max-width: 150px; object-fit: contain; }
               .company-info { flex: 1; text-align: center; padding: 0 15px; }
-              .company-info h1 { font-size: 18px; color: #1e40af; margin-bottom: 2px; }
-              .company-info p { font-size: 9px; color: #555; margin: 1px 0; }
+              .company-info h1 { font-size: 20px; color: #1e40af; margin-bottom: 2px; }
+              .company-info p { font-size: 10px; color: #222; margin: 1px 0; }
               .invoice-badge { background: #2563eb; color: white; padding: 6px 14px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; min-width: 80px; }
               .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
               .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
               .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 2px 0; font-size: 10px; }
-              .info-box strong { color: #1e293b; }
+              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #374151; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 2px 0; font-size: 12px; }
+              .info-box strong { color: #111827; }
               table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
+              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.2px; }
               thead th:first-child { border-radius: 4px 0 0 0; }
               thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
               thead th.text-right { text-align: right; }
-              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #111827; }
               tbody tr:nth-child(even) { background: #f8fafc; }
               tbody td.text-right { text-align: right; }
               .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
               .totals-box { width: 280px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
               .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
               .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 4px; }
+              .totals-row.grand-total { font-size: 15px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 4px; }
               .totals-row.remaining { color: #dc2626; font-weight: bold; }
+              .delivery-status { font-weight: bold; padding: 3px 8px; border-radius: 3px; display: inline-block; margin-top: 6px; }
+              .delivered { background: #dcfce7; color: #166534; }
+              .deferred { background: #fef3c7; color: #92400e; }
               .footer { margin-top: 15px; text-align: center; padding-top: 8px; border-top: 1px solid #e2e8f0; }
-              .footer .message { font-size: 11px; font-weight: 500; color: #1e40af; margin-bottom: 2px; }
-              .footer .sub { font-size: 8px; color: #94a3b8; }
+              .footer .message { font-size: 12px; font-weight: 500; color: #1e40af; margin-bottom: 2px; }
+              .footer .sub { font-size: 8px; color: #374151; }
               @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
             </style>
           </head>
@@ -265,33 +274,46 @@ const Livraisons: React.FC = () => {
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width:40px">Qte</th>
-                    <th class="text-right" style="width:80px">P.U.</th>
-                    <th class="text-right" style="width:80px">Total</th>
+                    <th class="text-right" style="width:85px">P.U.</th>
+                    <th class="text-right" style="width:85px">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${articles.map((a: any) => `
+                  ${articles
+                    .map(
+                      (a: any) => `
                     <tr>
                       <td>${a.designation}</td>
                       <td class="text-right">${a.quantite}</td>
                       <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
                       <td class="text-right">${formatCurrency(a.total)}</td>
                     </tr>
-                  `).join("")}
+                  `,
+                    )
+                    .join("")}
                 </tbody>
               </table>
               <div class="totals-section">
                 <div class="totals-box">
-                  ${inv.total_avant_remise ? `
+                  ${
+                    inv.total_avant_remise
+                      ? `
                     <div class="totals-row subtotal"><span>Sous-total:</span><span>${formatCurrency(inv.total_avant_remise)}</span></div>
                     <div class="totals-row discount"><span>Remise (${inv.remise_type === "pourcentage" ? inv.remise_valeur + "%" : formatCurrency(inv.remise_valeur || 0)}):</span><span>-${formatCurrency(inv.total_avant_remise - inv.total_ttc)}</span></div>
-                  ` : ""}
+                  `
+                      : ""
+                  }
                   <div class="totals-row grand-total"><span>Total TTC:</span><span>${formatCurrency(inv.total_ttc)}</span></div>
                   ${inv.monnaie_rendue > 0 ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(inv.monnaie_rendue)}</span></div>` : ""}
                   ${(inv.montant_restant ?? 0) > 0 ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(inv.montant_restant)}</span></div>` : ""}
+                  <div style="margin-top: 6px;">
+                    <span class="delivery-status ${inv.livraison_differee ? "deferred" : "delivered"}">
+                      ${inv.livraison_differee ? "NON LIVRÉ" : "✓ LIVRÉ"}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div style="margin-top:8px;font-size:10px">
+              <div style="margin-top:8px;font-size:12px">
                 Arrêté à : <strong>${montantEnLettres(inv.total_ttc, "francs CFA")}</strong>
               </div>
               <div class="footer">
@@ -312,31 +334,34 @@ const Livraisons: React.FC = () => {
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; line-height: 1.3; color: #333; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.3; color: #111; }
               .invoice { max-width: 136mm; margin: 0 auto; }
               .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 8px; }
               .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
               .company-info { flex: 1; padding: 0 12px; text-align: center; }
-              .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; }
+              .company-info h1 { font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; }
               .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
               .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
               .info-grid { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
               .info-box { width: 48%; background: #f8fafc; padding: 6px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 8px; text-transform: uppercase; color: #64748b; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 1px 0; font-size: 9px; }
+              .info-box h3 { font-size: 8px; text-transform: uppercase; color: #374151; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 1px 0; font-size: 11px; color: #111827; }
               table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-              thead th { background: #1e40af; color: white; padding: 5px 6px; text-align: left; font-size: 8px; text-transform: uppercase; }
+              thead th { background: #1e40af; color: white; padding: 5px 6px; text-align: left; font-size: 10px; text-transform: uppercase; }
               thead th.text-right { text-align: right; }
-              tbody td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 9px; }
+              tbody td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #111827; }
               tbody tr:nth-child(even) { background: #f8fafc; }
               tbody td.text-right { text-align: right; }
               .totals-section { display: flex; justify-content: flex-end; margin-top: 6px; }
               .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 6px 8px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
               .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
               .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 11px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 4px; margin-top: 3px; }
+              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 4px; margin-top: 3px; }
               .totals-row.remaining { color: #dc2626; font-weight: bold; }
+              .delivery-status { font-weight: bold; padding: 3px 8px; border-radius: 3px; display: inline-block; margin-top: 4px; }
+              .delivered { background: #dcfce7; color: #166534; }
+              .deferred { background: #fef3c7; color: #92400e; }
               .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 7.5px; color: #1e40af; }
               @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
             </style>
@@ -373,33 +398,46 @@ const Livraisons: React.FC = () => {
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width:35px">Qte</th>
-                    <th class="text-right" style="width:70px">P.U.</th>
-                    <th class="text-right" style="width:70px">Total</th>
+                    <th class="text-right" style="width:85px">P.U.</th>
+                    <th class="text-right" style="width:85px">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${articles.map((a: any) => `
+                  ${articles
+                    .map(
+                      (a: any) => `
                     <tr>
                       <td>${a.designation}</td>
                       <td class="text-right">${a.quantite}</td>
                       <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
                       <td class="text-right">${formatCurrency(a.total)}</td>
                     </tr>
-                  `).join("")}
+                  `,
+                    )
+                    .join("")}
                 </tbody>
               </table>
               <div class="totals-section">
                 <div class="totals-box">
-                  ${inv.total_avant_remise ? `
+                  ${
+                    inv.total_avant_remise
+                      ? `
                     <div class="totals-row subtotal"><span>Sous-total:</span><span>${formatCurrency(inv.total_avant_remise)}</span></div>
                     <div class="totals-row discount"><span>Remise (${inv.remise_type === "pourcentage" ? inv.remise_valeur + "%" : formatCurrency(inv.remise_valeur || 0)}):</span><span>-${formatCurrency(inv.total_avant_remise - inv.total_ttc)}</span></div>
-                  ` : ""}
+                  `
+                      : ""
+                  }
                   <div class="totals-row grand-total"><span>Total TTC:</span><span>${formatCurrency(inv.total_ttc)}</span></div>
                   ${inv.monnaie_rendue > 0 ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(inv.monnaie_rendue)}</span></div>` : ""}
                   ${(inv.montant_restant ?? 0) > 0 ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(inv.montant_restant)}</span></div>` : ""}
+                  <div style="margin-top: 4px;">
+                    <span class="delivery-status ${inv.livraison_differee ? "deferred" : "delivered"}">
+                      ${inv.livraison_differee ? "NON LIVRÉ" : "✓ LIVRÉ"}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div style="margin-top:6px;font-size:9px">
+              <div style="margin-top:6px;font-size:11px">
                 Arrêté à : <strong>${montantEnLettres(inv.total_ttc, "francs CFA")}</strong>
               </div>
               <div class="footer">
@@ -463,7 +501,9 @@ const Livraisons: React.FC = () => {
                 ${inv.client_telephone ? `<div class="ticket-info-row"><span>Tel:</span><span>${inv.client_telephone}</span></div>` : ""}
               </div>
               <div class="ticket-articles">
-                ${articles.map((a: any) => `
+                ${articles
+                  .map(
+                    (a: any) => `
                   <div class="ticket-article">
                     <div class="ticket-article-name">${a.designation}</div>
                     <div class="ticket-article-details">
@@ -471,13 +511,19 @@ const Livraisons: React.FC = () => {
                       <span>${formatCurrency(a.total)}</span>
                     </div>
                   </div>
-                `).join("")}
+                `,
+                  )
+                  .join("")}
               </div>
               <div class="ticket-totals">
-                ${inv.total_avant_remise ? `
+                ${
+                  inv.total_avant_remise
+                    ? `
                   <div class="ticket-total-row"><span>Sous-total:</span><span>${formatCurrency(inv.total_avant_remise)}</span></div>
                   <div class="ticket-total-row" style="color:#dc2626"><span>Remise:</span><span>-${formatCurrency(inv.total_avant_remise - inv.total_ttc)}</span></div>
-                ` : ""}
+                `
+                    : ""
+                }
                 <div class="ticket-total-row grand-total"><span>TOTAL</span><span>${formatCurrency(inv.total_ttc)}</span></div>
               </div>
               <div class="ticket-payment">
@@ -1059,7 +1105,9 @@ const Livraisons: React.FC = () => {
                   {/* Infos client + paiement */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                      <p className="text-xs uppercase text-gray-400 font-medium mb-2">Client</p>
+                      <p className="text-xs uppercase text-gray-400 font-medium mb-2">
+                        Client
+                      </p>
                       <p className="font-semibold text-gray-900 dark:text-white">
                         {invoiceData.client_nom || "Comptoir"}
                       </p>
@@ -1070,7 +1118,9 @@ const Livraisons: React.FC = () => {
                       )}
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                      <p className="text-xs uppercase text-gray-400 font-medium mb-2">Paiement</p>
+                      <p className="text-xs uppercase text-gray-400 font-medium mb-2">
+                        Paiement
+                      </p>
                       <p className="font-semibold text-gray-900 dark:text-white capitalize">
                         {invoiceData.methode_paiement || "-"}
                       </p>
@@ -1082,14 +1132,20 @@ const Livraisons: React.FC = () => {
 
                   {/* Articles */}
                   <div>
-                    <p className="text-xs uppercase text-gray-400 font-medium mb-2">Articles</p>
+                    <p className="text-xs uppercase text-gray-400 font-medium mb-2">
+                      Articles
+                    </p>
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-gray-100 dark:bg-gray-700 text-xs text-gray-600 dark:text-gray-300">
-                          <th className="text-left px-3 py-2 rounded-l-lg">Désignation</th>
+                          <th className="text-left px-3 py-2 rounded-l-lg">
+                            Désignation
+                          </th>
                           <th className="text-right px-3 py-2">Qté</th>
                           <th className="text-right px-3 py-2">P.U.</th>
-                          <th className="text-right px-3 py-2 rounded-r-lg">Total</th>
+                          <th className="text-right px-3 py-2 rounded-r-lg">
+                            Total
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -1097,11 +1153,14 @@ const Livraisons: React.FC = () => {
                           ? invoiceData.articles
                           : []
                         ).map((article: any, i: number) => (
-                          <tr key={i} className="text-gray-700 dark:text-gray-200">
-                            <td className="px-3 py-2">
-                              {article.designation}
+                          <tr
+                            key={i}
+                            className="text-gray-700 dark:text-gray-200"
+                          >
+                            <td className="px-3 py-2">{article.designation}</td>
+                            <td className="px-3 py-2 text-right">
+                              {article.quantite}
                             </td>
-                            <td className="px-3 py-2 text-right">{article.quantite}</td>
                             <td className="px-3 py-2 text-right">
                               {formatCurrency(article.prixUnitaire || 0)}
                             </td>
@@ -1120,37 +1179,55 @@ const Livraisons: React.FC = () => {
                       {invoiceData.total_avant_remise && (
                         <div className="flex justify-between text-gray-600 dark:text-gray-300">
                           <span>Sous-total</span>
-                          <span>{formatCurrency(invoiceData.total_avant_remise)}</span>
+                          <span>
+                            {formatCurrency(invoiceData.total_avant_remise)}
+                          </span>
                         </div>
                       )}
                       {invoiceData.total_avant_remise > 0 && (
                         <div className="flex justify-between text-red-600">
                           <span>
-                            Remise ({invoiceData.remise_type === "pourcentage"
+                            Remise (
+                            {invoiceData.remise_type === "pourcentage"
                               ? invoiceData.remise_valeur + "%"
-                              : formatCurrency(invoiceData.remise_valeur)})
+                              : formatCurrency(invoiceData.remise_valeur)}
+                            )
                           </span>
-                          <span>-{formatCurrency(invoiceData.total_avant_remise - invoiceData.total_ttc)}</span>
+                          <span>
+                            -
+                            {formatCurrency(
+                              invoiceData.total_avant_remise -
+                                invoiceData.total_ttc,
+                            )}
+                          </span>
                         </div>
                       )}
                       <div className="flex justify-between font-bold text-base text-blue-600 border-t border-gray-200 dark:border-gray-600 pt-2 mt-1">
                         <span>Total</span>
-                        <span>{formatCurrency(invoiceData.total_ttc || 0)}</span>
+                        <span>
+                          {formatCurrency(invoiceData.total_ttc || 0)}
+                        </span>
                       </div>
                       <div className="flex justify-between text-gray-600 dark:text-gray-300">
                         <span>Payé</span>
-                        <span>{formatCurrency(invoiceData.montant_paye || 0)}</span>
+                        <span>
+                          {formatCurrency(invoiceData.montant_paye || 0)}
+                        </span>
                       </div>
                       {invoiceData.montant_restant > 0 && (
                         <div className="flex justify-between font-semibold text-red-600">
                           <span>Reste à payer</span>
-                          <span>{formatCurrency(invoiceData.montant_restant)}</span>
+                          <span>
+                            {formatCurrency(invoiceData.montant_restant)}
+                          </span>
                         </div>
                       )}
                       {invoiceData.monnaie_rendue > 0 && (
                         <div className="flex justify-between text-gray-600 dark:text-gray-300">
                           <span>Monnaie rendue</span>
-                          <span>{formatCurrency(invoiceData.monnaie_rendue)}</span>
+                          <span>
+                            {formatCurrency(invoiceData.monnaie_rendue)}
+                          </span>
                         </div>
                       )}
                     </div>

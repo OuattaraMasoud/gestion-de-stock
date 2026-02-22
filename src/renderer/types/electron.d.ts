@@ -193,6 +193,7 @@ export interface ElectronAPI {
   // Paiements Clients
   getCustomerPayments: (saleId: number) => Promise<any[]>;
   createCustomerPayment: (payment: any) => Promise<any>;
+  payClientDebtByAmount: (clientId: number, montant: number, methode: string, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
 
   // Comptabilité
   getAccountingEntries: (
@@ -206,6 +207,7 @@ export interface ElectronAPI {
     endDate?: string,
   ) => Promise<PaginatedResponse<any>>;
   getTreasury: () => Promise<any>;
+  getTreasuryByPeriod: (startDate: string, endDate: string) => Promise<any>;
   getProfitStats: (
     startDate?: string,
     endDate?: string,
@@ -432,6 +434,10 @@ export interface ElectronAPI {
   closeCaisse: (caisseId: number, data: any) => Promise<any>;
   getCaisses: (page: number, limit: number) => Promise<PaginatedResponse<any>>;
   getCaisseStats: (caisseId: number) => Promise<any>;
+  getTotalCustomerDebtsByPeriod: (startDate: string, endDate: string) => Promise<number>;
+  getTotalSupplierDebtsByPeriod: (startDate: string, endDate: string) => Promise<number>;
+  getCaissesByPeriod: (startDate: string, endDate: string) => Promise<any[]>;
+  getTreasuryEvolution: (startDate: string, endDate: string) => Promise<any[]>;
 
   // Livraisons
   getLivraisons: (page: number, limit: number, statut?: string) => Promise<PaginatedResponse<any>>;

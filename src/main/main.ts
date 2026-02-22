@@ -449,6 +449,13 @@ ipcMain.handle("create-customer-payment", async (_, payment: any) => {
   return db.createCustomerPayment(payment);
 });
 
+ipcMain.handle(
+  "pay-client-debt-by-amount",
+  async (_, clientId: number, montant: number, methode: string, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.payClientDebtByAmount(clientId, montant, methode, utilisateur_id, utilisateur_nom);
+  },
+);
+
 // IPC Handlers pour la comptabilité
 ipcMain.handle(
   "get-accounting-entries",
@@ -460,6 +467,13 @@ ipcMain.handle(
 ipcMain.handle("get-treasury", async () => {
   return db.getTreasury();
 });
+
+ipcMain.handle(
+  "get-treasury-by-period",
+  async (_, startDate: string, endDate: string) => {
+    return db.getTreasuryByPeriod(startDate, endDate);
+  },
+);
 
 ipcMain.handle(
   "get-profit-stats",
@@ -1083,6 +1097,22 @@ ipcMain.handle("get-caisses", async (_, page: number, limit: number) => {
 
 ipcMain.handle("get-caisse-stats", async (_, caisseId: number) => {
   return db.getCaisseStats(caisseId);
+});
+
+ipcMain.handle("get-total-customer-debts-period", async (_, startDate: string, endDate: string) => {
+  return db.getTotalCustomerDebtsByPeriod(startDate, endDate);
+});
+
+ipcMain.handle("get-total-supplier-debts-period", async (_, startDate: string, endDate: string) => {
+  return db.getTotalSupplierDebtsByPeriod(startDate, endDate);
+});
+
+ipcMain.handle("get-caisses-by-period", async (_, startDate: string, endDate: string) => {
+  return db.getCaissesByPeriod(startDate, endDate);
+});
+
+ipcMain.handle("get-treasury-evolution", async (_, startDate: string, endDate: string) => {
+  return db.getTreasuryEvolution(startDate, endDate);
 });
 
 // IPC Handlers pour les livraisons

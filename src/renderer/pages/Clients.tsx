@@ -156,9 +156,9 @@ const Clients: React.FC = () => {
       await window.electronAPI.deleteClient(id, user?.id, user?.nom);
       showSuccessToast("Client supprimé avec succès");
       loadClients();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur:", error);
-      showErrorToast("Erreur lors de la suppression");
+      showErrorToast(error.message || "Erreur lors de la suppression");
     }
   };
 

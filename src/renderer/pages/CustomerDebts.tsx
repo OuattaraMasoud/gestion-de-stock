@@ -7,12 +7,15 @@ import {
   CreditCard as CardIcon,
   Check,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   DollarSign,
   Smartphone,
   Search,
   X,
-  Printer,
   FileText,
+  ListFilter,
+  Package,
 } from "lucide-react";
 import { formatCurrency } from "../utils/formatters";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
@@ -60,12 +63,24 @@ const CustomerDebts: React.FC = () => {
   const [paymentReceipt, setPaymentReceipt] = useState<any>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [config, setConfig] = useState<Configuration | null>(null);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [paymentMode, setPaymentMode] = useState<"by_sale" | "by_amount">(
+    "by_sale",
+  );
+  const [globalPaymentAmount, setGlobalPaymentAmount] = useState("");
+  const [globalPaymentMethod, setGlobalPaymentMethod] = useState<
+    "especes" | "carte" | "mobile" | "virement"
+  >("especes");
+  const [showCreditSalesModal, setShowCreditSalesModal] = useState(false);
+  const [expandedSaleId, setExpandedSaleId] = useState<number | null>(null);
 
   const loadConfig = async () => {
     try {
       const data = await window.electronAPI.getConfiguration();
       setConfig(data);
+      const logo = await window.electronAPI.getCompanyLogo();
+      setLogoBase64(logo);
     } catch (error) {
       console.error("Erreur chargement configuration:", error);
     }
@@ -137,6 +152,7 @@ const CustomerDebts: React.FC = () => {
         methode_paiement: paymentMethod,
         reference: paymentReference,
         client_nom: selectedClient?.client_nom,
+        client_telephone: selectedClient?.telephone,
         vente_id: selectedSale.id,
         total_vente: selectedSale.total,
         ancien_restant: selectedSale.montant_restant,
@@ -157,7 +173,12 @@ const CustomerDebts: React.FC = () => {
       setPaymentMethod("especes");
       setSelectedSale(null);
 
-      loadDebts();
+      const updatedDebts = await window.electronAPI.getCustomerDebts();
+      setDebts(updatedDebts);
+      const updatedClient = updatedDebts.find((d: CustomerDebt) => d.client_id === selectedClient?.client_id);
+      if (updatedClient) {
+        setSelectedClient(updatedClient);
+      }
       if (selectedClient) {
         loadClientSales(selectedClient.client_id);
       }
@@ -170,6 +191,210 @@ const CustomerDebts: React.FC = () => {
     if (selectedSale) {
       setPaymentAmount(selectedSale.montant_restant.toString());
     }
+  };
+
+  const handlePaymentByAmount = async () => {
+    if (!selectedClient) return;
+    const amount = parseFloat(globalPaymentAmount);
+    if (!amount || amount <= 0) {
+      showErrorToast("Veuillez entrer un montant valide");
+      return;
+    }
+    if (amount > selectedClient.solde_du) {
+      showErrorToast("Le montant dépasse la dette totale du client");
+      return;
+    }
+    try {
+      await window.electronAPI.payClientDebtByAmount(
+        selectedClient.client_id,
+        amount,
+        globalPaymentMethod,
+        user?.id,
+        user?.nom,
+      );
+      showSuccessToast("Paiement enregistré avec succès");
+      setShowPaymentModal(false);
+      setGlobalPaymentAmount("");
+      setGlobalPaymentMethod("especes");
+      setPaymentMode("by_sale");
+      const updatedDebts = await window.electronAPI.getCustomerDebts();
+      setDebts(updatedDebts);
+      const updatedClient = updatedDebts.find((d: CustomerDebt) => d.client_id === selectedClient?.client_id);
+      if (updatedClient) {
+        setSelectedClient(updatedClient);
+      }
+      loadClientSales(selectedClient.client_id);
+    } catch (error: any) {
+      showErrorToast(error.message || "Erreur lors du paiement");
+    }
+  };
+
+  const printDebtPaymentA5 = (receipt: any) => {
+    if (!receipt?.invoice) return;
+    const inv = receipt.invoice;
+    const articles: any[] = Array.isArray(inv.articles) ? inv.articles : [];
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Facture A5 - ${inv.numero || ""}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
+            .invoice { max-width: 136mm; margin: 0 auto; }
+            .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 10px; }
+            .company-logo { display: flex; align-items: center; }
+            .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
+            .company-info { flex: 1; padding: 0 12px; text-align: center; }
+            .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .company-info .slogan { font-size: 10px; color: #1e3a8a; margin: 0; }
+            .invoice-badge { background: #22c55e; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
+            .invoice-badge .numero { font-size: 9px; font-weight: normal; margin-top: 2px; }
+            .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+            .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
+            .info-box h3 { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
+            .info-box p { margin: 2px 0; font-size: 10px; }
+            .info-box strong { color: #1e293b; }
+            table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+            thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
+            thead th:first-child { border-radius: 4px 0 0 0; }
+            thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
+            thead th.text-right { text-align: right; }
+            tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+            tbody tr:nth-child(even) { background: #f8fafc; }
+            tbody td.text-right { text-align: right; }
+            .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
+            .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
+            .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
+            .totals-row.grand-total { font-size: 12px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 5px; margin-top: 4px; }
+            .totals-row.payed { color: #166534; font-weight: bold; }
+            .totals-row.remaining { color: #dc2626; font-weight: bold; }
+            .solde-badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: bold; padding: 3px 10px; border-radius: 4px; margin-top: 6px; font-size: 10px; }
+            .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 8px; color: #1e40af; line-height: 1.5; }
+            .footer p { margin: 1px 0; }
+            .footer strong { font-weight: 700; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <div class="invoice">
+            <div class="header">
+              <div class="company-logo">
+                ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
+              </div>
+              <div class="company-info">
+                <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
+                ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
+              </div>
+              <div class="invoice-badge">
+                RECU
+                <div class="numero">Paiement Dette</div>
+              </div>
+            </div>
+
+            <div class="info-grid">
+              <div class="info-box">
+                <h3>Client</h3>
+                <p><strong>${receipt.client_nom || "Client"}</strong></p>
+                ${receipt.client_telephone ? `<p>Tel: ${receipt.client_telephone}</p>` : ""}
+                ${receipt.client_email ? `<p>${receipt.client_email}</p>` : ""}
+              </div>
+              <div class="info-box">
+                <h3>Facture</h3>
+                <p><strong>N°:</strong> ${inv.numero || "-"}</p>
+                <p><strong>Date:</strong> ${inv.date_facture || receipt.date}</p>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Désignation</th>
+                  <th class="text-right" style="width:35px">Qté</th>
+                  <th class="text-right" style="width:85px">P.U.</th>
+                  <th class="text-right" style="width:85px">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${articles
+                  .map(
+                    (a: any) => `
+                  <tr>
+                    <td>${a.designation}</td>
+                    <td class="text-right">${a.quantite}</td>
+                    <td class="text-right">${a.prixUnitaire?.toLocaleString("fr-FR")} FCFA</td>
+                    <td class="text-right">${a.total?.toLocaleString("fr-FR")} FCFA</td>
+                  </tr>
+                `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+
+            <div class="totals-section">
+              <div class="totals-box">
+                <div class="totals-row grand-total"><span>Total TTC:</span><span>${(inv.total_ttc ?? 0).toLocaleString("fr-FR")} FCFA</span></div>
+                <div class="totals-row payed"><span>Montant payé:</span><span>${(inv.montant_paye ?? 0).toLocaleString("fr-FR")} FCFA</span></div>
+                ${
+                  (inv.montant_restant ?? 0) <= 0
+                    ? `<div style="margin-top:6px;"><span class="solde-badge">✓ SOLDÉ</span></div>`
+                    : `<div class="totals-row remaining"><span>Reste:</span><span>${(inv.montant_restant ?? 0).toLocaleString("fr-FR")} FCFA</span></div>`
+                }
+              </div>
+            </div>
+
+            <div class="footer">
+              ${[
+                [
+                  config?.telephone
+                    ? `<strong>Tél:</strong> ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}`
+                    : "",
+                  config?.email
+                    ? `<strong>Email:</strong> ${config.email}`
+                    : "",
+                  config?.adresse
+                    ? `<strong>Adresse:</strong> ${config.adresse}${config?.ville ? " " + config.ville : ""}`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join("&nbsp;&nbsp;"),
+                [
+                  config?.secteur || "",
+                  config?.nif ? `<strong>IFU:</strong> ${config.nif}` : "",
+                  config?.rccm ? `<strong>RCCM:</strong> ${config.rccm}` : "",
+                  config?.regime_fiscal
+                    ? `<strong>Régime fiscal:</strong> ${config.regime_fiscal}`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join("&nbsp;&nbsp;"),
+                [
+                  config?.division_fiscale
+                    ? `<strong>Division fiscale:</strong> ${config.division_fiscale}`
+                    : "",
+                  config?.numero_compte_uba
+                    ? `<strong>N° Compte UBA:</strong> ${config.numero_compte_uba}`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join("&nbsp;&nbsp;"),
+                config?.reference_cadastrale
+                  ? `<strong>Réf. cadastrales:</strong> ${config.reference_cadastrale}`
+                  : "",
+              ]
+                .filter(Boolean)
+                .map((line) => `<p>${line}</p>`)
+                .join("")}
+            </div>
+          </div>
+          <script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},100);},500);};</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const totalDebts = debts.reduce((sum, debt) => sum + debt.solde_du, 0);
@@ -306,6 +531,25 @@ const CustomerDebts: React.FC = () => {
                         </p>
                       </div>
                     </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setPaymentMode("by_amount");
+                          setSelectedSale(null);
+                          setShowPaymentModal(true);
+                        }}
+                        className="flex items-center gap-1 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-sm font-medium transition-all"
+                      >
+                        <DollarSign className="w-4 h-4" />
+                        Payer global
+                      </button>
+                      <button
+                        onClick={() => setShowCreditSalesModal(true)}
+                        className="flex items-center gap-1 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-sm font-medium transition-all"
+                      >
+                        <ListFilter className="w-4 h-4" />À crédit
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-3 max-h-[calc(100vh-350px)] overflow-y-auto">
@@ -381,6 +625,22 @@ const CustomerDebts: React.FC = () => {
 
                         <div className="flex gap-2">
                           <button
+                            onClick={() =>
+                              setExpandedSaleId(
+                                expandedSaleId === sale.id ? null : sale.id,
+                              )
+                            }
+                            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm transition-all flex items-center gap-1"
+                          >
+                            <Package className="w-4 h-4" />
+                            Détails
+                            {expandedSaleId === sale.id ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
                             onClick={() => {
                               setSelectedSale(sale);
                               setShowPaymentModal(true);
@@ -402,6 +662,50 @@ const CustomerDebts: React.FC = () => {
                             Montant libre
                           </button>
                         </div>
+
+                        {expandedSaleId === sale.id &&
+                          sale.produits &&
+                          sale.produits.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                              <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                                Produits ({sale.produits.length})
+                              </p>
+                              <div className="space-y-2">
+                                {sale.produits.map(
+                                  (produit: any, idx: number) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center justify-between text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-100 dark:border-gray-700"
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-gray-900 dark:text-white truncate">
+                                          {produit.nom ||
+                                            produit.designation ||
+                                            `Produit #${produit.produit_id || idx + 1}`}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                          {produit.quantite} x{" "}
+                                          {formatCurrency(
+                                            produit.prix_unitaire ||
+                                              produit.prix ||
+                                              0,
+                                          )}
+                                        </p>
+                                      </div>
+                                      <p className="font-semibold text-gray-900 dark:text-white ml-2">
+                                        {formatCurrency(
+                                          (produit.quantite || 0) *
+                                            (produit.prix_unitaire ||
+                                              produit.prix ||
+                                              0),
+                                        )}
+                                      </p>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          )}
                       </div>
                     ))}
 
@@ -434,147 +738,294 @@ const CustomerDebts: React.FC = () => {
           </div>
         )}
 
-        {showPaymentModal && selectedSale && selectedClient && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-5">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Effectuer un paiement
-                </h3>
-                <button
-                  onClick={() => setShowPaymentModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-2 mb-4 text-sm">
-                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Client:</span>
-                  <span className="font-semibold">
-                    {selectedClient.client_nom}
-                  </span>
-                </div>
-                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Vente:</span>
-                  <span className="font-semibold">#{selectedSale.id}</span>
-                </div>
-                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Total:</span>
-                  <span className="font-semibold">
-                    {formatCurrency(selectedSale.total)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-red-600 font-semibold">
-                  <span>Reste à payer:</span>
-                  <span>{formatCurrency(selectedSale.montant_restant)}</span>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Montant
-                  </label>
+        {showPaymentModal &&
+          selectedClient &&
+          (selectedSale || paymentMode === "by_amount") && (
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-5">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Effectuer un paiement
+                  </h3>
                   <button
-                    onClick={handlePayFullAmount}
-                    className="w-full mb-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-medium text-sm transition-all"
+                    onClick={() => {
+                      setShowPaymentModal(false);
+                      setPaymentMode("by_sale");
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
                   >
-                    Payer le reste (
-                    {formatCurrency(selectedSale.montant_restant)})
+                    <X className="w-5 h-5" />
                   </button>
-                  <input
-                    type="number"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    min="0"
-                    max={selectedSale.montant_restant}
-                    step="0.01"
-                    placeholder="Montant"
-                    className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
-                  />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Mode de paiement
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { value: "especes", label: "Espèces", icon: Banknote },
-                      { value: "carte", label: "Carte", icon: CreditCard },
-                      { value: "mobile", label: "Mobile", icon: Smartphone },
-                      { value: "virement", label: "Virement", icon: CardIcon },
-                    ].map((method) => (
-                      <button
-                        key={method.value}
-                        onClick={() => setPaymentMethod(method.value as any)}
-                        className={`p-2 rounded-lg border-2 transition-all ${
-                          paymentMethod === method.value
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
-                        }`}
-                      >
-                        <method.icon className="w-4 h-4 mx-auto" />
-                        <span className="text-xs block mt-1">
-                          {method.label}
+                {/* Toggle mode */}
+                <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 mb-4 overflow-hidden text-sm">
+                  <button
+                    onClick={() => setPaymentMode("by_sale")}
+                    className={`flex-1 py-2 font-medium transition-all ${paymentMode === "by_sale" ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50"}`}
+                  >
+                    Par vente précise
+                  </button>
+                  <button
+                    onClick={() => setPaymentMode("by_amount")}
+                    className={`flex-1 py-2 font-medium transition-all ${paymentMode === "by_amount" ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50"}`}
+                  >
+                    Par montant global
+                  </button>
+                </div>
+
+                {paymentMode === "by_sale" && selectedSale && (
+                  <>
+                    <div className="space-y-2 mb-4 text-sm">
+                      <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                        <span>Client:</span>
+                        <span className="font-semibold">
+                          {selectedClient.client_nom}
                         </span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                        <span>Vente:</span>
+                        <span className="font-semibold">
+                          #{selectedSale.id}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                        <span>Total:</span>
+                        <span className="font-semibold">
+                          {formatCurrency(selectedSale.total)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-red-600 font-semibold">
+                        <span>Reste à payer:</span>
+                        <span>
+                          {formatCurrency(selectedSale.montant_restant)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Montant
+                        </label>
+                        <button
+                          onClick={handlePayFullAmount}
+                          className="w-full mb-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-medium text-sm transition-all"
+                        >
+                          Payer le reste (
+                          {formatCurrency(selectedSale.montant_restant)})
+                        </button>
+                        <input
+                          type="number"
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(e.target.value)}
+                          min="0"
+                          max={selectedSale.montant_restant}
+                          step="0.01"
+                          placeholder="Montant"
+                          className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Mode de paiement
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            {
+                              value: "especes",
+                              label: "Espèces",
+                              icon: Banknote,
+                            },
+                            {
+                              value: "carte",
+                              label: "Carte",
+                              icon: CreditCard,
+                            },
+                            {
+                              value: "mobile",
+                              label: "Mobile",
+                              icon: Smartphone,
+                            },
+                            {
+                              value: "virement",
+                              label: "Virement",
+                              icon: CardIcon,
+                            },
+                          ].map((method) => (
+                            <button
+                              key={method.value}
+                              onClick={() =>
+                                setPaymentMethod(method.value as any)
+                              }
+                              className={`p-2 rounded-lg border-2 transition-all ${paymentMethod === method.value ? "border-blue-500 bg-blue-50" : "border-gray-200 dark:border-gray-700 hover:border-gray-300"}`}
+                            >
+                              <method.icon className="w-4 h-4 mx-auto" />
+                              <span className="text-xs block mt-1">
+                                {method.label}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Référence (optionnel)
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentReference}
+                          onChange={(e) => setPaymentReference(e.target.value)}
+                          placeholder="N° de transaction..."
+                          className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Commentaire (optionnel)
+                        </label>
+                        <textarea
+                          value={paymentComment}
+                          onChange={(e) => setPaymentComment(e.target.value)}
+                          rows={2}
+                          placeholder="Note..."
+                          className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                        />
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          onClick={() => {
+                            setShowPaymentModal(false);
+                            setPaymentMode("by_sale");
+                          }}
+                          className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all text-sm"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={handlePayment}
+                          disabled={
+                            !paymentAmount || parseFloat(paymentAmount) <= 0
+                          }
+                          className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                        >
+                          <Check className="w-4 h-4" />
+                          Valider
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {paymentMode === "by_amount" && (
+                  <div className="space-y-4">
+                    <div className="space-y-2 mb-2 text-sm">
+                      <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                        <span>Client:</span>
+                        <span className="font-semibold">
+                          {selectedClient.client_nom}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-red-600 font-semibold">
+                        <span>Dette totale:</span>
+                        <span>{formatCurrency(selectedClient.solde_du)}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Le montant sera distribué automatiquement sur les ventes
+                        les plus anciennes.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Montant à payer
+                      </label>
+                      <input
+                        type="number"
+                        value={globalPaymentAmount}
+                        onChange={(e) => setGlobalPaymentAmount(e.target.value)}
+                        min="0"
+                        max={selectedClient.solde_du}
+                        step="0.01"
+                        placeholder="Montant"
+                        className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Mode de paiement
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          {
+                            value: "especes",
+                            label: "Espèces",
+                            icon: Banknote,
+                          },
+                          { value: "carte", label: "Carte", icon: CreditCard },
+                          {
+                            value: "mobile",
+                            label: "Mobile",
+                            icon: Smartphone,
+                          },
+                          {
+                            value: "virement",
+                            label: "Virement",
+                            icon: CardIcon,
+                          },
+                        ].map((method) => (
+                          <button
+                            key={method.value}
+                            onClick={() =>
+                              setGlobalPaymentMethod(method.value as any)
+                            }
+                            className={`p-2 rounded-lg border-2 transition-all ${globalPaymentMethod === method.value ? "border-blue-500 bg-blue-50" : "border-gray-200 dark:border-gray-700 hover:border-gray-300"}`}
+                          >
+                            <method.icon className="w-4 h-4 mx-auto" />
+                            <span className="text-xs block mt-1">
+                              {method.label}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => {
+                          setShowPaymentModal(false);
+                          setPaymentMode("by_sale");
+                        }}
+                        className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all text-sm"
+                      >
+                        Annuler
                       </button>
-                    ))}
+                      <button
+                        onClick={handlePaymentByAmount}
+                        disabled={
+                          !globalPaymentAmount ||
+                          parseFloat(globalPaymentAmount) <= 0
+                        }
+                        className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                      >
+                        <Check className="w-4 h-4" />
+                        Valider
+                      </button>
+                    </div>
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Référence (optionnel)
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentReference}
-                    onChange={(e) => setPaymentReference(e.target.value)}
-                    placeholder="N° de transaction..."
-                    className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Commentaire (optionnel)
-                  </label>
-                  <textarea
-                    value={paymentComment}
-                    onChange={(e) => setPaymentComment(e.target.value)}
-                    rows={2}
-                    placeholder="Note..."
-                    className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={() => setShowPaymentModal(false)}
-                    className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all text-sm"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={handlePayment}
-                    disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
-                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
-                  >
-                    <Check className="w-4 h-4" />
-                    Valider
-                  </button>
-                </div>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          )}
         {/* Modal reçu de paiement */}
         {showReceipt && paymentReceipt && (
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[95vh] flex flex-col">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[95vh] flex flex-col">
               {/* Header */}
               <div className="bg-green-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -596,291 +1047,619 @@ const CustomerDebts: React.FC = () => {
                 </button>
               </div>
 
-              {/* Contenu du reçu - Format ticket */}
-              <div className="flex-1 overflow-y-auto p-6 bg-gray-100 dark:bg-gray-700 flex justify-center">
+              {/* Contenu du reçu - Format A5 */}
+              <div className="flex-1 overflow-y-auto p-6 bg-gray-200 dark:bg-gray-600 flex justify-center">
                 <div
                   ref={receiptRef}
-                  className="bg-white dark:bg-gray-800 shadow-xl"
+                  className="bg-white shadow-xl dark:text-gray-900"
                   style={{
-                    width: "80mm",
-                    padding: "3mm",
-                    fontFamily: "'Courier New', 'Lucida Console', monospace",
-                    fontSize: "12px",
+                    width: "148mm",
+                    minHeight: "200mm",
+                    padding: "10mm",
+                    fontFamily: "'Segoe UI', Arial, sans-serif",
+                    fontSize: "11px",
                     lineHeight: "1.4",
-                    minHeight: "150mm",
-                    color: "#000",
+                    color: "#333",
+                    transform: "scale(0.85)",
+                    transformOrigin: "top center",
                   }}
                 >
-                  {/* En-tête */}
+                  {/* Header */}
                   <div
                     style={{
-                      textAlign: "center",
-                      paddingBottom: "3mm",
-                      borderBottom: "1px dashed #000",
-                      marginBottom: "3mm",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingBottom: "10px",
+                      borderBottom: "2px solid #2563eb",
+                      marginBottom: "15px",
                     }}
                   >
-                    <h1
+                    <div>
+                      {logoBase64 && (
+                        <img
+                          src={logoBase64}
+                          alt="Logo"
+                          style={{
+                            maxHeight: "60px",
+                            maxWidth: "120px",
+                            marginBottom: "5px",
+                            objectFit: "contain",
+                          }}
+                        />
+                      )}
+                      <h1
+                        style={{
+                          fontSize: "16px",
+                          color: "#1e40af",
+                          marginBottom: "3px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {config?.nom_entreprise || "Mon Entreprise"}
+                      </h1>
+                      {config?.description_entreprise && (
+                        <p
+                          style={{
+                            fontSize: "10px",
+                            color: "#666",
+                            fontStyle: "italic",
+                            marginBottom: "3px",
+                          }}
+                        >
+                          {config.description_entreprise}
+                        </p>
+                      )}
+                      {config?.adresse && (
+                        <p
+                          style={{
+                            fontSize: "9px",
+                            color: "#555",
+                            margin: "1px 0",
+                          }}
+                        >
+                          {config.adresse}
+                          {config?.ville ? ", " + config.ville : ""}
+                        </p>
+                      )}
+                      {config?.telephone && (
+                        <p
+                          style={{
+                            fontSize: "9px",
+                            color: "#555",
+                            margin: "1px 0",
+                          }}
+                        >
+                          Tel: {config.telephone}
+                          {config?.telephone2 ? " / " + config.telephone2 : ""}
+                        </p>
+                      )}
+                      {config?.email && (
+                        <p
+                          style={{
+                            fontSize: "9px",
+                            color: "#555",
+                            margin: "1px 0",
+                          }}
+                        >
+                          {config.email}
+                        </p>
+                      )}
+                      {config?.nif && (
+                        <p
+                          style={{
+                            fontSize: "9px",
+                            color: "#555",
+                            margin: "1px 0",
+                          }}
+                        >
+                          NIF: {config.nif}
+                        </p>
+                      )}
+                    </div>
+                    <div
                       style={{
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        marginBottom: "2mm",
-                        textTransform: "uppercase",
+                        background: "#22c55e",
+                        color: "white",
+                        padding: "6px 15px",
+                        borderRadius: "4px",
+                        textAlign: "center",
                       }}
                     >
-                      {config?.nom_entreprise || "Mon Entreprise"}
-                    </h1>
-                    {config?.telephone && (
-                      <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                        Tel: {config.telephone}
+                      <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                        RECU
+                      </div>
+                      <div style={{ fontSize: "10px" }}>Paiement Dette</div>
+                    </div>
+                  </div>
+
+                  {/* Info grid */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "15px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "48%",
+                        background: "#f8fafc",
+                        padding: "10px",
+                        borderRadius: "6px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          fontSize: "9px",
+                          textTransform: "uppercase",
+                          color: "#64748b",
+                          letterSpacing: "0.5px",
+                          marginBottom: "5px",
+                          paddingBottom: "4px",
+                          borderBottom: "1px solid #e2e8f0",
+                        }}
+                      >
+                        Client
+                      </h3>
+                      <p
+                        style={{
+                          margin: "2px 0",
+                          fontWeight: "bold",
+                          color: "#1e293b",
+                        }}
+                      >
+                        {paymentReceipt.client_nom}
                       </p>
-                    )}
-                    {config?.adresse && (
-                      <p style={{ fontSize: "10px", margin: "1mm 0" }}>
-                        {config.adresse}
+                      {paymentReceipt.client_telephone && (
+                        <p style={{ margin: "2px 0", fontSize: "10px" }}>
+                          Tel: {paymentReceipt.client_telephone}
+                        </p>
+                      )}
+                      {paymentReceipt.client_email && (
+                        <p style={{ margin: "2px 0", fontSize: "10px" }}>
+                          Email: {paymentReceipt.client_email}
+                        </p>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        width: "48%",
+                        background: "#f8fafc",
+                        padding: "10px",
+                        borderRadius: "6px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          fontSize: "9px",
+                          textTransform: "uppercase",
+                          color: "#64748b",
+                          letterSpacing: "0.5px",
+                          marginBottom: "5px",
+                          paddingBottom: "4px",
+                          borderBottom: "1px solid #e2e8f0",
+                        }}
+                      >
+                        Details
+                      </h3>
+                      <p style={{ margin: "2px 0", fontSize: "10px" }}>
+                        <strong>Date:</strong> {paymentReceipt.date}
                       </p>
+                      <p style={{ margin: "2px 0", fontSize: "10px" }}>
+                        <strong>Heure:</strong> {paymentReceipt.heure}
+                      </p>
+                      <p style={{ margin: "2px 0", fontSize: "10px" }}>
+                        <strong>Caissier:</strong> {paymentReceipt.caissier}
+                      </p>
+                      <p style={{ margin: "2px 0", fontSize: "10px" }}>
+                        <strong>Vente:</strong> #{paymentReceipt.vente_id}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Table des articles si disponibles */}
+                  {paymentReceipt?.invoice?.articles &&
+                    paymentReceipt.invoice.articles.length > 0 && (
+                      <table
+                        style={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          margin: "10px 0",
+                        }}
+                      >
+                        <thead>
+                          <tr>
+                            <th
+                              style={{
+                                background: "#1e40af",
+                                color: "white",
+                                padding: "6px 8px",
+                                textAlign: "left",
+                                fontSize: "9px",
+                                textTransform: "uppercase",
+                                borderRadius: "4px 0 0 0",
+                              }}
+                            >
+                              Designation
+                            </th>
+                            <th
+                              style={{
+                                background: "#1e40af",
+                                color: "white",
+                                padding: "6px 8px",
+                                textAlign: "right",
+                                fontSize: "9px",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Qte
+                            </th>
+                            <th
+                              style={{
+                                background: "#1e40af",
+                                color: "white",
+                                padding: "6px 8px",
+                                textAlign: "right",
+                                fontSize: "9px",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Prix U.
+                            </th>
+                            <th
+                              style={{
+                                background: "#1e40af",
+                                color: "white",
+                                padding: "6px 8px",
+                                textAlign: "right",
+                                fontSize: "9px",
+                                textTransform: "uppercase",
+                                borderRadius: "0 4px 0 0",
+                              }}
+                            >
+                              Total
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paymentReceipt.invoice.articles.map(
+                            (article: any, index: number) => (
+                              <tr
+                                key={index}
+                                style={{
+                                  background:
+                                    index % 2 === 0 ? "white" : "#f8fafc",
+                                }}
+                              >
+                                <td
+                                  style={{
+                                    padding: "6px 8px",
+                                    borderBottom: "1px solid #e2e8f0",
+                                    fontSize: "10px",
+                                  }}
+                                >
+                                  {article.designation}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "6px 8px",
+                                    borderBottom: "1px solid #e2e8f0",
+                                    fontSize: "10px",
+                                    textAlign: "right",
+                                  }}
+                                >
+                                  {article.quantite}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "6px 8px",
+                                    borderBottom: "1px solid #e2e8f0",
+                                    fontSize: "10px",
+                                    textAlign: "right",
+                                  }}
+                                >
+                                  {formatCurrency(article.prixUnitaire)}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "6px 8px",
+                                    borderBottom: "1px solid #e2e8f0",
+                                    fontSize: "10px",
+                                    textAlign: "right",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {formatCurrency(article.total)}
+                                </td>
+                              </tr>
+                            ),
+                          )}
+                        </tbody>
+                      </table>
                     )}
-                  </div>
 
-                  {/* Titre */}
+                  {/* Totaux */}
                   <div
                     style={{
-                      textAlign: "center",
-                      fontSize: "14px",
-                      fontWeight: "bold",
-                      margin: "3mm 0",
-                      padding: "2mm 0",
-                      borderBottom: "1px dashed #000",
-                    }}
-                  >
-                    RECU DE PAIEMENT DETTE
-                  </div>
-
-                  {/* Infos */}
-                  <div
-                    style={{
-                      marginBottom: "3mm",
-                      paddingBottom: "3mm",
-                      borderBottom: "1px dashed #000",
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      marginTop: "10px",
                     }}
                   >
                     <div
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "11px",
-                        margin: "1mm 0",
+                        width: "220px",
+                        background: "#f0f9ff",
+                        borderRadius: "6px",
+                        border: "1px solid #bae6fd",
+                        padding: "10px 12px",
                       }}
                     >
-                      <span>Date:</span>
-                      <span>{paymentReceipt.date}</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "11px",
-                        margin: "1mm 0",
-                      }}
-                    >
-                      <span>Heure:</span>
-                      <span>{paymentReceipt.heure}</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "11px",
-                        margin: "1mm 0",
-                      }}
-                    >
-                      <span>Caissier:</span>
-                      <span>{paymentReceipt.caissier}</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "11px",
-                        margin: "1mm 0",
-                      }}
-                    >
-                      <span>Client:</span>
-                      <span>{paymentReceipt.client_nom}</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "11px",
-                        margin: "1mm 0",
-                      }}
-                    >
-                      <span>Vente ref:</span>
-                      <span>#{paymentReceipt.vente_id}</span>
-                    </div>
-                  </div>
-
-                  {/* Détails paiement */}
-                  <div
-                    style={{
-                      marginBottom: "3mm",
-                      paddingBottom: "3mm",
-                      borderBottom: "1px dashed #000",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "11px",
-                        margin: "1mm 0",
-                      }}
-                    >
-                      <span>Total vente:</span>
-                      <span>{formatCurrency(paymentReceipt.total_vente)}</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "11px",
-                        margin: "1mm 0",
-                      }}
-                    >
-                      <span>Ancien solde dû:</span>
-                      <span>
-                        {formatCurrency(paymentReceipt.ancien_restant)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        margin: "2mm 0",
-                        paddingTop: "2mm",
-                        borderTop: "1px solid #000",
-                      }}
-                    >
-                      <span>PAIEMENT:</span>
-                      <span>{formatCurrency(paymentReceipt.montant)}</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "11px",
-                        margin: "1mm 0",
-                      }}
-                    >
-                      <span>Mode:</span>
-                      <span>{paymentReceipt.methode_paiement}</span>
-                    </div>
-                    {paymentReceipt.reference && (
                       <div
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
-                          fontSize: "11px",
-                          margin: "1mm 0",
+                          padding: "4px 0",
+                          fontSize: "10px",
                         }}
                       >
-                        <span>Réf:</span>
-                        <span>{paymentReceipt.reference}</span>
+                        <span>Total vente:</span>
+                        <span>
+                          {formatCurrency(paymentReceipt.total_vente)}
+                        </span>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Nouveau solde */}
-                  <div
-                    style={{
-                      marginBottom: "3mm",
-                      paddingBottom: "3mm",
-                      borderBottom: "1px dashed #000",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        margin: "1mm 0",
-                        color:
-                          paymentReceipt.nouveau_restant <= 0 ? "green" : "red",
-                      }}
-                    >
-                      <span>RESTE A PAYER:</span>
-                      <span>
-                        {paymentReceipt.nouveau_restant <= 0
-                          ? "0 FCFA (Soldé)"
-                          : formatCurrency(paymentReceipt.nouveau_restant)}
-                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "4px 0",
+                          fontSize: "10px",
+                        }}
+                      >
+                        <span>Ancien solde:</span>
+                        <span>
+                          {formatCurrency(paymentReceipt.ancien_restant)}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "6px 0",
+                          fontSize: "14px",
+                          fontWeight: "bold",
+                          color: "#1e40af",
+                          borderTop: "2px solid #1e40af",
+                          marginTop: "4px",
+                        }}
+                      >
+                        <span>PAIEMENT:</span>
+                        <span>{formatCurrency(paymentReceipt.montant)}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "10px",
+                          margin: "2px 0",
+                        }}
+                      >
+                        <span>Mode:</span>
+                        <span>{paymentReceipt.methode_paiement}</span>
+                      </div>
+                      {paymentReceipt.reference && (
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: "10px",
+                            margin: "2px 0",
+                          }}
+                        >
+                          <span>Réf:</span>
+                          <span>{paymentReceipt.reference}</span>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          marginTop: "6px",
+                          paddingTop: "6px",
+                          borderTop: "1px solid #e2e8f0",
+                          color:
+                            paymentReceipt.nouveau_restant <= 0
+                              ? "#16a34a"
+                              : "#dc2626",
+                        }}
+                      >
+                        <span>RESTE:</span>
+                        <span>
+                          {paymentReceipt.nouveau_restant <= 0
+                            ? "0 FCFA (Soldé)"
+                            : formatCurrency(paymentReceipt.nouveau_restant)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Footer */}
-                  <div style={{ textAlign: "center", paddingTop: "3mm" }}>
+                  <div
+                    style={{
+                      marginTop: "20px",
+                      textAlign: "center",
+                      paddingTop: "10px",
+                      borderTop: "1px solid #e2e8f0",
+                    }}
+                  >
                     <p
                       style={{
-                        fontSize: "12px",
-                        fontWeight: "bold",
-                        marginBottom: "2mm",
+                        fontSize: "11px",
+                        fontWeight: "500",
+                        color: "#1e40af",
+                        marginBottom: "3px",
                       }}
                     >
-                      {config?.message_pied || "Merci de votre visite !"}
+                      {config?.message_pied || "Merci de votre confiance !"}
                     </p>
-                    <p style={{ fontSize: "9px", margin: "1mm 0" }}>
-                      --------------------------------
-                    </p>
+                    {config?.support_text && (
+                      <p style={{ fontSize: "9px", color: "#94a3b8" }}>
+                        {config.support_text}
+                      </p>
+                    )}
+                    <div
+                      style={{
+                        marginTop: "8px",
+                        fontSize: "8px",
+                        color: "#1e40af",
+                        lineHeight: "1.5",
+                      }}
+                    >
+                      {config?.telephone && (
+                        <p>
+                          <strong>Tél:</strong> {config.telephone}
+                          {config?.telephone2 ? ` / ${config.telephone2}` : ""}
+                        </p>
+                      )}
+                      {config?.email && (
+                        <p>
+                          <strong>Email:</strong> {config.email}
+                        </p>
+                      )}
+                      {config?.secteur && <p>{config.secteur}</p>}
+                      <p>
+                        {config?.nif && (
+                          <>
+                            <strong>IFU:</strong> {config.nif}
+                          </>
+                        )}
+                        {config?.rccm && (
+                          <>
+                            {" "}
+                            <strong>RCCM:</strong> {config.rccm}
+                          </>
+                        )}
+                        {config?.regime_fiscal && (
+                          <>
+                            {" "}
+                            <strong>Régime fiscal:</strong>{" "}
+                            {config.regime_fiscal}
+                          </>
+                        )}
+                      </p>
+                      <p>
+                        {config?.division_fiscale && (
+                          <>
+                            <strong>Division fiscale:</strong>{" "}
+                            {config.division_fiscale}
+                          </>
+                        )}
+                        {config?.numero_compte_uba && (
+                          <>
+                            {" "}
+                            <strong>N° Compte UBA:</strong>{" "}
+                            {config.numero_compte_uba}
+                          </>
+                        )}
+                      </p>
+                      {config?.reference_cadastrale && (
+                        <p>
+                          <strong>Réf. cadastrales:</strong>{" "}
+                          {config.reference_cadastrale}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Boutons */}
-              <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 rounded-b-2xl flex-shrink-0">
+              <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 rounded-b-2xl flex-shrink-0 flex-wrap">
                 <button
                   onClick={() => setShowReceipt(false)}
-                  className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 min-w-[100px]"
                 >
                   <X className="w-5 h-5" />
                   Fermer
                 </button>
+                {paymentReceipt?.invoice && (
+                  <button
+                    onClick={() => printDebtPaymentA5(paymentReceipt)}
+                    className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2 min-w-[100px]"
+                  >
+                    <FileText className="w-5 h-5" />
+                    Imprimer
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Factures à crédit */}
+        {showCreditSalesModal && selectedClient && (
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full p-5 max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Factures à crédit – {selectedClient.client_nom}
+                </h3>
                 <button
-                  onClick={() => {
-                    if (!receiptRef.current) return;
-                    const printWindow = window.open("", "_blank");
-                    if (printWindow) {
-                      printWindow.document.write(`
-                        <!DOCTYPE html>
-                        <html>
-                          <head>
-                            <title>Reçu de paiement</title>
-                            <style>
-                              * { margin: 0; padding: 0; box-sizing: border-box; }
-                              @page { size: 80mm auto; margin: 2mm; }
-                              body { font-family: 'Courier New', 'Lucida Console', monospace; font-size: 12px; line-height: 1.4; color: #000; background: white; width: 76mm; margin: 0 auto; }
-                            </style>
-                          </head>
-                          <body>
-                            ${receiptRef.current.innerHTML}
-                            <script>
-                              window.onload = function() {
-                                setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500);
-                              };
-                            </script>
-                          </body>
-                        </html>
-                      `);
-                      printWindow.document.close();
-                    }
-                  }}
-                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2"
+                  onClick={() => setShowCreditSalesModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
                 >
-                  <Printer className="w-5 h-5" />
-                  Imprimer
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-3">
+                {clientSales.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Check className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Aucune facture à crédit
+                    </p>
+                  </div>
+                ) : (
+                  clientSales.map((sale) => (
+                    <div
+                      key={sale.id}
+                      className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                            Vente #{sale.id}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(sale.date_vente).toLocaleDateString(
+                              "fr-FR",
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-gray-900 dark:text-white text-sm">
+                            {formatCurrency(sale.total)}
+                          </p>
+                          <p className="text-xs font-semibold text-red-600">
+                            Reste: {formatCurrency(sale.montant_restant)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="pt-4 border-t border-gray-100 dark:border-gray-700 mt-3">
+                <button
+                  onClick={() => setShowCreditSalesModal(false)}
+                  className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all text-sm"
+                >
+                  Fermer
                 </button>
               </div>
             </div>

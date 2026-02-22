@@ -11,17 +11,22 @@ import {
   Minus,
   AlertTriangle,
   Package,
+  ShoppingCart,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Invoice, Configuration } from "../types";
 import Pagination from "../components/Pagination";
 import { formatCurrency } from "../utils/formatters";
 import { montantEnLettres } from "../utils/numberToWords";
 import { useAuthStore } from "../store/useAuthStore";
+import { useStore } from "../store/useStore";
 import { toast } from "react-hot-toast";
 import { generateInvoiceQR } from "../utils/qrcode";
 
 const Invoices: React.FC = () => {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const { clearCart, addToCart, setEditingSale } = useStore();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -161,7 +166,65 @@ const Invoices: React.FC = () => {
     }
   };
 
+  const handleEditInPOS = async (invoice: Invoice) => {
+    if (!invoice.vente_id) {
+      toast.error("Impossible de modifier cette facture");
+      return;
+    }
+
+    try {
+      const result = await window.electronAPI.canModifySale(invoice.vente_id);
+      if (!result.canModify) {
+        toast.error(result.reason || "Modification impossible");
+        return;
+      }
+
+      const loadedProducts = await window.electronAPI.getProducts();
+      clearCart();
+
+      for (const article of invoice.articles) {
+        const matchingProduct = loadedProducts.find(
+          (p: any) => p.nom === article.designation,
+        );
+        if (matchingProduct) {
+          const qty = article.quantite;
+          for (let i = 0; i < qty; i++) {
+            addToCart(
+              matchingProduct,
+              article.prixUnitaire !== matchingProduct.prix_vente
+                ? article.prixUnitaire
+                : undefined,
+            );
+          }
+        }
+      }
+
+      setEditingSale({
+        vente_id: invoice.vente_id,
+        invoice_id: invoice.id!,
+        montant_paye: invoice.montant_paye,
+        client_id: invoice.client_id,
+        client_nom: invoice.client_nom,
+      });
+
+      navigate("/caisse");
+    } catch (error) {
+      console.error("Erreur modification en caisse:", error);
+      toast.error("Erreur lors de la préparation de la modification");
+    }
+  };
+
   const handleAddProduct = (product: any) => {
+    if (!product.sans_stock) {
+      const existing = editArticles.find((a) => a.produit_id === product.id);
+      const currentQty = existing ? existing.quantite : 0;
+      if (currentQty >= product.quantite_stock) {
+        toast.error(
+          `Stock insuffisant pour "${product.nom}" (disponible : ${product.quantite_stock})`,
+        );
+        return;
+      }
+    }
     const existing = editArticles.find((a) => a.produit_id === product.id);
     if (existing) {
       setEditArticles(
@@ -198,6 +261,18 @@ const Invoices: React.FC = () => {
     if (newQuantity <= 0) {
       setEditArticles(editArticles.filter((a) => a.tempId !== tempId));
     } else {
+      const article = editArticles.find((a) => a.tempId === tempId);
+      if (article) {
+        const product = products.find((p: any) => p.id === article.produit_id);
+        if (
+          product &&
+          !product.sans_stock &&
+          newQuantity > product.quantite_stock
+        ) {
+          toast.error(`Stock insuffisant (max : ${product.quantite_stock})`);
+          return;
+        }
+      }
       setEditArticles(
         editArticles.map((a) =>
           a.tempId === tempId
@@ -262,8 +337,11 @@ const Invoices: React.FC = () => {
             sous_total: a.sous_total,
           })),
           total: editTotal,
-          montant_paye: editTotal,
-          montant_restant: 0,
+          montant_paye: editInvoice.montant_paye ?? 0,
+          montant_restant: Math.max(
+            0,
+            editTotal - (editInvoice.montant_paye ?? 0),
+          ),
           methode_paiement:
             editInvoice.methode_paiement === "Espèces"
               ? "especes"
@@ -271,6 +349,7 @@ const Invoices: React.FC = () => {
                 ? "carte"
                 : "mobile",
           client_nom: editInvoice.client_nom,
+          client_id: editInvoice.client_id,
         },
         user?.id,
         user?.nom,
@@ -348,47 +427,50 @@ const Invoices: React.FC = () => {
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               @page { size: A4; margin: 8mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
-              .invoice { max-width: 194mm; max-height: 500px; margin: 0 auto; }
-              .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #2563eb; margin-bottom: 10px; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #111; }
+              .invoice { max-width: 194mm; margin: 0 auto; }
+              .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 2px solid #2563eb; margin-bottom: 12px; }
               .company-logo { width: 150px; display: flex; align-items: center; }
               .company-logo img { max-height: 110px; max-width: 150px; object-fit: contain; }
               .company-info { flex: 1; text-align: center; padding: 0 15px; }
-              .company-info h1 { font-size: 18px; color: #1e40af; margin-bottom: 2px; }
-              .company-info p { font-size: 9px; color: #555; margin: 1px 0; }
-              .invoice-badge { background: #2563eb; color: white; padding: 6px 14px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; min-width: 80px; }
-              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
-              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
-              .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 2px 0; font-size: 10px; }
-              .info-box strong { color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
+              .company-info h1 { font-size: 18px; color: #1e40af; margin-bottom: 3px; }
+              .company-info p { font-size: 10px; color: #222; margin: 2px 0; }
+              .invoice-badge { background: #2563eb; color: white; padding: 7px 16px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; min-width: 85px; }
+              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 2px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+              .info-box { width: 48%; background: #f8fafc; padding: 10px 12px; border-radius: 4px; border: 1px solid #e2e8f0; }
+              .info-box h3 { font-size: 10px; text-transform: uppercase; color: #374151; letter-spacing: 0.3px; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 3px 0; font-size: 11px; }
+              .info-box strong { color: #111827; }
+              table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+              thead th { background: #1e40af; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2px; }
               thead th:first-child { border-radius: 4px 0 0 0; }
               thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
               thead th.text-right { text-align: right; }
-              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+              tbody td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #111827; }
               tbody tr:nth-child(even) { background: #f8fafc; }
               tbody td.text-right { text-align: right; }
-              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
-              .totals-box { width: 280px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 10px; }
+              .totals-box { width: 280px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 10px 12px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
               .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
               .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 4px; }
-              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 4px; font-size: 9px; }
+              .totals-row.grand-total { font-size: 14px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 5px; }
+              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 5px; font-size: 10px; }
               .totals-row.remaining { color: #dc2626; font-weight: bold; }
-              .amount-words { margin-top: 8px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 9px; color: #92400e; }
-              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
+              .delivery-status { font-weight: bold; padding: 3px 8px; border-radius: 3px; display: inline-block; margin-top: 6px; font-size: 10px; }
+              .delivered { background: #dcfce7; color: #166534; }
+              .deferred { background: #fef3c7; color: #92400e; }
+              .amount-words { margin-top: 10px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 10px; color: #78350f; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 12px; padding-top: 10px; }
               .qr-code { text-align: center; }
               .qr-code img { width: 80px; height: 80px; }
-              .qr-code p { font-size: 8px; color: #64748b; margin-top: 2px; }
+              .qr-code p { font-size: 9px; color: #374151; margin-top: 3px; }
               .stamp-area { width: 150px; height: 80px; border: 1px dashed #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
-              .stamp-area p { font-size: 9px; color: #94a3b8; text-align: center; }
-              .footer { margin-top: 15px; text-align: center; padding-top: 8px; border-top: 1px solid #e2e8f0; }
-              .footer .message { font-size: 11px; font-weight: 500; color: #1e40af; margin-bottom: 2px; }
-              .footer .sub { font-size: 8px; color: #94a3b8; }
+              .stamp-area p { font-size: 10px; color: #374151; text-align: center; }
+              .footer { margin-top: 15px; text-align: center; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+              .footer .message { font-size: 11px; font-weight: 500; color: #1e40af; margin-bottom: 3px; }
+              .footer .sub { font-size: 9px; color: #374151; }
               @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
             </style>
           </head>
@@ -430,8 +512,8 @@ const Invoices: React.FC = () => {
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width: 40px;">Qte</th>
-                    <th class="text-right" style="width: 80px;">P.U.</th>
-                    <th class="text-right" style="width: 80px;">Total</th>
+                    <th class="text-right" style="width: 85px;">P.U.</th>
+                    <th class="text-right" style="width: 85px;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -480,6 +562,11 @@ const Invoices: React.FC = () => {
                       ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(selectedInvoice.montant_restant!)}</span></div>`
                       : ""
                   }
+                  <div style="margin-top: 6px;">
+                    <span class="delivery-status ${(selectedInvoice as any).livraison_differee ? "deferred" : "delivered"}">
+                      ${(selectedInvoice as any).livraison_differee ? "NON LIVRÉ" : "✓ LIVRÉ"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -518,42 +605,45 @@ const Invoices: React.FC = () => {
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; line-height: 1.3; color: #333; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
               .invoice { max-width: 136mm; margin: 0 auto; }
-              .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 8px; }
+              .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 10px; }
               .company-logo { display: flex; align-items: center; }
               .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
               .company-info { flex: 1; padding: 0 12px; text-align: center; }
               .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .company-info .slogan { font-size: 10px; color: #1e3a8a; margin: 0; }
               .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
-              .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
-              .info-grid { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
-              .info-box { width: 48%; background: #f8fafc; padding: 6px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 8px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 1px 0; font-size: 9px; }
+              .invoice-badge .numero { font-size: 9px; font-weight: normal; margin-top: 2px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+              .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
+              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 2px 0; font-size: 10px; }
               .info-box strong { color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-              thead th { background: #1e40af; color: white; padding: 5px 6px; text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: 0.2px; }
+              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
               thead th:first-child { border-radius: 4px 0 0 0; }
               thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
               thead th.text-right { text-align: right; }
-              tbody td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 9px; }
+              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
               tbody tr:nth-child(even) { background: #f8fafc; }
               tbody td.text-right { text-align: right; }
-              .totals-section { display: flex; justify-content: flex-end; margin-top: 6px; }
-              .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 6px 8px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
+              .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
               .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
               .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 11px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 4px; margin-top: 3px; }
+              .totals-row.grand-total { font-size: 12px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 5px; margin-top: 4px; }
               .totals-row.remaining { color: #dc2626; font-weight: bold; }
-              .amount-words { margin-top: 6px; padding: 4px 8px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 8px; color: #92400e; }
-              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 8px; padding-top: 6px; }
+              .amount-words { margin-top: 8px; padding: 5px 8px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 9px; color: #92400e; }
+              .delivery-status { font-weight: bold; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 5px; font-size: 9px; }
+              .delivered { background: #dcfce7; color: #166534; }
+              .deferred { background: #fef3c7; color: #92400e; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
               .qr-code { text-align: center; }
               .qr-code img { width: 60px; height: 60px; }
-              .qr-code p { font-size: 7px; color: #64748b; margin-top: 2px; }
-              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 7.5px; color: #1e40af; line-height: 1.5; }
+              .qr-code p { font-size: 8px; color: #64748b; margin-top: 2px; }
+              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 8px; color: #1e40af; line-height: 1.5; }
               .footer p { margin: 1px 0; }
               .footer strong { font-weight: 700; }
               @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
@@ -594,8 +684,8 @@ const Invoices: React.FC = () => {
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width: 35px;">Qte</th>
-                    <th class="text-right" style="width: 70px;">P.U.</th>
-                    <th class="text-right" style="width: 70px;">Total</th>
+                    <th class="text-right" style="width: 85px;">P.U.</th>
+                    <th class="text-right" style="width: 85px;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -636,6 +726,11 @@ const Invoices: React.FC = () => {
                   </div>
                   ${selectedInvoice.monnaie_rendue > 0 ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(selectedInvoice.monnaie_rendue)}</span></div>` : ""}
                   ${(selectedInvoice.montant_restant ?? 0) > 0 ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(selectedInvoice.montant_restant!)}</span></div>` : ""}
+                  <div style="margin-top: 4px;">
+                    <span class="delivery-status ${(selectedInvoice as any).livraison_differee ? "deferred" : "delivered"}">
+                      ${(selectedInvoice as any).livraison_differee ? "NON LIVRÉ" : "✓ LIVRÉ"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -878,7 +973,7 @@ const Invoices: React.FC = () => {
               Rechercher par numero
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-0 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-5" />
               <input
                 type="text"
                 placeholder="Numero de facture..."
@@ -1017,10 +1112,18 @@ const Invoices: React.FC = () => {
                       <button
                         onClick={() => handleOpenEdit(invoice)}
                         className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
-                        title="Modifier la facture (disponible 24h)"
+                        title="Modifier ici (disponible 24h)"
                       >
                         <Edit className="w-4 h-4" />
                         Modifier
+                      </button>
+                      <button
+                        onClick={() => handleEditInPOS(invoice)}
+                        className="text-green-600 hover:text-green-900 flex items-center gap-1"
+                        title="Modifier en caisse (disponible 24h)"
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                        En caisse
                       </button>
                     </div>
                   </td>
@@ -1097,7 +1200,7 @@ const Invoices: React.FC = () => {
                     minHeight: "350mm",
                     padding: "15mm",
                     fontFamily: "'Segoe UI', Arial, sans-serif",
-                    fontSize: "12px",
+                    fontSize: "14px",
                     lineHeight: "1.5",
                     color: "#333",
                     ...(format === "A5" && {

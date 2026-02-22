@@ -6,6 +6,14 @@ interface CartItem extends Product {
   customPrice?: number;
 }
 
+interface EditingSale {
+  vente_id: number;
+  invoice_id: number;
+  montant_paye: number;
+  client_id?: number;
+  client_nom?: string;
+}
+
 interface StoreState {
   cart: CartItem[];
   addToCart: (product: Product, customPrice?: number) => void;
@@ -15,6 +23,10 @@ interface StoreState {
   updateAllCartPrices: (prices: Map<number, number>) => void;
   clearCart: () => void;
   getCartTotal: () => number;
+
+  editingSale: EditingSale | null;
+  setEditingSale: (data: EditingSale) => void;
+  clearEditingSale: () => void;
 
   products: Product[];
   setProducts: (products: Product[]) => void;
@@ -27,6 +39,10 @@ export const useStore = create<StoreState>((set, get) => ({
   cart: [],
   products: [],
   categories: [],
+  editingSale: null,
+
+  setEditingSale: (data) => set({ editingSale: data }),
+  clearEditingSale: () => set({ editingSale: null }),
 
   addToCart: (product, customPrice) => {
     const { cart } = get();

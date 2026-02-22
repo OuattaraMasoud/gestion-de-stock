@@ -153,6 +153,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("get-customer-payments", saleId),
   createCustomerPayment: (payment: any) =>
     ipcRenderer.invoke("create-customer-payment", payment),
+  payClientDebtByAmount: (clientId: number, montant: number, methode: string, utilisateur_id?: number, utilisateur_nom?: string) =>
+    ipcRenderer.invoke("pay-client-debt-by-amount", clientId, montant, methode, utilisateur_id, utilisateur_nom),
 
   // Comptabilité
   getAccountingEntries: (startDate?: string, endDate?: string) =>
@@ -171,6 +173,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       endDate,
     ),
   getTreasury: () => ipcRenderer.invoke("get-treasury"),
+  getTreasuryByPeriod: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-treasury-by-period", startDate, endDate),
   getProfitStats: (startDate?: string, endDate?: string) =>
     ipcRenderer.invoke("get-profit-stats", startDate, endDate),
 
@@ -431,6 +435,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   closeCaisse: (caisseId: number, data: any) => ipcRenderer.invoke("close-caisse", caisseId, data),
   getCaisses: (page: number, limit: number) => ipcRenderer.invoke("get-caisses", page, limit),
   getCaisseStats: (caisseId: number) => ipcRenderer.invoke("get-caisse-stats", caisseId),
+  getTotalCustomerDebtsByPeriod: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-total-customer-debts-period", startDate, endDate),
+  getTotalSupplierDebtsByPeriod: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-total-supplier-debts-period", startDate, endDate),
+  getCaissesByPeriod: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-caisses-by-period", startDate, endDate),
+  getTreasuryEvolution: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-treasury-evolution", startDate, endDate),
 
   // Livraisons
   getLivraisons: (page: number, limit: number, statut?: string) =>

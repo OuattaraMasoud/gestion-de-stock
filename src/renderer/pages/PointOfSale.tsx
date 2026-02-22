@@ -42,7 +42,6 @@ import {
 } from "../utils/toast";
 import { generateInvoiceQR } from "../utils/qrcode";
 
-// Interface pour le ticket
 interface ReceiptData {
   numero: string;
   date: string;
@@ -65,6 +64,7 @@ interface ReceiptData {
   remiseType?: "pourcentage" | "montant";
   remiseValeur?: number;
   totalAvantRemise?: number;
+  livraisonDifferee?: boolean;
 }
 
 // Composant de prévisualisation du ticket/facture
@@ -121,47 +121,50 @@ const ReceiptPreview: React.FC<{
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               @page { size: A4; margin: 8mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #111; }
               .invoice { max-width: 194mm; margin: 0 auto; }
-              .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #2563eb; margin-bottom: 10px; }
+              .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 2px solid #2563eb; margin-bottom: 12px; }
               .company-logo { width: 150px; display: flex; align-items: center; }
               .company-logo img { max-height: 110px; max-width: 150px; object-fit: contain; }
               .company-info { flex: 1; text-align: center; padding: 0 15px; }
-              .company-info h1 { font-size: 18px; color: #1e40af; margin-bottom: 2px; }
-              .company-info p { font-size: 9px; color: #555; margin: 1px 0; }
-              .invoice-badge { background: #2563eb; color: white; padding: 6px 14px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; min-width: 80px; }
-              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
-              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
-              .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 2px 0; font-size: 10px; }
-              .info-box strong { color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
+              .company-info h1 { font-size: 18px; color: #1e40af; margin-bottom: 3px; }
+              .company-info p { font-size: 10px; color: #222; margin: 2px 0; }
+              .invoice-badge { background: #2563eb; color: white; padding: 7px 16px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; min-width: 85px; }
+              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 2px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+              .info-box { width: 48%; background: #f8fafc; padding: 10px 12px; border-radius: 4px; border: 1px solid #e2e8f0; }
+              .info-box h3 { font-size: 10px; text-transform: uppercase; color: #374151; letter-spacing: 0.3px; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 3px 0; font-size: 11px; }
+              .info-box strong { color: #111827; }
+              table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+              thead th { background: #1e40af; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2px; }
               thead th:first-child { border-radius: 4px 0 0 0; }
               thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
               thead th.text-right { text-align: right; }
-              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+              tbody td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #111827; }
               tbody tr:nth-child(even) { background: #f8fafc; }
               tbody td.text-right { text-align: right; }
-              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
-              .totals-box { width: 280px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 10px; }
+              .totals-box { width: 280px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 10px 12px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
               .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
               .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 4px; }
-              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 4px; font-size: 9px; }
+              .totals-row.grand-total { font-size: 14px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 5px; }
+              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 5px; font-size: 10px; }
               .totals-row.remaining { color: #dc2626; font-weight: bold; }
-              .amount-words { margin-top: 8px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 9px; color: #92400e; }
-              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
+              .delivery-status { font-weight: bold; padding: 3px 8px; border-radius: 3px; display: inline-block; margin-top: 6px; font-size: 10px; }
+              .delivered { background: #dcfce7; color: #166534; }
+              .deferred { background: #fef3c7; color: #92400e; }
+              .amount-words { margin-top: 10px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 10px; color: #78350f; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 12px; padding-top: 10px; }
               .qr-code { text-align: center; }
               .qr-code img { width: 80px; height: 80px; }
-              .qr-code p { font-size: 8px; color: #64748b; margin-top: 2px; }
+              .qr-code p { font-size: 9px; color: #374151; margin-top: 3px; }
               .stamp-area { width: 150px; height: 80px; border: 1px dashed #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
-              .stamp-area p { font-size: 9px; color: #94a3b8; text-align: center; }
-              .footer { margin-top: 15px; text-align: center; padding-top: 8px; border-top: 1px solid #e2e8f0; }
-              .footer .message { font-size: 11px; font-weight: 500; color: #1e40af; margin-bottom: 2px; }
-              .footer .sub { font-size: 8px; color: #94a3b8; }
+              .stamp-area p { font-size: 10px; color: #374151; text-align: center; }
+              .footer { margin-top: 15px; text-align: center; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+              .footer .message { font-size: 11px; font-weight: 500; color: #1e40af; margin-bottom: 3px; }
+              .footer .sub { font-size: 9px; color: #374151; }
               @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
             </style>
           </head>
@@ -187,13 +190,14 @@ const ReceiptPreview: React.FC<{
               <div class="info-grid">
                 <div class="info-box">
                   <h3>Client</h3>
-                  <p><strong>${receipt.client_nom}</strong></p>
+                  <p><strong>${receipt.client_nom || "Client comptoir"}</strong></p>
                   ${receipt.client_telephone ? `<p>Tel: ${receipt.client_telephone}</p>` : ""}
                   ${receipt.client_email ? `<p>${receipt.client_email}</p>` : ""}
                 </div>
                 <div class="info-box">
                   <h3>Facture</h3>
                   <p><strong>Date:</strong> ${receipt.date} | <strong>Heure:</strong> ${receipt.heure}</p>
+                  <p><strong>Caissier:</strong> ${receipt.caissier}</p>
                 </div>
               </div>
 
@@ -202,8 +206,8 @@ const ReceiptPreview: React.FC<{
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width: 40px;">Qte</th>
-                    <th class="text-right" style="width: 80px;">P.U.</th>
-                    <th class="text-right" style="width: 80px;">Total</th>
+                    <th class="text-right" style="width: 85px;">P.U.</th>
+                    <th class="text-right" style="width: 85px;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -232,33 +236,36 @@ const ReceiptPreview: React.FC<{
                       <span>${formatCurrency(receipt.totalAvantRemise || 0)}</span>
                     </div>
                     <div class="totals-row discount">
-                      <span>Remise (${receipt.remiseType === "pourcentage" ? receipt.remiseValeur + "%" : "fixe"}):</span>
+                      <span>Remise (${receipt.remiseType === "pourcentage" ? receipt.remiseValeur + "%" : formatCurrency(remiseAmount)}):</span>
                       <span>-${formatCurrency(remiseAmount)}</span>
                     </div>
                   `
                       : ""
                   }
-                  <div class="totals-row grand-total">
-                    <span>Total TTC:</span>
-                    <span>${formatCurrency(receipt.totalTTC)}</span>
+                   <div class="totals-row grand-total">
+                     <span>Total TTC:</span>
+                     <span>${formatCurrency(receipt.totalTTC)}</span>
+                   </div>
+                   ${
+                     receipt.monnaieRendue > 0
+                       ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(receipt.monnaieRendue)}</span></div>`
+                       : ""
+                   }
+                   ${
+                     receipt.montantRestant != null &&
+                     receipt.montantRestant > 0
+                       ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(receipt.montantRestant)}</span></div>`
+                       : ""
+                   }
+                  <div style="margin-top: 6px;">
+                    <span class="delivery-status ${receipt.livraisonDifferee ? "deferred" : "delivered"}">
+                      ${receipt.livraisonDifferee ? "NON LIVRÉ" : "✓ LIVRÉ"}
+                    </span>
                   </div>
-                  <div class="totals-row payment-info">
-                    <span>Reglement: ${receipt.methodePaiement} | Recu: ${formatCurrency(receipt.montantPaye)}</span>
-                  </div>
-                  ${
-                    receipt.monnaieRendue > 0
-                      ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(receipt.monnaieRendue)}</span></div>`
-                      : ""
-                  }
-                  ${
-                    receipt.montantRestant != null && receipt.montantRestant > 0
-                      ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(receipt.montantRestant)}</span></div>`
-                      : ""
-                  }
                 </div>
               </div>
 
-              <div >
+              <div class="amount-words">
                 Arrete la presente facture a la somme de : <strong>${montantEnLettres(receipt.totalTTC, "francs CFA")}</strong>
               </div>
 
@@ -266,7 +273,8 @@ const ReceiptPreview: React.FC<{
                 <div class="qr-code">
                   ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
                 </div>
-                <div >
+                <div class="stamp-area">
+                  <p>Cachet et signature</p>
                 </div>
               </div>
 
@@ -299,43 +307,46 @@ const ReceiptPreview: React.FC<{
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; line-height: 1.3; color: #333; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
               .invoice { max-width: 136mm; margin: 0 auto; }
-              .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 8px; }
+              .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 10px; }
               .company-logo { display: flex; align-items: center; }
               .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
               .company-info { flex: 1; padding: 0 12px; text-align: center; }
               .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .company-info .slogan { font-size: 10px; color: #1e3a8a; margin: 0; }
               .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
-              .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
-              .info-grid { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
-              .info-box { width: 48%; background: #f8fafc; padding: 6px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 8px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 1px 0; font-size: 9px; }
+              .invoice-badge .numero { font-size: 9px; font-weight: normal; margin-top: 2px; }
+              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+              .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
+              .info-box h3 { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 2px 0; font-size: 10px; }
               .info-box strong { color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-              thead th { background: #1e40af; color: white; padding: 5px 6px; text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: 0.2px; }
+              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2px; }
               thead th:first-child { border-radius: 4px 0 0 0; }
               thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
               thead th.text-right { text-align: right; }
-              tbody td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 9px; }
+              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
               tbody tr:nth-child(even) { background: #f8fafc; }
               tbody td.text-right { text-align: right; }
-              .totals-section { display: flex; justify-content: flex-end; margin-top: 6px; }
-              .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 6px 8px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
+              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
+              .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; }
               .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
               .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 11px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 4px; margin-top: 3px; }
-              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 4px; margin-top: 3px; font-size: 8px; }
+              .totals-row.grand-total { font-size: 12px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 5px; margin-top: 4px; }
+              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 4px; font-size: 9px; }
               .totals-row.remaining { color: #dc2626; font-weight: bold; }
-              .amount-words { margin-top: 6px; padding: 4px 8px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 8px; color: #92400e; }
-              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 8px; padding-top: 6px; }
+              .delivery-status { font-weight: bold; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 5px; font-size: 9px; }
+              .delivered { background: #dcfce7; color: #166534; }
+              .deferred { background: #fef3c7; color: #92400e; }
+              .amount-words { margin-top: 8px; padding: 5px 8px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 9px; color: #92400e; }
+              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
               .qr-code { text-align: center; }
               .qr-code img { width: 60px; height: 60px; }
-              .qr-code p { font-size: 7px; color: #64748b; margin-top: 2px; }
-              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 7.5px; color: #1e40af; line-height: 1.5; }
+              .qr-code p { font-size: 8px; color: #64748b; margin-top: 2px; }
+              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 8px; color: #1e40af; line-height: 1.5; }
               .footer p { margin: 1px 0; }
               .footer strong { font-weight: 700; }
               @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
@@ -375,8 +386,8 @@ const ReceiptPreview: React.FC<{
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width: 35px;">Qte</th>
-                    <th class="text-right" style="width: 70px;">P.U.</th>
-                    <th class="text-right" style="width: 70px;">Total</th>
+                    <th class="text-right" style="width: 85px;">P.U.</th>
+                    <th class="text-right" style="width: 85px;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -420,6 +431,11 @@ const ReceiptPreview: React.FC<{
                   </div>
                   ${receipt.monnaieRendue > 0 ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(receipt.monnaieRendue)}</span></div>` : ""}
                   ${receipt.montantRestant != null && receipt.montantRestant > 0 ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(receipt.montantRestant)}</span></div>` : ""}
+                  <div style="margin-top: 4px;">
+                    <span class="delivery-status ${receipt.livraisonDifferee ? "deferred" : "delivered"}">
+                      ${receipt.livraisonDifferee ? "NON LIVRÉ" : "✓ LIVRÉ"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -492,7 +508,7 @@ const ReceiptPreview: React.FC<{
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
       <div
-        className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl ${isA4 ? "max-w-4xl" : "max-w-md"} w-full max-h-[95vh] flex flex-col animate-scaleIn`}
+        className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl ${format !== "80mm" ? "max-w-4xl" : "max-w-md"} w-full max-h-[95vh] flex flex-col animate-scaleIn`}
       >
         {/* En-tete du modal */}
         <div className="relative bg-blue-600 text-white px-8 py-5 rounded-t-2xl shrink-0">
@@ -526,10 +542,10 @@ const ReceiptPreview: React.FC<{
               className="bg-white shadow-xl dark:text-gray-900"
               style={{
                 width: "210mm",
-                minHeight: "297mm",
+                minHeight: "350mm",
                 padding: "15mm",
                 fontFamily: "'Segoe UI', Arial, sans-serif",
-                fontSize: "12px",
+                fontSize: "11px",
                 lineHeight: "1.5",
                 color: "#333",
                 ...(format === "A5" && {
@@ -543,7 +559,7 @@ const ReceiptPreview: React.FC<{
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "flex-start",
+                  alignItems: "center",
                   paddingBottom: "20px",
                   borderBottom: "3px solid #2563eb",
                   marginBottom: "25px",
@@ -575,10 +591,10 @@ const ReceiptPreview: React.FC<{
                   {config?.description_entreprise && (
                     <p
                       style={{
-                        fontSize: "13px",
+                        fontSize: "14px",
                         color: "#666",
                         fontStyle: "italic",
-                        marginBottom: "4px",
+                        marginBottom: "8px",
                         textAlign: "center",
                       }}
                     >
@@ -918,7 +934,7 @@ const ReceiptPreview: React.FC<{
                       display: "flex",
                       justifyContent: "space-between",
                       padding: "10px 0 6px 0",
-                      fontSize: "16px",
+                      fontSize: "20px",
                       fontWeight: "bold",
                       color: "#1e40af",
                       borderTop: "2px solid #1e40af",
@@ -932,20 +948,7 @@ const ReceiptPreview: React.FC<{
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
-                      fontSize: "12px",
-                      padding: "8px 0 4px 0",
-                      marginTop: "6px",
-                      borderTop: "1px dashed #bae6fd",
-                    }}
-                  >
-                    <span>Mode de paiement:</span>
-                    <span>{receipt.methodePaiement}</span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "12px",
+                      fontSize: "14px",
                       margin: "4px 0",
                     }}
                   >
@@ -957,7 +960,7 @@ const ReceiptPreview: React.FC<{
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        fontSize: "12px",
+                        fontSize: "14px",
                         margin: "4px 0",
                       }}
                     >
@@ -971,7 +974,7 @@ const ReceiptPreview: React.FC<{
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
-                          fontSize: "12px",
+                          fontSize: "14px",
                           margin: "4px 0",
                           color: "#dc2626",
                           fontWeight: "bold",
@@ -981,6 +984,24 @@ const ReceiptPreview: React.FC<{
                         <span>{formatCurrency(receipt.montantRestant)}</span>
                       </div>
                     )}
+                  <div style={{ marginTop: "6px" }}>
+                    <span
+                      style={{
+                        fontWeight: "bold",
+                        padding: "3px 8px",
+                        borderRadius: "3px",
+                        display: "inline-block",
+                        background: receipt.livraisonDifferee
+                          ? "#fef3c7"
+                          : "#dcfce7",
+                        color: receipt.livraisonDifferee
+                          ? "#92400e"
+                          : "#166534",
+                      }}
+                    >
+                      {receipt.livraisonDifferee ? "NON LIVRÉ" : "✓ LIVRÉ"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1660,6 +1681,8 @@ const PointOfSale: React.FC = () => {
     updateAllCartPrices,
     clearCart,
     getCartTotal,
+    editingSale,
+    clearEditingSale,
   } = useStore();
   const { user } = useAuthStore();
   const sidebarContext = useContext(SidebarContext);
@@ -1770,6 +1793,21 @@ const PointOfSale: React.FC = () => {
     };
     checkCaisse();
   }, []);
+
+  useEffect(() => {
+    if (editingSale) {
+      if (editingSale.client_id) {
+        setSelectedClientId(editingSale.client_id);
+        setClientName(editingSale.client_nom || "");
+        setClientSearchQuery(editingSale.client_nom || "");
+      }
+      const restant = Math.max(0, getCartTotal() - editingSale.montant_paye);
+      if (restant > 0) {
+        setVenteACredit(true);
+        setMontantPaye("");
+      }
+    }
+  }, [editingSale]);
 
   const handleOpenCaisse = async () => {
     const fonds = parseInt(fondsRoulement) || 0;
@@ -2154,19 +2192,21 @@ const PointOfSale: React.FC = () => {
             ? "Carte bancaire"
             : "Mobile Money",
       montantPaye: venteACredit
-        ? parseFloat(montantPaye) || 0
+        ? (editingSale?.montant_paye || 0) + (parseFloat(montantPaye) || 0)
         : methodePaiement === "especes"
-          ? parseFloat(montantPaye)
+          ? (editingSale?.montant_paye || 0) + (parseFloat(montantPaye) || 0)
           : total,
       monnaieRendue:
         !venteACredit && methodePaiement === "especes" ? monnaieRendue : 0,
       montantRestant: venteACredit
-        ? total - (parseFloat(montantPaye) || 0)
+        ? total -
+          (editingSale?.montant_paye || 0) -
+          (parseFloat(montantPaye) || 0)
         : undefined,
-      // Informations de remise
       remiseType: montantRemise > 0 ? remiseType : undefined,
       remiseValeur: montantRemise > 0 ? parseFloat(remiseValeur) : undefined,
       totalAvantRemise: montantRemise > 0 ? sousTotal : undefined,
+      livraisonDifferee: livraisonDifferee,
     };
   }, [
     cart,
@@ -2183,6 +2223,8 @@ const PointOfSale: React.FC = () => {
     venteACredit,
     selectedClientId,
     clients,
+    editingSale,
+    livraisonDifferee,
   ]);
 
   const handlePayment = useCallback(async () => {
@@ -2198,14 +2240,19 @@ const PointOfSale: React.FC = () => {
       return;
     }
 
-    if (venteACredit && montant > total) {
-      showErrorToast(
-        "Le montant payé ne peut pas dépasser le total de la vente",
-      );
+    const alreadyPaid = editingSale?.montant_paye || 0;
+    const remainingAmount = total - alreadyPaid;
+
+    if (venteACredit && montant > remainingAmount) {
+      showErrorToast("Le montant payé ne peut pas dépasser le reste à payer");
       return;
     }
 
-    if (!venteACredit && methodePaiement === "especes" && montant < total) {
+    if (
+      !venteACredit &&
+      methodePaiement === "especes" &&
+      montant < remainingAmount
+    ) {
       showErrorToast("Le montant payé est insuffisant");
       return;
     }
@@ -2217,8 +2264,8 @@ const PointOfSale: React.FC = () => {
         ? parseFloat(montantPaye) || 0
         : methodePaiement === "especes"
           ? montant
-          : total;
-      const effectiveMontantRestant = total - effectiveMontantPaye;
+          : remainingAmount;
+      const effectiveMontantRestant = remainingAmount - effectiveMontantPaye;
       const effectiveStatut: "paye" | "partiel" | "impaye" =
         effectiveMontantRestant <= 0
           ? "paye"
@@ -2260,8 +2307,33 @@ const PointOfSale: React.FC = () => {
         }),
       };
 
-      // Creer la vente et recuperer l'ID
-      const saleResult = await window.electronAPI.createSale(saleData);
+      // Mode édition : mettre à jour la vente existante
+      let saleResult: any;
+      if (editingSale) {
+        const newMontantPaye = editingSale.montant_paye + effectiveMontantPaye;
+        const newMontantRestant = Math.max(0, total - newMontantPaye);
+        const newStatut: "paye" | "partiel" | "impaye" =
+          newMontantRestant <= 0
+            ? "paye"
+            : newMontantPaye > 0
+              ? "partiel"
+              : "impaye";
+
+        saleResult = await window.electronAPI.updateSale(
+          editingSale.vente_id,
+          {
+            ...saleData,
+            montant_paye: newMontantPaye,
+            montant_restant: newMontantRestant,
+            statut_paiement: newStatut,
+          },
+          user?.id,
+          user?.nom,
+        );
+        saleResult = { id: editingSale.vente_id };
+      } else {
+        saleResult = await window.electronAPI.createSale(saleData);
+      }
 
       // Enregistrer les prix effectifs de la vente comme prix personnalisés du client
       if (selectedClientId && cart.length > 0) {
@@ -2308,7 +2380,30 @@ const PointOfSale: React.FC = () => {
         articles: receipt.articles,
       };
 
-      await window.electronAPI.createInvoice(invoiceData);
+      if (editingSale) {
+        // Mettre à jour la facture existante
+        const updateData = {
+          total_ttc: invoiceData.total_ttc,
+          montant_paye: editingSale.montant_paye + effectiveMontantPaye,
+          montant_restant: Math.max(
+            0,
+            total - (editingSale.montant_paye + effectiveMontantPaye),
+          ),
+          statut_paiement: effectiveStatut,
+          articles: invoiceData.articles,
+          methode_paiement: invoiceData.methode_paiement,
+          remise_type: invoiceData.remise_type,
+          remise_valeur: invoiceData.remise_valeur,
+          total_avant_remise: invoiceData.total_avant_remise,
+        };
+        await window.electronAPI.updateInvoice(
+          editingSale.invoice_id,
+          updateData,
+        );
+        clearEditingSale();
+      } else {
+        await window.electronAPI.createInvoice(invoiceData);
+      }
 
       setReceiptData(receipt);
       setShowReceipt(true);
@@ -2349,6 +2444,8 @@ const PointOfSale: React.FC = () => {
     livraisonDifferee,
     adresseLivraison,
     livreur,
+    editingSale,
+    clearEditingSale,
   ]);
 
   const handleReceiptClose = useCallback(() => {
@@ -2549,6 +2646,28 @@ const PointOfSale: React.FC = () => {
 
       {/* Droite - Panier */}
       <div className="min-w-[38rem] flex-shrink-0 flex flex-col space-y-4">
+        {editingSale && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-amber-800">
+                ✏️ Modification facture #{editingSale.invoice_id}
+              </p>
+              <p className="text-xs text-amber-700">
+                Montant déjà payé conservé :{" "}
+                {formatCurrency(editingSale.montant_paye)}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                clearEditingSale();
+                clearCart();
+              }}
+              className="text-amber-600 hover:text-amber-800 text-xs underline"
+            >
+              Annuler
+            </button>
+          </div>
+        )}
         <div className="card flex-1 flex flex-col shadow-xl border-2 border-gray-100 dark:border-gray-700">
           {/* En-tête du panier avec toggle vue */}
           <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-gray-100 dark:border-gray-700">
@@ -3039,12 +3158,44 @@ const PointOfSale: React.FC = () => {
 
             {/* Total principal */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border-2 border-blue-200">
+              {editingSale && editingSale.montant_paye > 0 && (
+                <div className="mb-3 pb-3 border-b border-blue-200">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Montant total
+                    </span>
+                    <span className="font-semibold text-gray-800 dark:text-gray-200">
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mt-1">
+                    <span className="text-green-600 dark:text-green-400">
+                      Déjà payé
+                    </span>
+                    <span className="font-semibold text-green-600">
+                      {formatCurrency(editingSale.montant_paye)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mt-1">
+                    <span className="text-orange-600 dark:text-orange-400 font-medium">
+                      Reste à payer
+                    </span>
+                    <span className="font-bold text-orange-600">
+                      {formatCurrency(total - editingSale.montant_paye)}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-black-700 dark:text-black">
-                  Total à payer
+                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                  {editingSale && editingSale.montant_paye > 0
+                    ? "Nouveau paiement"
+                    : "Total à payer"}
                 </span>
                 <span className="text-xl font-bold text-blue-600">
-                  {formatCurrency(total || 0)}
+                  {editingSale && editingSale.montant_paye > 0
+                    ? formatCurrency(total - editingSale.montant_paye)
+                    : formatCurrency(total || 0)}
                 </span>
               </div>
               {montantRemise > 0 && (
@@ -3346,7 +3497,11 @@ const PointOfSale: React.FC = () => {
                     </p>
                   </div>
                   <p className="text-4xl font-bold text-orange-600">
-                    {formatCurrency(total - (parseFloat(montantPaye) || 0))}
+                    {formatCurrency(
+                      total -
+                        (editingSale?.montant_paye || 0) -
+                        (parseFloat(montantPaye) || 0),
+                    )}
                   </p>
                   <p className="text-xs text-orange-700 mt-2">
                     Ce montant sera ajouté à la dette du client
@@ -3425,8 +3580,11 @@ const PointOfSale: React.FC = () => {
                     processing ||
                     (!venteACredit &&
                       methodePaiement === "especes" &&
-                      parseFloat(montantPaye) < total) ||
-                    (venteACredit && (parseFloat(montantPaye) || 0) > total)
+                      parseFloat(montantPaye) <
+                        total - (editingSale?.montant_paye || 0)) ||
+                    (venteACredit &&
+                      (parseFloat(montantPaye) || 0) >
+                        total - (editingSale?.montant_paye || 0))
                   }
                   className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >

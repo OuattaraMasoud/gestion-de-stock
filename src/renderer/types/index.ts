@@ -255,6 +255,7 @@ export interface Invoice {
   date_facture: string;
   heure_facture: string;
   vendeur: string;
+  client_id?: number;
   client_nom?: string;
   client_telephone?: string;
   client_email?: string;
@@ -265,6 +266,7 @@ export interface Invoice {
   monnaie_rendue: number;
   montant_restant?: number;
   statut_paiement?: "paye" | "partiel" | "impaye";
+  livraison_differee?: number;
   remise_type?: "pourcentage" | "montant";
   remise_valeur?: number;
   total_avant_remise?: number;
@@ -471,6 +473,7 @@ declare global {
         totalSorties: number;
       }>;
       getTreasury: () => Promise<{ total: number; entries: AccountingEntry[] }>;
+      getTreasuryByPeriod: (startDate: string, endDate: string) => Promise<{ total: number; entrees: number; sorties: number }>;
       getProfitStats: (startDate?: string, endDate?: string) => Promise<{
         chiffreAffaires: number;
         coutMarchandises: number;
@@ -490,7 +493,7 @@ declare global {
         startDate: string,
         endDate: string,
       ) => Promise<Invoice[]>;
-      updateInvoice: (id: number, invoice: Invoice) => Promise<any>;
+      updateInvoice: (id: number, invoice: Partial<Invoice>) => Promise<any>;
       deleteInvoice: (
         id: number,
         utilisateur_id?: number,
@@ -804,6 +807,10 @@ declare global {
         totalPages: number;
       }>;
       getCaisseStats: (caisseId: number) => Promise<any>;
+      getTotalCustomerDebtsByPeriod: (startDate: string, endDate: string) => Promise<number>;
+      getTotalSupplierDebtsByPeriod: (startDate: string, endDate: string) => Promise<number>;
+      getCaissesByPeriod: (startDate: string, endDate: string) => Promise<any[]>;
+      getTreasuryEvolution: (startDate: string, endDate: string) => Promise<any[]>;
       // Livraisons
       getLivraisons: (page: number, limit: number, statut?: string) => Promise<{
         data: any[];
