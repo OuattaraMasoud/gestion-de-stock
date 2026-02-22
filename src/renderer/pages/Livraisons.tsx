@@ -274,8 +274,8 @@ const Livraisons: React.FC = () => {
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width:40px">Qte</th>
-                    <th class="text-right" style="width:85px">P.U.</th>
-                    <th class="text-right" style="width:85px">Total</th>
+                    <th class="text-right" style="width:130px">P.U.</th>
+                    <th class="text-right" style="width:130px">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -334,35 +334,35 @@ const Livraisons: React.FC = () => {
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.3; color: #111; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; line-height: 1.3; color: #111; }
               .invoice { max-width: 136mm; margin: 0 auto; }
               .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 8px; }
               .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
               .company-info { flex: 1; padding: 0 12px; text-align: center; }
               .company-info h1 { font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; }
-              .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; min-width: 65px; }
-              .invoice-badge .numero { font-size: 8px; font-weight: normal; margin-top: 1px; }
+              .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 13px; font-weight: bold; text-align: center; min-width: 65px; }
+              .invoice-badge .numero { font-size: 10px; font-weight: normal; margin-top: 1px; }
               .info-grid { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
               .info-box { width: 48%; background: #f8fafc; padding: 6px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 8px; text-transform: uppercase; color: #374151; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 1px 0; font-size: 11px; color: #111827; }
+              .info-box h3 { font-size: 10px; text-transform: uppercase; color: #374151; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0; }
+              .info-box p { margin: 1px 0; font-size: 13px; color: #111827; }
               table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-              thead th { background: #1e40af; color: white; padding: 5px 6px; text-align: left; font-size: 10px; text-transform: uppercase; }
+              thead th { background: #1e40af; color: white; padding: 5px 6px; text-align: left; font-size: 12px; text-transform: uppercase; }
               thead th.text-right { text-align: right; }
-              tbody td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #111827; }
+              tbody td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #111827; }
               tbody tr:nth-child(even) { background: #f8fafc; }
               tbody td.text-right { text-align: right; }
               .totals-section { display: flex; justify-content: flex-end; margin-top: 6px; }
               .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 6px 8px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
+              .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 13px; }
               .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
               .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 13px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 4px; margin-top: 3px; }
+              .totals-row.grand-total { font-size: 15px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 4px; margin-top: 3px; }
               .totals-row.remaining { color: #dc2626; font-weight: bold; }
               .delivery-status { font-weight: bold; padding: 3px 8px; border-radius: 3px; display: inline-block; margin-top: 4px; }
               .delivered { background: #dcfce7; color: #166534; }
               .deferred { background: #fef3c7; color: #92400e; }
-              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 7.5px; color: #1e40af; }
+              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 9.5px; color: #1e40af; }
               @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
             </style>
           </head>
@@ -398,8 +398,8 @@ const Livraisons: React.FC = () => {
                   <tr>
                     <th>Designation</th>
                     <th class="text-right" style="width:35px">Qte</th>
-                    <th class="text-right" style="width:85px">P.U.</th>
-                    <th class="text-right" style="width:85px">Total</th>
+                    <th class="text-right" style="width:110px">P.U.</th>
+                    <th class="text-right" style="width:110px">Total</th>
                   </tr>
                 </thead>
                 <tbody>
