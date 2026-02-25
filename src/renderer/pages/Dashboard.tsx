@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -10,9 +10,11 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Calendar,
+  X,
 } from "lucide-react";
 import { DashboardStatsByDate, Product } from "../types";
 import { formatCurrency } from "../utils/formatters";
+import Pagination from "../components/Pagination";
 
 type PeriodType = "today" | "yesterday" | "last3days" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom";
 
@@ -80,15 +82,129 @@ const getDateRange = (period: PeriodType, customStart?: string, customEnd?: stri
   }
 };
 
+// Modal affichant les détails d'une carte du dashboard
+const DashboardDetailModal: React.FC<{
+  type: string;
+  data: any[];
+  onClose: () => void;
+}> = ({ type, data, onClose }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  const titles: Record<string, string> = {
+    ventes: "Détail Ventes Totales",
+    benefice: "Détail Bénéfice",
+    nb_ventes: "Détail Ventes",
+    couts: "Détail Coûts",
+  };
+
+  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return data.slice(start, start + itemsPerPage);
+  }, [data, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [type, data.length]);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">{titles[type] || "Détail"}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-4">
+          {data.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">Aucune donnée pour cette période</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
+                  {type === "nb_ventes" ? (
+                    <>
+                      <th className="py-2 text-left">Vente</th>
+                      <th className="py-2 text-left">Client</th>
+                      <th className="py-2 text-right">Total</th>
+                      <th className="py-2 text-center">Articles</th>
+                      <th className="py-2 text-center">Statut</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="py-2 text-left">Produit</th>
+                      <th className="py-2 text-right">Quantité</th>
+                      <th className="py-2 text-right">
+                        {type === "ventes" ? "CA Généré" : type === "benefice" ? "Bénéfice" : "Coût Total"}
+                      </th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {type === "nb_ventes"
+                  ? paginatedData.map((row: any, i: number) => (
+                      <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="py-2 text-gray-900 dark:text-white">#{row.id}</td>
+                        <td className="py-2 text-gray-600 dark:text-gray-400">{row.client_nom || "—"}</td>
+                        <td className="py-2 text-right font-semibold text-blue-600">{formatCurrency(row.total)}</td>
+                        <td className="py-2 text-center text-gray-600 dark:text-gray-400">{row.nb_articles}</td>
+                        <td className="py-2 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            row.statut_paiement === "paye" ? "bg-green-100 text-green-700" :
+                            row.statut_paiement === "partiel" ? "bg-yellow-100 text-yellow-700" :
+                            "bg-red-100 text-red-700"
+                          }`}>
+                            {row.statut_paiement === "paye" ? "Payé" : row.statut_paiement === "partiel" ? "Partiel" : "Impayé"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  : paginatedData.map((row: any, i: number) => (
+                      <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="py-2 text-gray-900 dark:text-white">{row.nom}</td>
+                        <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.quantite_vendue}</td>
+                        <td className="py-2 text-right font-semibold text-blue-600">
+                          {formatCurrency(row.ca_genere ?? row.benefice_genere ?? row.cout_total ?? 0)}
+                        </td>
+                      </tr>
+                    ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {data.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={data.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            itemsPerPageOptions={[10, 20, 50, 100]}
+            onItemsPerPageChange={(val) => { setItemsPerPage(val); setCurrentPage(1); }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStatsByDate | null>(null);
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("thisMonth");
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("today");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
   const [showCustomDates, setShowCustomDates] = useState(false);
+
+  // Modal card details
+  const [cardDetailType, setCardDetailType] = useState<string | null>(null);
+  const [cardDetailData, setCardDetailData] = useState<any[]>([]);
+  const [cardDetailLoading, setCardDetailLoading] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -106,7 +222,6 @@ const Dashboard: React.FC = () => {
       setStats(statsData);
       setLowStockProducts(lowStock);
 
-      // Charger les 5 produits les plus récents avec pagination
       const recentProductsResult = await window.electronAPI.getProductsPaginated(1, 5);
       setRecentProducts(recentProductsResult.data);
     } catch (error) {
@@ -120,7 +235,6 @@ const Dashboard: React.FC = () => {
     setSelectedPeriod(period);
     if (period === "custom") {
       setShowCustomDates(true);
-      // Initialiser avec aujourd'hui si pas de dates
       if (!customStartDate) {
         const today = new Date().toISOString().split("T")[0];
         setCustomStartDate(today);
@@ -128,6 +242,22 @@ const Dashboard: React.FC = () => {
       }
     } else {
       setShowCustomDates(false);
+    }
+  };
+
+  const handleCardClick = async (type: string) => {
+    if (!stats) return;
+    const { start, end } = getDateRange(selectedPeriod, customStartDate, customEndDate);
+    setCardDetailType(type);
+    setCardDetailLoading(true);
+    setCardDetailData([]);
+    try {
+      const data = await window.electronAPI.getDashboardCardDetails(type, start, end);
+      setCardDetailData(data);
+    } catch (error) {
+      console.error("Erreur card details:", error);
+    } finally {
+      setCardDetailLoading(false);
     }
   };
 
@@ -139,7 +269,6 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Calculer les pourcentages de variation
   const calculateChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? "+100%" : "0%";
     const change = ((current - previous) / previous) * 100;
@@ -148,20 +277,22 @@ const Dashboard: React.FC = () => {
 
   const salesOverview = [
     {
-      title: "CHIFFRE D'AFFAIRES",
+      title: "VENTES TOTALES",
       value: formatCurrency(stats?.ventesPeriode || 0),
       change: calculateChange(stats?.ventesPeriode || 0, stats?.ventesPeriodePrecedente || 0),
       isPositive: (stats?.ventesPeriode || 0) >= (stats?.ventesPeriodePrecedente || 0),
-      subtitle: (stats?.ventesPeriode || 0) >= (stats?.ventesPeriodePrecedente || 0) ? "vs période préc." : "vs période préc.",
+      subtitle: "vs période préc.",
       gradient: "from-blue-500 to-blue-600",
+      cardType: "ventes",
     },
     {
       title: "BÉNÉFICE TOTAL",
       value: formatCurrency(stats?.profitPeriode || 0),
       change: calculateChange(stats?.profitPeriode || 0, stats?.profitPeriodePrecedente || 0),
       isPositive: (stats?.profitPeriode || 0) >= (stats?.profitPeriodePrecedente || 0),
-      subtitle: (stats?.profitPeriode || 0) >= (stats?.profitPeriodePrecedente || 0) ? "vs période préc." : "vs période préc.",
+      subtitle: "vs période préc.",
       gradient: "from-green-500 to-green-600",
+      cardType: "benefice",
     },
     {
       title: "NOMBRE DE VENTES",
@@ -170,14 +301,16 @@ const Dashboard: React.FC = () => {
       isPositive: (stats?.ventesPeriode || 0) >= (stats?.ventesPeriodePrecedente || 0),
       subtitle: "transactions",
       gradient: "from-purple-500 to-purple-600",
+      cardType: "nb_ventes",
     },
     {
       title: "COÛTS",
       value: formatCurrency(stats?.coutsPeriode || 0),
       change: calculateChange(stats?.coutsPeriode || 0, stats?.coutsPeriodePrecedente || 0),
       isPositive: (stats?.coutsPeriode || 0) <= (stats?.coutsPeriodePrecedente || 0),
-      subtitle: (stats?.coutsPeriode || 0) <= (stats?.coutsPeriodePrecedente || 0) ? "vs période préc." : "vs période préc.",
+      subtitle: "vs période préc.",
       gradient: "from-orange-500 to-orange-600",
+      cardType: "couts",
     },
   ];
 
@@ -212,19 +345,7 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  // Calculer les pourcentages pour le graphique
-  const total = (stats?.ventesPeriode || 0) + (stats?.profitPeriode || 0) + (stats?.coutsPeriode || 0) + (stats?.valeurStock || 0);
-  const chartData = total > 0 ? [
-    { label: "Ventes", value: ((stats?.ventesPeriode || 0) / total * 100).toFixed(0), color: "bg-blue-500" },
-    { label: "Bénéfice", value: ((stats?.profitPeriode || 0) / total * 100).toFixed(0), color: "bg-green-500" },
-    { label: "Dépenses", value: ((stats?.valeurStock || 0) / total * 100).toFixed(0), color: "bg-purple-500" },
-    { label: "Coûts", value: ((stats?.coutsPeriode || 0) / total * 100).toFixed(0), color: "bg-orange-500" },
-  ] : [
-    { label: "Ventes", value: "0", color: "bg-blue-500" },
-    { label: "Bénéfice", value: "0", color: "bg-green-500" },
-    { label: "Dépenses", value: "0", color: "bg-purple-500" },
-    { label: "Coûts", value: "0", color: "bg-orange-500" },
-  ];
+  const caisse = stats?.caisseOuverte;
 
   return (
     <div className="space-y-6">
@@ -273,10 +394,14 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Sales Overview */}
+      {/* Sales Overview — cartes cliquables */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {salesOverview.map((item, index) => (
-          <div key={index} className={`card bg-gradient-to-br ${item.gradient} text-white`}>
+          <div
+            key={index}
+            onClick={() => handleCardClick(item.cardType)}
+            className={`card bg-gradient-to-br ${item.gradient} text-white cursor-pointer hover:opacity-90 transition-opacity`}
+          >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-white/80 uppercase">{item.title}</p>
@@ -287,9 +412,7 @@ const Dashboard: React.FC = () => {
                   ) : (
                     <ArrowDownRight className="w-4 h-4 text-white/80" />
                   )}
-                  <span className="text-xs font-medium text-white/90">
-                    {item.change}
-                  </span>
+                  <span className="text-xs font-medium text-white/90">{item.change}</span>
                   <span className="text-xs text-white/70">{item.subtitle}</span>
                 </div>
               </div>
@@ -303,9 +426,51 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
+      {/* Section Résultat Global */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4">
+          Résultat Global — {periodLabels[selectedPeriod]}
+        </h2>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700">
+            <span className="text-sm text-blue-600 font-medium">Ventes totales (CA)</span>
+            <span className="text-sm font-bold text-blue-600">{formatCurrency(stats?.ventesPeriode || 0)}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700">
+            <span className="text-sm text-orange-500">Total des remises</span>
+            <span className="text-sm font-semibold text-orange-500">− {formatCurrency(stats?.totalRemisesPeriode || 0)}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700">
+            <span className="text-sm text-red-500">Total crédits accordés</span>
+            <span className="text-sm font-semibold text-red-500">− {formatCurrency(stats?.totalCreditsAccordes || 0)}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700">
+            <span className="text-sm text-green-600">Total crédits soldés</span>
+            <span className="text-sm font-semibold text-green-600">+ {formatCurrency(stats?.totalCreditsSoldes || 0)}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700">
+            <span className="text-sm text-red-500">Total dépenses</span>
+            <span className="text-sm font-semibold text-red-500">− {formatCurrency(stats?.totalDepensesPeriode || 0)}</span>
+          </div>
+          <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 bg-purple-50 dark:bg-purple-900/20 rounded px-2">
+            <span className="text-sm font-bold text-purple-700 dark:text-purple-300">Résultat TTC (CA − remises − dépenses)</span>
+            <span className={`text-sm font-bold ${(stats?.resultatTTC || 0) >= 0 ? "text-purple-700 dark:text-purple-300" : "text-red-600"}`}>
+              {formatCurrency(stats?.resultatTTC || 0)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between py-2 bg-green-50 dark:bg-green-900/20 rounded px-2">
+            <span className="text-sm font-bold text-green-800 dark:text-green-300">Bénéfice net (CA − coûts − remises − dépenses)</span>
+            <span className={`text-sm font-bold ${(stats?.beneficeNet || 0) >= 0 ? "text-green-800 dark:text-green-300" : "text-red-600"}`}>
+              {formatCurrency(stats?.beneficeNet || 0)}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Products */}
+        {/* Colonne principale */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Recent Products */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">Produits récents</h2>
@@ -385,9 +550,37 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column */}
+        {/* Colonne droite */}
         <div className="space-y-6">
-          {/* Inventory Overview */}
+          {/* État de la Caisse */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">État de la Caisse</h2>
+            {caisse ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Statut</span>
+                  <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700">Ouverte</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Fonds d'ouverture</span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(caisse.fonds_roulement)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Date ouverture</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                    {new Date(caisse.date_ouverture).toLocaleDateString("fr-FR")}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-100 text-gray-500">Fermée</span>
+                <p className="text-xs text-gray-500 mt-2">Aucune caisse ouverte</p>
+              </div>
+            )}
+          </div>
+
+          {/* Aperçu inventaire */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Aperçu inventaire</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -396,7 +589,7 @@ const Dashboard: React.FC = () => {
                 return (
                   <div key={index} className="text-center">
                     <div className={`${card.bgColor} w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-2`}>
-                      <Icon className={`w-8 h-8 text-white ${card.color.replace('bg-', 'text-')}`} style={{filter: 'brightness(0.8)'}} />
+                      <Icon className={`w-8 h-8 text-white ${card.color.replace("bg-", "text-")}`} style={{ filter: "brightness(0.8)" }} />
                     </div>
                     <p className="text-xl font-bold text-gray-900 dark:text-white">{card.value}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{card.title}</p>
@@ -406,7 +599,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Inventory Summary */}
+          {/* Résumé inventaire */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Résumé inventaire</h2>
             <div className="space-y-3">
@@ -428,33 +621,22 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Revenue Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Graphique revenus</h2>
-            <div className="flex items-center justify-center py-4">
-              <svg className="w-40 h-40" viewBox="0 0 200 200">
-                {/* Graphique en camembert simple */}
-                <circle cx="100" cy="100" r="80" fill="#FFA500" stroke="white" strokeWidth="2" />
-                <path d="M 100 100 L 100 20 A 80 80 0 0 1 180 100 Z" fill="#3B82F6" stroke="white" strokeWidth="2" />
-                <path d="M 100 100 L 180 100 A 80 80 0 0 1 140 173.2 Z" fill="#10B981" stroke="white" strokeWidth="2" />
-                <path d="M 100 100 L 140 173.2 A 80 80 0 0 1 60 173.2 Z" fill="#8B5CF6" stroke="white" strokeWidth="2" />
-              </svg>
-            </div>
-            <div className="space-y-2 mt-4">
-              {chartData.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${item.color}`}></div>
-                    <span className="text-xs text-gray-600 dark:text-gray-400">{item.label}</span>
-                  </div>
-                  <span className="text-xs font-medium text-gray-900 dark:text-white">{item.value}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
+
+      {/* Modal détails carte */}
+      {cardDetailType && (
+        <DashboardDetailModal
+          type={cardDetailType}
+          data={cardDetailLoading ? [] : cardDetailData}
+          onClose={() => { setCardDetailType(null); setCardDetailData([]); }}
+        />
+      )}
+      {cardDetailLoading && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      )}
     </div>
   );
 };

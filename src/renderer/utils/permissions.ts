@@ -135,13 +135,13 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     path: "/clients",
     label: "Clients",
     icon: "UserCircle",
-    allowedRoles: ["admin", "gestionnaire"],
+    allowedRoles: ["admin", "gestionnaire", "caissier"],
   },
   {
     path: "/dettes-clients",
     label: "Dettes Clients",
     icon: "AlertCircle",
-    allowedRoles: ["admin", "gestionnaire"],
+    allowedRoles: ["admin", "gestionnaire", "caissier"],
   },
 
   {

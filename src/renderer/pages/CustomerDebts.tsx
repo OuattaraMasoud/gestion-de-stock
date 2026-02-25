@@ -164,6 +164,7 @@ const CustomerDebts: React.FC = () => {
         }),
         caissier: user?.nom,
         invoice: result?.invoice,
+        produits: selectedSale.produits || [],
       });
       setShowReceipt(true);
 
@@ -234,9 +235,19 @@ const CustomerDebts: React.FC = () => {
   };
 
   const printDebtPaymentA5 = (receipt: any) => {
-    if (!receipt?.invoice) return;
-    const inv = receipt.invoice;
-    const articles: any[] = Array.isArray(inv.articles) ? inv.articles : [];
+    const inv = receipt.invoice || {};
+    // Use invoice articles if available, otherwise use produits from the sale
+    let articles: any[] = [];
+    if (Array.isArray(inv.articles) && inv.articles.length > 0) {
+      articles = inv.articles;
+    } else if (Array.isArray(receipt.produits) && receipt.produits.length > 0) {
+      articles = receipt.produits.map((p: any) => ({
+        designation: p.nom_produit,
+        quantite: p.quantite,
+        prixUnitaire: p.prix_unitaire,
+        total: p.sous_total ?? (p.quantite * p.prix_unitaire),
+      }));
+    }
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
     printWindow.document.write(`
@@ -329,8 +340,8 @@ const CustomerDebts: React.FC = () => {
                   <tr>
                     <td>${a.designation}</td>
                     <td class="text-right">${a.quantite}</td>
-                    <td class="text-right">${a.prixUnitaire?.toLocaleString("fr-FR")} FCFA</td>
-                    <td class="text-right">${a.total?.toLocaleString("fr-FR")} FCFA</td>
+                    <td class="text-right">${a.prixUnitaire?.toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</td>
+                    <td class="text-right">${a.total?.toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</td>
                   </tr>
                 `,
                   )
@@ -340,12 +351,12 @@ const CustomerDebts: React.FC = () => {
 
             <div class="totals-section">
               <div class="totals-box">
-                <div class="totals-row grand-total"><span>Total TTC:</span><span>${(inv.total_ttc ?? 0).toLocaleString("fr-FR")} FCFA</span></div>
-                <div class="totals-row payed"><span>Montant payé:</span><span>${(inv.montant_paye ?? 0).toLocaleString("fr-FR")} FCFA</span></div>
+                <div class="totals-row grand-total"><span>Total TTC:</span><span>${(inv.total_ttc ?? 0).toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</span></div>
+                <div class="totals-row payed"><span>Montant payé:</span><span>${(inv.montant_paye ?? 0).toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</span></div>
                 ${
                   (inv.montant_restant ?? 0) <= 0
                     ? `<div style="margin-top:6px;"><span class="solde-badge">✓ SOLDÉ</span></div>`
-                    : `<div class="totals-row remaining"><span>Reste:</span><span>${(inv.montant_restant ?? 0).toLocaleString("fr-FR")} FCFA</span></div>`
+                    : `<div class="totals-row remaining"><span>Reste:</span><span>${(inv.montant_restant ?? 0).toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</span></div>`
                 }
               </div>
             </div>
@@ -683,7 +694,8 @@ const CustomerDebts: React.FC = () => {
                                     >
                                       <div className="flex-1 min-w-0">
                                         <p className="font-medium text-gray-900 dark:text-white truncate">
-                                          {produit.nom ||
+                                          {produit.nom_produit ||
+                                            produit.nom ||
                                             produit.designation ||
                                             `Produit #${produit.produit_id || idx + 1}`}
                                         </p>
@@ -1265,8 +1277,8 @@ const CustomerDebts: React.FC = () => {
                   </div>
 
                   {/* Table des articles si disponibles */}
-                  {paymentReceipt?.invoice?.articles &&
-                    paymentReceipt.invoice.articles.length > 0 && (
+                  {((paymentReceipt?.invoice?.articles && paymentReceipt.invoice.articles.length > 0) ||
+                    (paymentReceipt?.produits && paymentReceipt.produits.length > 0)) && (
                       <table
                         style={{
                           width: "100%",
@@ -1329,7 +1341,15 @@ const CustomerDebts: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {paymentReceipt.invoice.articles.map(
+                          {(paymentReceipt?.invoice?.articles?.length > 0
+                            ? paymentReceipt.invoice.articles
+                            : (paymentReceipt?.produits || []).map((p: any) => ({
+                                designation: p.nom_produit,
+                                quantite: p.quantite,
+                                prixUnitaire: p.prix_unitaire,
+                                total: p.sous_total ?? (p.quantite * p.prix_unitaire),
+                              }))
+                          ).map(
                             (article: any, index: number) => (
                               <tr
                                 key={index}
@@ -1485,7 +1505,7 @@ const CustomerDebts: React.FC = () => {
                         <span>RESTE:</span>
                         <span>
                           {paymentReceipt.nouveau_restant <= 0
-                            ? "0 FCFA (Soldé)"
+                            ? `0 ${config?.devise || 'FCFA'} (Soldé)`
                             : formatCurrency(paymentReceipt.nouveau_restant)}
                         </span>
                       </div>
@@ -1591,15 +1611,13 @@ const CustomerDebts: React.FC = () => {
                   <X className="w-5 h-5" />
                   Fermer
                 </button>
-                {paymentReceipt?.invoice && (
-                  <button
-                    onClick={() => printDebtPaymentA5(paymentReceipt)}
-                    className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2 min-w-[100px]"
-                  >
-                    <FileText className="w-5 h-5" />
-                    Imprimer
-                  </button>
-                )}
+                <button
+                  onClick={() => printDebtPaymentA5(paymentReceipt)}
+                  className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2 min-w-[100px]"
+                >
+                  <FileText className="w-5 h-5" />
+                  Imprimer
+                </button>
               </div>
             </div>
           </div>

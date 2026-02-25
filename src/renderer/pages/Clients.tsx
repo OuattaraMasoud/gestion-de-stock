@@ -322,10 +322,12 @@ const Clients: React.FC = () => {
             {totalItems} client(s)
           </p>
         </div>
-        <button onClick={() => handleOpenModal()} className="btn-primary">
-          <Plus className="w-5 h-5" />
-          Nouveau Client
-        </button>
+        {user?.role !== "caissier" && (
+          <button onClick={() => handleOpenModal()} className="btn-primary">
+            <Plus className="w-5 h-5" />
+            Nouveau Client
+          </button>
+        )}
       </div>
 
       {/* Liste des clients */}
@@ -425,12 +427,14 @@ const Clients: React.FC = () => {
                       >
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(client.id!)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {user?.role !== "caissier" && (
+                        <button
+                          onClick={() => handleDelete(client.id!)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

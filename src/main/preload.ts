@@ -457,4 +457,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Verrou automatique des factures
   lockOldInvoices: () => ipcRenderer.invoke("lock-old-invoices"),
+
+  // Dashboard card details
+  getDashboardCardDetails: (type: string, startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-dashboard-card-details", type, startDate, endDate),
+
+  // Paiement global dette fournisseur
+  paySupplierDebtByAmount: (supplierId: number, montant: number, methode: string, utilisateur_id?: number, utilisateur_nom?: string) =>
+    ipcRenderer.invoke("pay-supplier-debt-by-amount", supplierId, montant, methode, utilisateur_id, utilisateur_nom),
+
+  // Rapports PDF
+  getSalesValueReport: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-sales-value-report", startDate, endDate),
+  getCreditSalesReport: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke("get-credit-sales-report", startDate, endDate),
 });

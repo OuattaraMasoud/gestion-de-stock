@@ -92,6 +92,13 @@ export interface DashboardStatsByDate {
   nbClients: number;
   dateDebut: string;
   dateFin: string;
+  totalRemisesPeriode: number;
+  totalCreditsAccordes: number;
+  totalCreditsSoldes: number;
+  totalDepensesPeriode: number;
+  resultatTTC: number;
+  beneficeNet: number;
+  caisseOuverte?: { id: number; fonds_roulement: number; date_ouverture: string; statut: string; } | null;
 }
 
 export interface User {
@@ -823,7 +830,13 @@ declare global {
       updateLivraison: (id: number, livraison: any) => Promise<any>;
       markAsDelivered: (venteId: number) => Promise<any>;
       // Statistiques Client
-      getClientStats: (clientId: number) => Promise<any>;
+      getClientStats: (clientId: number, startDate?: string, endDate?: string) => Promise<any>;
+      getVenteDetails: (venteId: number) => Promise<any>;
+      getDashboardCardDetails: (type: string, startDate: string, endDate: string) => Promise<any[]>;
+      payClientDebtByAmount: (clientId: number, montant: number, methode: string, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      paySupplierDebtByAmount: (supplierId: number, montant: number, methode: string, utilisateur_id?: number, utilisateur_nom?: string) => Promise<any>;
+      getSalesValueReport: (startDate: string, endDate: string) => Promise<any[]>;
+      getCreditSalesReport: (startDate: string, endDate: string) => Promise<any[]>;
     };
   }
 }

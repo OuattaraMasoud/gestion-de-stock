@@ -2931,13 +2931,66 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
       .prepare(`SELECT COUNT(*) as count FROM clients`)
       .get() as { count: number };
 
+    // Total des remises pour la période
+    const totalRemisesPeriode = db
+      .prepare(
+        `SELECT COALESCE(SUM(
+          CASE
+            WHEN remise_type = 'pourcentage' THEN total_avant_remise * remise_valeur / 100
+            WHEN remise_type = 'montant' THEN remise_valeur
+            ELSE 0
+          END
+        ), 0) as total
+        FROM ventes
+        WHERE DATE(date_vente) BETWEEN DATE(?) AND DATE(?)`,
+      )
+      .get(startDate, endDate) as { total: number };
+
+    // Total crédits accordés (montant_restant des ventes impayées/partielles de la période)
+    const totalCreditsAccordes = db
+      .prepare(
+        `SELECT COALESCE(SUM(montant_restant), 0) as total
+         FROM ventes
+         WHERE DATE(date_vente) BETWEEN DATE(?) AND DATE(?)
+           AND statut_paiement IN ('impaye', 'partiel')`,
+      )
+      .get(startDate, endDate) as { total: number };
+
+    // Total crédits soldés (paiements reçus dans la période)
+    const totalCreditsSoldes = db
+      .prepare(
+        `SELECT COALESCE(SUM(montant), 0) as total
+         FROM paiements_clients
+         WHERE DATE(date_paiement) BETWEEN DATE(?) AND DATE(?)`,
+      )
+      .get(startDate, endDate) as { total: number };
+
+    // Total dépenses pour la période
+    const totalDepensesPeriode = db
+      .prepare(
+        `SELECT COALESCE(SUM(montant), 0) as total
+         FROM depenses
+         WHERE DATE(date_depense) BETWEEN DATE(?) AND DATE(?)`,
+      )
+      .get(startDate, endDate) as { total: number };
+
+    // Caisse ouverte
+    const caisseOuverte = getOpenCaisse();
+
+    const ventes = ventesPeriode.total;
+    const remises = totalRemisesPeriode.total;
+    const depenses = totalDepensesPeriode.total;
+    const couts = coutsPeriode.couts;
+    const resultatTTC = ventes - (remises + depenses);
+    const beneficeNet = ventes - (couts + remises + depenses);
+
     return {
-      ventesPeriode: ventesPeriode.total,
+      ventesPeriode: ventes,
       ventesPeriodePrecedente: ventesPeriodePrecedente.total,
       nbVentesPeriode: nbVentesPeriode.count,
       profitPeriode: profitPeriode.profit,
       profitPeriodePrecedente: profitPeriodePrecedente.profit,
-      coutsPeriode: coutsPeriode.couts,
+      coutsPeriode: couts,
       coutsPeriodePrecedente: coutsPeriodePrecedente.couts,
       totalProduits: totalProduits.count,
       stockFaible: stockFaible.count,
@@ -2946,9 +2999,79 @@ export function getDashboardStatsByDate(startDate: string, endDate: string) {
       nbClients: nbClients.count,
       dateDebut: startDate,
       dateFin: endDate,
+      totalRemisesPeriode: remises,
+      totalCreditsAccordes: totalCreditsAccordes.total,
+      totalCreditsSoldes: totalCreditsSoldes.total,
+      totalDepensesPeriode: depenses,
+      resultatTTC,
+      beneficeNet,
+      caisseOuverte: caisseOuverte || null,
     };
   } catch (error) {
     console.error("Erreur get dashboard stats by date:", error);
+    throw error;
+  }
+}
+
+export function getDashboardCardDetails(type: string, startDate: string, endDate: string) {
+  try {
+    if (type === "ventes") {
+      return db
+        .prepare(
+          `SELECT p.nom, SUM(vp.quantite) as quantite_vendue, SUM(vp.sous_total) as ca_genere
+           FROM ventes_produits vp
+           JOIN ventes v ON vp.vente_id = v.id
+           JOIN produits p ON vp.produit_id = p.id
+           WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+           GROUP BY p.id
+           ORDER BY ca_genere DESC`,
+        )
+        .all(startDate, endDate);
+    }
+    if (type === "benefice") {
+      return db
+        .prepare(
+          `SELECT p.nom, SUM(vp.quantite) as quantite_vendue,
+                  SUM((vp.prix_unitaire - p.prix_achat) * vp.quantite) as benefice_genere
+           FROM ventes_produits vp
+           JOIN ventes v ON vp.vente_id = v.id
+           JOIN produits p ON vp.produit_id = p.id
+           WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+           GROUP BY p.id
+           ORDER BY benefice_genere DESC`,
+        )
+        .all(startDate, endDate);
+    }
+    if (type === "nb_ventes") {
+      return db
+        .prepare(
+          `SELECT v.id, v.date_vente, v.total, v.client_nom, v.methode_paiement,
+                  v.statut_paiement, COUNT(vp.id) as nb_articles
+           FROM ventes v
+           LEFT JOIN ventes_produits vp ON vp.vente_id = v.id
+           WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+           GROUP BY v.id
+           ORDER BY v.date_vente DESC`,
+        )
+        .all(startDate, endDate);
+    }
+    if (type === "couts") {
+      return db
+        .prepare(
+          `SELECT p.nom, SUM(vp.quantite) as quantite_vendue,
+                  SUM(p.prix_achat * vp.quantite) as cout_total
+           FROM ventes_produits vp
+           JOIN ventes v ON vp.vente_id = v.id
+           JOIN produits p ON vp.produit_id = p.id
+           WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+           GROUP BY p.id
+           ORDER BY cout_total DESC`,
+        )
+        .all(startDate, endDate);
+    }
+    return [];
+  } catch (error) {
+    console.error("Erreur getDashboardCardDetails:", error);
     throw error;
   }
 }
@@ -3697,6 +3820,12 @@ export function updateClient(id: number, client: any) {
       id,
     );
 
+    // Propager le changement de nom dans ventes et factures
+    if (oldClient.nom !== client.nom) {
+      db.prepare(`UPDATE ventes SET client_nom = ? WHERE client_id = ?`).run(client.nom, id);
+      db.prepare(`UPDATE factures SET client_nom = ? WHERE client_id = ?`).run(client.nom, id);
+    }
+
     const changes = [];
     if (oldClient.nom !== client.nom)
       changes.push(`nom: "${oldClient.nom}" → "${client.nom}"`);
@@ -4334,6 +4463,71 @@ export function payClientDebtByAmount(
     })();
   } catch (error) {
     console.error("Erreur payClientDebtByAmount:", error);
+    throw error;
+  }
+}
+
+export function paySupplierDebtByAmount(
+  supplierId: number,
+  montant: number,
+  methode: string,
+  utilisateur_id?: number,
+  utilisateur_nom?: string,
+) {
+  try {
+    return db.transaction(() => {
+      const unpaidPurchases = db
+        .prepare(
+          `SELECT id, montant_restant FROM achats
+           WHERE fournisseur_id = ? AND statut_paiement IN ('impaye', 'partiel') AND montant_restant > 0
+           ORDER BY date_achat ASC`,
+        )
+        .all(supplierId) as any[];
+
+      let remaining = montant;
+      const updatedPurchases: number[] = [];
+
+      for (const purchase of unpaidPurchases) {
+        if (remaining <= 0) break;
+        const toPay = Math.min(remaining, purchase.montant_restant);
+        remaining -= toPay;
+
+        db.prepare(
+          `UPDATE achats SET montant_paye = montant_paye + ?, montant_restant = montant_restant - ?,
+           statut_paiement = CASE WHEN montant_restant - ? <= 0 THEN 'paye' ELSE 'partiel' END
+           WHERE id = ?`,
+        ).run(toPay, toPay, toPay, purchase.id);
+
+        db.prepare(
+          `INSERT INTO paiements_fournisseurs (achat_id, fournisseur_id, montant, methode_paiement)
+           VALUES (?, ?, ?, ?)`,
+        ).run(purchase.id, supplierId, toPay, methode);
+
+        db.prepare(
+          `INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
+           VALUES ('paiement_fournisseur', ?, ?, ?, 'sortie', ?)`,
+        ).run(purchase.id, `Paiement global dette fournisseur #${supplierId} - Achat #${purchase.id}`, toPay, methode);
+
+        updatedPurchases.push(purchase.id);
+      }
+
+      db.prepare(
+        `UPDATE fournisseurs SET solde_du = MAX(0, solde_du - ?) WHERE id = ?`,
+      ).run(montant, supplierId);
+
+      logAudit(
+        "paiement global dette fournisseur",
+        "paiements_fournisseurs",
+        supplierId,
+        `Paiement global de ${montant} pour fournisseur #${supplierId} - ${updatedPurchases.length} achat(s) touché(s)`,
+        utilisateur_id,
+        utilisateur_nom,
+      );
+
+      return { success: true, updatedPurchases };
+    })();
+  } catch (error) {
+    console.error("Erreur paySupplierDebtByAmount:", error);
     throw error;
   }
 }
@@ -8089,16 +8283,23 @@ export function getCaisseStats(caisseId: number): any {
     const caisse = db.prepare("SELECT * FROM caisses WHERE id = ?").get(caisseId) as any;
     if (!caisse) return null;
 
+    const openingDatetime = `${caisse.date_ouverture} ${caisse.heure_ouverture}`;
+    const closingDatetime = caisse.date_fermeture && caisse.heure_fermeture
+      ? `${caisse.date_fermeture} ${caisse.heure_fermeture}`
+      : null;
+
     const stats = db.prepare(`
-      SELECT 
+      SELECT
         COUNT(*) as nb_ventes,
         COALESCE(SUM(total), 0) as total_ventes,
-        COALESCE(SUM(CASE WHEN methode_paiement = 'especes' THEN total ELSE 0 END), 0) as total_especes,
-        COALESCE(SUM(CASE WHEN methode_paiement = 'carte' THEN total ELSE 0 END), 0) as total_carte,
-        COALESCE(SUM(CASE WHEN methode_paiement = 'mobile' THEN total ELSE 0 END), 0) as total_mobile
-      FROM ventes 
-      WHERE DATE(date_vente) = DATE(?)
-    `).get(caisse.date_ouverture) as any;
+        COALESCE(SUM(montant_paye), 0) as total_encaisse,
+        COALESCE(SUM(CASE WHEN methode_paiement = 'especes' THEN montant_paye ELSE 0 END), 0) as total_especes,
+        COALESCE(SUM(CASE WHEN methode_paiement = 'carte' THEN montant_paye ELSE 0 END), 0) as total_carte,
+        COALESCE(SUM(CASE WHEN methode_paiement = 'mobile' THEN montant_paye ELSE 0 END), 0) as total_mobile
+      FROM ventes
+      WHERE date_vente >= ?
+        AND (? IS NULL OR date_vente <= ?)
+    `).get(openingDatetime, closingDatetime, closingDatetime) as any;
 
     return { ...caisse, ...stats };
   } catch (error) {
@@ -8411,4 +8612,61 @@ export function getTreasuryEvolution(startDate: string, endDate: string): any[] 
     console.error("Erreur getTreasuryEvolution:", error);
     return [];
   }
+}
+
+// ===== RAPPORTS PDF =====
+
+export function getSalesValueReport(startDate: string, endDate: string) {
+  const stmt = db.prepare(`
+    SELECT
+      p.nom as designation,
+      'Pièce' as unite,
+      SUM(vp.quantite) as quantite,
+      COALESCE(SUM(COALESCE(p.prix_achat, 0) * vp.quantite), 0) as valeur_achat,
+      COALESCE(SUM(vp.sous_total), 0) as valeur_vente,
+      COALESCE(SUM((vp.prix_unitaire - COALESCE(p.prix_achat, 0)) * vp.quantite), 0) as marge
+    FROM ventes_produits vp
+    JOIN ventes v ON vp.vente_id = v.id
+    JOIN produits p ON vp.produit_id = p.id
+    WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+    GROUP BY p.id, p.nom
+    ORDER BY p.nom ASC
+  `);
+  return stmt.all(startDate, endDate);
+}
+
+export function getCreditSalesDetailedReport(startDate: string, endDate: string) {
+  const salesStmt = db.prepare(`
+    SELECT
+      v.id, CAST(v.id AS TEXT) as numero, v.date_vente, v.client_nom,
+      COALESCE(c.telephone, '') as client_telephone,
+      COALESCE(c.email, '') as client_email,
+      v.total,
+      COALESCE(v.total_avant_remise, v.total) as total_avant_remise,
+      COALESCE(v.remise_valeur, 0) as remise_valeur,
+      v.remise_type,
+      v.montant_paye,
+      v.montant_restant,
+      v.methode_paiement,
+      v.delivered,
+      v.statut_paiement
+    FROM ventes v
+    LEFT JOIN clients c ON v.client_id = c.id
+    WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)
+      AND v.statut_paiement IN ('impaye', 'partiel')
+    ORDER BY v.date_vente ASC, v.id ASC
+  `);
+  const sales = salesStmt.all(startDate, endDate) as any[];
+
+  const productsStmt = db.prepare(`
+    SELECT p.nom as nom_produit, vp.quantite, vp.prix_unitaire, vp.sous_total
+    FROM ventes_produits vp
+    JOIN produits p ON vp.produit_id = p.id
+    WHERE vp.vente_id = ?
+  `);
+
+  return sales.map((sale) => ({
+    ...sale,
+    produits: productsStmt.all(sale.id),
+  }));
 }

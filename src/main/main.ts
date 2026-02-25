@@ -1146,3 +1146,22 @@ ipcMain.handle("get-vente-details", async (_, venteId: number) => {
 ipcMain.handle("lock-old-invoices", async () => {
   return db.lockOldInvoices();
 });
+
+ipcMain.handle("get-dashboard-card-details", async (_, type: string, startDate: string, endDate: string) => {
+  return db.getDashboardCardDetails(type, startDate, endDate);
+});
+
+ipcMain.handle(
+  "pay-supplier-debt-by-amount",
+  async (_, supplierId: number, montant: number, methode: string, utilisateur_id?: number, utilisateur_nom?: string) => {
+    return db.paySupplierDebtByAmount(supplierId, montant, methode, utilisateur_id, utilisateur_nom);
+  },
+);
+
+ipcMain.handle("get-sales-value-report", async (_, startDate: string, endDate: string) => {
+  return db.getSalesValueReport(startDate, endDate);
+});
+
+ipcMain.handle("get-credit-sales-report", async (_, startDate: string, endDate: string) => {
+  return db.getCreditSalesDetailedReport(startDate, endDate);
+});
