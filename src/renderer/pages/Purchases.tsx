@@ -11,6 +11,8 @@ import {
   History,
   Minus,
   TrendingDown,
+  Eye,
+  Package,
 } from "lucide-react";
 import { Product, Supplier, Purchase, PurchaseItem } from "../types";
 import { formatCurrency } from "../utils/formatters";
@@ -52,6 +54,7 @@ const Purchases: React.FC = () => {
   const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
   const [totalHistoryItems, setTotalHistoryItems] = useState(0);
   const [sortByStock, setSortByStock] = useState(true);
+  const [selectedPurchaseDetail, setSelectedPurchaseDetail] = useState<Purchase | null>(null);
 
   const loadSuppliers = async () => {
     try {
@@ -766,6 +769,9 @@ const Purchases: React.FC = () => {
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Statut
                       </th>
+                      <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+                        Détails
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -780,10 +786,19 @@ const Purchases: React.FC = () => {
                         <td className="px-3 py-2 text-sm font-medium">
                           {purchase.fournisseur_nom}
                         </td>
-                        <td className="px-3 py-2 text-sm text-gray-500 max-w-xs truncate">
-                          {purchase.produits
-                            ?.map((p) => p.nom_produit)
-                            .join(", ") || "-"}
+                        <td className="px-3 py-2 text-sm text-gray-500">
+                          <div className="flex items-center gap-1.5">
+                            <Package className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+                            <span className="font-medium text-gray-700">
+                              {purchase.produits?.length || 0} article{(purchase.produits?.length || 0) > 1 ? "s" : ""}
+                            </span>
+                            {purchase.produits && purchase.produits.length > 0 && (
+                              <span className="text-gray-400 truncate max-w-[160px]">
+                                — {purchase.produits.slice(0, 2).map((p) => p.nom_produit).join(", ")}
+                                {purchase.produits.length > 2 ? ` +${purchase.produits.length - 2}` : ""}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-sm font-bold text-blue-600 text-right">
                           {formatCurrency(purchase.total || 0)}
@@ -804,6 +819,16 @@ const Purchases: React.FC = () => {
                                 ? "Partiel"
                                 : "Impayé"}
                           </span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => setSelectedPurchaseDetail(purchase)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                            title="Voir les détails"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Voir
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -834,6 +859,129 @@ const Purchases: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Purchase Detail Modal */}
+        {selectedPurchaseDetail && (
+          <div
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+            onClick={() => setSelectedPurchaseDetail(null)}
+          >
+            <div
+              className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b dark:border-gray-700">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Approvisionnement #{selectedPurchaseDetail.id}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    {new Date(selectedPurchaseDetail.date_achat || "").toLocaleDateString("fr-FR", {
+                      weekday: "long", year: "numeric", month: "long", day: "numeric"
+                    })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedPurchaseDetail(null)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Infos */}
+              <div className="px-5 py-3 bg-gray-50 dark:bg-gray-900/50 flex flex-wrap gap-4 text-sm border-b dark:border-gray-700">
+                <div>
+                  <span className="text-gray-500">Fournisseur :</span>{" "}
+                  <span className="font-semibold">{selectedPurchaseDetail.fournisseur_nom}</span>
+                </div>
+                {selectedPurchaseDetail.utilisateur_nom && (
+                  <div>
+                    <span className="text-gray-500">Par :</span>{" "}
+                    <span className="font-semibold">{selectedPurchaseDetail.utilisateur_nom}</span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-gray-500">Statut :</span>{" "}
+                  <span className={`font-semibold ${
+                    selectedPurchaseDetail.statut_paiement === "paye"
+                      ? "text-green-600"
+                      : selectedPurchaseDetail.statut_paiement === "partiel"
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                  }`}>
+                    {selectedPurchaseDetail.statut_paiement === "paye"
+                      ? "Payé"
+                      : selectedPurchaseDetail.statut_paiement === "partiel"
+                        ? "Partiel"
+                        : "Impayé"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Products table */}
+              <div className="overflow-y-auto flex-1">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
+                      <th className="px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase w-20">Qté</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase w-28">Prix unit.</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase w-28">Sous-total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y dark:divide-gray-700">
+                    {selectedPurchaseDetail.produits?.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
+                        <td className="px-4 py-2.5 font-medium text-gray-800 dark:text-gray-200">
+                          {item.nom_produit || `Produit #${item.produit_id}`}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-full font-bold text-xs">
+                            {item.quantite}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-600 dark:text-gray-400">
+                          {formatCurrency(item.prix_unitaire)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-800 dark:text-gray-200">
+                          {formatCurrency(item.sous_total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Footer totaux */}
+              <div className="p-5 border-t dark:border-gray-700 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Total commande</span>
+                  <span className="font-bold text-lg text-blue-600">{formatCurrency(selectedPurchaseDetail.total || 0)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Montant payé</span>
+                  <span className="font-semibold text-green-600">{formatCurrency(selectedPurchaseDetail.montant_paye || 0)}</span>
+                </div>
+                {(selectedPurchaseDetail.montant_restant || 0) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Reste à payer</span>
+                    <span className="font-semibold text-red-600">{formatCurrency(selectedPurchaseDetail.montant_restant || 0)}</span>
+                  </div>
+                )}
+                <div className="pt-2">
+                  <button
+                    onClick={() => setSelectedPurchaseDetail(null)}
+                    className="w-full py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg font-medium text-sm transition-colors"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Confirmation Modal */}
         {showConfirmation && (
