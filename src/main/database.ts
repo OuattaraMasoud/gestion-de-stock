@@ -8217,7 +8217,7 @@ export function openCaisse(caisse: any): any {
       if ((caisse.fonds_roulement || 0) > 0) {
         db.prepare(`
           INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
-          VALUES ('ouverture_caisse', ?, ?, ?, 'entree', 'especes')
+          VALUES ('autre', ?, ?, ?, 'entree', 'especes')
         `).run(
           Number(result.lastInsertRowid),
           `Fonds de roulement - Ouverture caisse`,
