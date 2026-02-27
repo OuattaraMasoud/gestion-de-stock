@@ -36,6 +36,13 @@ import Pagination from "../components/Pagination";
 import { formatCurrency } from "../utils/formatters";
 import { montantEnLettres } from "../utils/numberToWords";
 import {
+  PrintData,
+  generateA4HTML,
+  generateA5HTML,
+  generate80mmHTML,
+  openPrintWindow,
+} from "../utils/printTemplates";
+import {
   showSaleToast,
   showErrorToast,
   showWarningToast,
@@ -101,407 +108,42 @@ const ReceiptPreview: React.FC<{
 
   const handlePrint = async () => {
     if (!receiptRef.current) return;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
 
+    const data: PrintData = {
+      numero: receipt.numero,
+      date: receipt.date,
+      heure: receipt.heure,
+      document_type: "FACTURE",
+      client_nom: receipt.client_nom,
+      client_telephone: receipt.client_telephone,
+      client_email: receipt.client_email,
+      vendeur: receipt.caissier,
+      methode_paiement: receipt.methodePaiement,
+      montant_paye: receipt.montantPaye,
+      articles: receipt.articles.map((a) => ({
+        designation: a.designation,
+        quantite: a.quantite,
+        prix_unitaire: a.prixUnitaire,
+        total: a.total,
+      })),
+      total_avant_remise: receipt.totalAvantRemise,
+      remise_type: receipt.remiseType,
+      remise_valeur: receipt.remiseValeur,
+      total_ttc: receipt.totalTTC,
+      monnaie_rendue: receipt.monnaieRendue,
+      montant_restant: receipt.montantRestant,
+      livraison_differee: receipt.livraisonDifferee,
+    };
+
+    let html: string;
     if (isA4) {
-      // Format A4 - Facture professionnelle compacte
-      const remiseAmount =
-        receipt.remiseValeur && receipt.remiseValeur > 0
-          ? receipt.remiseType === "pourcentage"
-            ? ((receipt.totalAvantRemise || 0) * receipt.remiseValeur) / 100
-            : receipt.remiseValeur
-          : 0;
-
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Facture - ${receipt.numero}</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              @page { size: A4; margin: 8mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; line-height: 1.4; color: #111; }
-              .invoice { max-width: 194mm; margin: 0 auto; }
-              .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 2px solid #2563eb; margin-bottom: 12px; }
-              .company-logo { width: 150px; display: flex; align-items: center; }
-              .company-logo img { max-height: 110px; max-width: 150px; object-fit: contain; }
-              .company-info { flex: 1; text-align: center; padding: 0 15px; }
-              .company-info h1 { font-size: 18px; color: #1e40af; margin-bottom: 3px; }
-              .company-info p { font-size: 12px; color: #222; margin: 2px 0; }
-              .invoice-badge { background: #2563eb; color: white; padding: 7px 16px; border-radius: 4px; font-size: 16px; font-weight: bold; text-align: center; min-width: 85px; }
-              .invoice-badge .numero { font-size: 12px; font-weight: normal; margin-top: 2px; }
-              .info-grid { display: flex; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
-              .info-box { width: 48%; background: #f8fafc; padding: 10px 12px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 12px; text-transform: uppercase; color: #374151; letter-spacing: 0.3px; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 3px 0; font-size: 13px; }
-              .info-box strong { color: #111827; }
-              table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-              thead th { background: #1e40af; color: white; padding: 8px 10px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.2px; }
-              thead th:first-child { border-radius: 4px 0 0 0; }
-              thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
-              thead th.text-right { text-align: right; }
-              tbody td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #111827; }
-              tbody tr:nth-child(even) { background: #f8fafc; }
-              tbody td.text-right { text-align: right; }
-              .totals-section { display: flex; justify-content: flex-end; margin-top: 10px; }
-              .totals-box { width: 280px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 10px 12px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
-              .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
-              .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 16px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 5px; }
-              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 5px; font-size: 12px; }
-              .totals-row.remaining { color: #dc2626; font-weight: bold; }
-              .delivery-status { font-weight: bold; padding: 3px 8px; border-radius: 3px; display: inline-block; margin-top: 6px; font-size: 12px; }
-              .delivered { background: #dcfce7; color: #166534; }
-              .deferred { background: #fef3c7; color: #92400e; }
-              .amount-words { margin-top: 10px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 12px; color: #78350f; }
-              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 12px; padding-top: 10px; }
-              .qr-code { text-align: center; }
-              .qr-code img { width: 80px; height: 80px; }
-              .qr-code p { font-size: 11px; color: #374151; margin-top: 3px; }
-              .stamp-area { width: 150px; height: 80px; border: 1px dashed #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
-              .stamp-area p { font-size: 12px; color: #374151; text-align: center; }
-              .footer { margin-top: 15px; text-align: center; padding-top: 10px; border-top: 1px solid #e2e8f0; }
-              .footer .message { font-size: 13px; font-weight: 500; color: #1e40af; margin-bottom: 3px; }
-              .footer .sub { font-size: 11px; color: #374151; }
-              @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-            </style>
-          </head>
-          <body>
-            <div class="invoice">
-              <div class="header">
-                <div class="company-logo">
-                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
-                </div>
-                <div class="company-info">
-                  <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-                  ${config?.description_entreprise ? `<p style="font-size: 11px; color: #666; font-style: italic;">${config.description_entreprise}</p>` : ""}
-                  ${config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
-                  ${config?.telephone ? `<p>Tel: ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}${config?.nif ? " | NIF: " + config.nif : ""}</p>` : ""}
-                  ${config?.email && !config?.telephone ? `<p>${config.email}</p>` : ""}
-                </div>
-                <div class="invoice-badge">
-                  FACTURE
-                  <div class="numero">N° ${receipt.numero}</div>
-                </div>
-              </div>
-
-              <div class="info-grid">
-                <div class="info-box">
-                  <h3>Client</h3>
-                  <p><strong>${receipt.client_nom || "Client comptoir"}</strong></p>
-                  ${receipt.client_telephone ? `<p>Tel: ${receipt.client_telephone}</p>` : ""}
-                  ${receipt.client_email ? `<p>${receipt.client_email}</p>` : ""}
-                </div>
-                <div class="info-box">
-                  <h3>Facture</h3>
-                  <p><strong>Date:</strong> ${receipt.date} | <strong>Heure:</strong> ${receipt.heure}</p>
-                  <p><strong>Caissier:</strong> ${receipt.caissier}</p>
-                </div>
-              </div>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>Designation</th>
-                    <th class="text-right" style="width: 40px;">Qte</th>
-                    <th class="text-right" style="width: 130px;">P.U.</th>
-                    <th class="text-right" style="width: 130px;">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${receipt.articles
-                    .map(
-                      (a) => `
-                    <tr>
-                      <td>${a.designation}</td>
-                      <td class="text-right">${a.quantite}</td>
-                      <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
-                      <td class="text-right">${formatCurrency(a.total)}</td>
-                    </tr>
-                  `,
-                    )
-                    .join("")}
-                </tbody>
-              </table>
-
-              <div class="totals-section">
-                <div class="totals-box">
-                  ${
-                    receipt.remiseValeur != null && receipt.remiseValeur > 0
-                      ? `
-                    <div class="totals-row subtotal">
-                      <span>Sous-total:</span>
-                      <span>${formatCurrency(receipt.totalAvantRemise || 0)}</span>
-                    </div>
-                    <div class="totals-row discount">
-                      <span>Remise (${receipt.remiseType === "pourcentage" ? receipt.remiseValeur + "%" : formatCurrency(remiseAmount)}):</span>
-                      <span>-${formatCurrency(remiseAmount)}</span>
-                    </div>
-                  `
-                      : ""
-                  }
-                   <div class="totals-row grand-total">
-                     <span>Total TTC:</span>
-                     <span>${formatCurrency(receipt.totalTTC)}</span>
-                   </div>
-                   ${
-                     receipt.monnaieRendue > 0
-                       ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(receipt.monnaieRendue)}</span></div>`
-                       : ""
-                   }
-                   ${
-                     receipt.montantRestant != null &&
-                     receipt.montantRestant > 0
-                       ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(receipt.montantRestant)}</span></div>`
-                       : ""
-                   }
-                  <div style="margin-top: 6px;">
-                    <span class="delivery-status ${receipt.livraisonDifferee ? "deferred" : "delivered"}">
-                      ${receipt.livraisonDifferee ? "NON LIVRÉ" : "✓ LIVRÉ"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="amount-words">
-                Arrete la presente facture a la somme de : <strong>${montantEnLettres(receipt.totalTTC, "francs CFA")}</strong>
-              </div>
-
-              <div class="qr-stamp-section">
-                <div class="qr-code">
-                  ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
-                </div>
-                <div class="stamp-area">
-                  <p>Cachet et signature</p>
-                </div>
-              </div>
-
-              <div class="footer">
-                <p class="message">${config?.message_pied || "Merci de votre confiance !"}</p>
-                ${config?.support_text ? `<p class="sub">${config.support_text}</p>` : ""}
-              </div>
-            </div>
-            <script>
-              window.onload = function() {
-                setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500);
-              };
-            </script>
-          </body>
-        </html>
-      `);
+      html = generateA4HTML(data, config, logoBase64, qrCodeUrl);
     } else if (format === "A5") {
-      // Format A5 - Facture compacte
-      const remiseAmountA5 =
-        receipt.remiseValeur && receipt.remiseValeur > 0
-          ? receipt.remiseType === "pourcentage"
-            ? ((receipt.totalAvantRemise || 0) * receipt.remiseValeur) / 100
-            : receipt.remiseValeur
-          : 0;
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Facture - ${receipt.numero}</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.3; color: #333; }
-              .invoice { max-width: 136mm; margin: 0 auto; }
-              .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 10px; }
-              .company-logo { display: flex; align-items: center; }
-              .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
-              .company-info { flex: 1; padding: 0 12px; text-align: center; }
-              .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-              .company-info .slogan { font-size: 12px; color: #1e3a8a; margin: 0; }
-              .invoice-badge { background: #1e3a8a; color: white; padding: 5px 10px; border-radius: 4px; font-size: 13px; font-weight: bold; text-align: center; min-width: 65px; }
-              .invoice-badge .numero { font-size: 11px; font-weight: normal; margin-top: 2px; }
-              .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
-              .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
-              .info-box h3 { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
-              .info-box p { margin: 2px 0; font-size: 12px; }
-              .info-box strong { color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-              thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.2px; }
-              thead th:first-child { border-radius: 4px 0 0 0; }
-              thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
-              thead th.text-right { text-align: right; }
-              tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
-              tbody tr:nth-child(even) { background: #f8fafc; }
-              tbody td.text-right { text-align: right; }
-              .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
-              .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
-              .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
-              .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
-              .totals-row.discount { color: #dc2626; }
-              .totals-row.grand-total { font-size: 14px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 5px; margin-top: 4px; }
-              .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 4px; font-size: 11px; }
-              .totals-row.remaining { color: #dc2626; font-weight: bold; }
-              .delivery-status { font-weight: bold; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 5px; font-size: 11px; }
-              .delivered { background: #dcfce7; color: #166534; }
-              .deferred { background: #fef3c7; color: #92400e; }
-              .amount-words { margin-top: 8px; padding: 5px 8px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 11px; color: #92400e; }
-              .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
-              .qr-code { text-align: center; }
-              .qr-code img { width: 60px; height: 60px; }
-              .qr-code p { font-size: 10px; color: #64748b; margin-top: 2px; }
-              .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 10px; color: #1e40af; line-height: 1.5; }
-              .footer p { margin: 1px 0; }
-              .footer strong { font-weight: 700; }
-              @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-            </style>
-          </head>
-          <body>
-            <div class="invoice">
-              <div class="header">
-                <div class="company-logo">
-                  ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
-                </div>
-                <div class="company-info">
-                  <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-                  ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
-                </div>
-                <div class="invoice-badge">
-                  FACTURE
-                  <div class="numero">N° ${receipt.numero}</div>
-                </div>
-              </div>
-
-              <div class="info-grid">
-                <div class="info-box">
-                  <h3>Client</h3>
-                  <p><strong>${receipt.client_nom}</strong></p>
-                  ${receipt.client_telephone ? `<p>Tel: ${receipt.client_telephone}</p>` : ""}
-                  ${receipt.client_email ? `<p>${receipt.client_email}</p>` : ""}
-                </div>
-                <div class="info-box">
-                  <h3>Facture</h3>
-                  <p><strong>Date:</strong> ${receipt.date} | <strong>Heure:</strong> ${receipt.heure}</p>
-                </div>
-              </div>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>Designation</th>
-                    <th class="text-right" style="width: 35px;">Qte</th>
-                    <th class="text-right" style="width: 110px;">P.U.</th>
-                    <th class="text-right" style="width: 110px;">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${receipt.articles
-                    .map(
-                      (a) => `
-                    <tr>
-                      <td>${a.designation}</td>
-                      <td class="text-right">${a.quantite}</td>
-                      <td class="text-right">${formatCurrency(a.prixUnitaire)}</td>
-                      <td class="text-right">${formatCurrency(a.total)}</td>
-                    </tr>
-                  `,
-                    )
-                    .join("")}
-                </tbody>
-              </table>
-
-              <div class="totals-section">
-                <div class="totals-box">
-                  ${
-                    receipt.remiseValeur != null && receipt.remiseValeur > 0
-                      ? `
-                    <div class="totals-row subtotal">
-                      <span>Sous-total:</span>
-                      <span>${formatCurrency(receipt.totalAvantRemise || 0)}</span>
-                    </div>
-                    <div class="totals-row discount">
-                      <span>Remise (${receipt.remiseType === "pourcentage" ? receipt.remiseValeur + "%" : "fixe"}):</span>
-                      <span>-${formatCurrency(remiseAmountA5)}</span>
-                    </div>
-                  `
-                      : ""
-                  }
-                  <div class="totals-row grand-total">
-                    <span>Total TTC:</span>
-                    <span>${formatCurrency(receipt.totalTTC)}</span>
-                  </div>
-                  <div class="totals-row payment-info">
-                    <span>Reglement: ${receipt.methodePaiement} | Recu: ${formatCurrency(receipt.montantPaye)}</span>
-                  </div>
-                  ${receipt.monnaieRendue > 0 ? `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(receipt.monnaieRendue)}</span></div>` : ""}
-                  ${receipt.montantRestant != null && receipt.montantRestant > 0 ? `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(receipt.montantRestant)}</span></div>` : ""}
-                  <div style="margin-top: 4px;">
-                    <span class="delivery-status ${receipt.livraisonDifferee ? "deferred" : "delivered"}">
-                      ${receipt.livraisonDifferee ? "NON LIVRÉ" : "✓ LIVRÉ"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                Arrêté à : <strong>${montantEnLettres(receipt.totalTTC, "francs CFA")}</strong>
-              </div>
-
-              <div class="qr-stamp-section">
-                <div class="qr-code">
-                  ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
-                </div>
-              </div>
-
-              <div class="footer">
-                <p>${config?.message_pied || "Merci de votre confiance !"}</p>
-                ${config?.support_text ? `<p>${config.support_text}</p>` : ""}
-              </div>
-            </div>
-            <script>
-              window.onload = function() {
-                setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500);
-              };
-            </script>
-          </body>
-        </html>
-      `);
+      html = generateA5HTML(data, config, logoBase64, qrCodeUrl);
     } else {
-      // Format ticket 80mm
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Ticket - ${receipt.numero}</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              @page { size: 80mm auto; margin: 2mm; }
-              body { font-family: 'Courier New', 'Lucida Console', monospace; font-size: 12px; line-height: 1.4; color: #000; background: white; width: 76mm; margin: 0 auto; }
-              .ticket { width: 76mm; padding: 2mm; background: white; }
-              .ticket-header { text-align: center; padding-bottom: 3mm; border-bottom: 1px dashed #000; margin-bottom: 3mm; }
-              .ticket-header h1 { font-size: 14px; font-weight: bold; margin-bottom: 2mm; text-transform: uppercase; }
-              .ticket-header p { font-size: 10px; margin: 1mm 0; }
-              @media print { body { width: 76mm; } .ticket { width: 76mm; } }
-            </style>
-          </head>
-          <body>
-            <div class="ticket">
-              <div class="ticket-header">
-                ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="max-height: 40px; max-width: 60mm; margin-bottom: 2mm; object-fit: contain;" />` : ""}
-                <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-                ${config?.telephone ? `<p>Tel: ${config.telephone}</p>` : ""}
-                ${config?.telephone2 ? `<p>${config.telephone2}</p>` : ""}
-                ${config?.adresse ? `<p>${config.adresse}</p>` : ""}
-                ${config?.nif ? `<p>NIF: ${config.nif}</p>` : ""}
-              </div>
-              ${receiptRef.current.innerHTML}
-            </div>
-            <script>
-              window.onload = function() {
-                setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 100); }, 500);
-              };
-            </script>
-          </body>
-        </html>
-      `);
+      html = generate80mmHTML(data, config, logoBase64, qrCodeUrl);
     }
-    printWindow.document.close();
+    openPrintWindow(html);
     onPrint();
   };
 

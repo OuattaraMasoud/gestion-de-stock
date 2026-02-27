@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "../utils/formatters";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
+import {
+  PrintData,
+  generateA4HTML,
+  generateA5HTML,
+  openPrintWindow,
+} from "../utils/printTemplates";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuthStore } from "../store/useAuthStore";
 import { Configuration } from "../types";
@@ -235,7 +241,6 @@ const CustomerDebts: React.FC = () => {
 
   const printDebtPaymentA5 = (receipt: any) => {
     const inv = receipt.invoice || {};
-    // Use invoice articles if available, otherwise use produits from the sale
     let articles: any[] = [];
     if (Array.isArray(inv.articles) && inv.articles.length > 0) {
       articles = inv.articles;
@@ -244,171 +249,31 @@ const CustomerDebts: React.FC = () => {
         designation: p.nom_produit,
         quantite: p.quantite,
         prixUnitaire: p.prix_unitaire,
-        total: p.sous_total ?? (p.quantite * p.prix_unitaire),
+        total: p.sous_total ?? p.quantite * p.prix_unitaire,
       }));
     }
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Facture A5 - ${inv.numero || ""}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            @page { size: A5; margin: 6mm 6mm 25mm 6mm; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.3; color: #333; }
-            .invoice { max-width: 136mm; margin: 0 auto; }
-            .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid #1e3a8a; margin-bottom: 10px; }
-            .company-logo { display: flex; align-items: center; }
-            .company-logo img { max-height: 70px; max-width: 90px; object-fit: contain; }
-            .company-info { flex: 1; padding: 0 12px; text-align: center; }
-            .company-info h1 { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .company-info .slogan { font-size: 12px; color: #1e3a8a; margin: 0; }
-            .invoice-badge { background: #22c55e; color: white; padding: 5px 10px; border-radius: 4px; font-size: 13px; font-weight: bold; text-align: center; min-width: 65px; }
-            .invoice-badge .numero { font-size: 11px; font-weight: normal; margin-top: 2px; }
-            .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
-            .info-box { width: 48%; background: #f8fafc; padding: 8px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
-            .info-box h3 { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; }
-            .info-box p { margin: 2px 0; font-size: 12px; }
-            .info-box strong { color: #1e293b; }
-            table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-            thead th { background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.2px; }
-            thead th:first-child { border-radius: 4px 0 0 0; }
-            thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
-            thead th.text-right { text-align: right; }
-            tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
-            tbody tr:nth-child(even) { background: #f8fafc; }
-            tbody td.text-right { text-align: right; }
-            .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
-            .totals-box { width: 200px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
-            .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
-            .totals-row.grand-total { font-size: 14px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 5px; margin-top: 4px; }
-            .totals-row.payed { color: #166534; font-weight: bold; }
-            .totals-row.remaining { color: #dc2626; font-weight: bold; }
-            .solde-badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: bold; padding: 3px 10px; border-radius: 4px; margin-top: 6px; font-size: 12px; }
-            .footer { position: fixed; bottom: 6mm; left: 6mm; right: 6mm; border-top: 1px solid #2563eb; padding-top: 4px; text-align: center; font-size: 10px; color: #1e40af; line-height: 1.5; }
-            .footer p { margin: 1px 0; }
-            .footer strong { font-weight: 700; }
-            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-          </style>
-        </head>
-        <body>
-          <div class="invoice">
-            <div class="header">
-              <div class="company-logo">
-                ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
-              </div>
-              <div class="company-info">
-                <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-                ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
-              </div>
-              <div class="invoice-badge">
-                RECU
-                <div class="numero">Paiement Dette</div>
-              </div>
-            </div>
 
-            <div class="info-grid">
-              <div class="info-box">
-                <h3>Client</h3>
-                <p><strong>${receipt.client_nom || "Client"}</strong></p>
-                ${receipt.client_telephone ? `<p>Tel: ${receipt.client_telephone}</p>` : ""}
-                ${receipt.client_email ? `<p>${receipt.client_email}</p>` : ""}
-              </div>
-              <div class="info-box">
-                <h3>Facture</h3>
-                <p><strong>N°:</strong> ${inv.numero || "-"}</p>
-                <p><strong>Date:</strong> ${inv.date_facture || receipt.date}</p>
-              </div>
-            </div>
+    const data: PrintData = {
+      numero: inv.numero || "-",
+      date: inv.date_facture || receipt.date || "",
+      document_type: "RECU",
+      client_nom: receipt.client_nom || "Client",
+      client_telephone: receipt.client_telephone,
+      client_email: receipt.client_email,
+      articles: articles.map((a: any) => ({
+        designation: a.designation,
+        quantite: a.quantite,
+        prix_unitaire: a.prixUnitaire ?? 0,
+        total: a.total ?? 0,
+      })),
+      total_ttc: inv.total_ttc ?? 0,
+      montant_paye: inv.montant_paye ?? 0,
+      montant_restant: inv.montant_restant ?? 0,
+      show_fiscal_footer: true,
+    };
 
-            <table>
-              <thead>
-                <tr>
-                  <th>Désignation</th>
-                  <th class="text-right" style="width:35px">Qté</th>
-                  <th class="text-right" style="width:110px">P.U.</th>
-                  <th class="text-right" style="width:110px">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${articles
-                  .map(
-                    (a: any) => `
-                  <tr>
-                    <td>${a.designation}</td>
-                    <td class="text-right">${a.quantite}</td>
-                    <td class="text-right">${a.prixUnitaire?.toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</td>
-                    <td class="text-right">${a.total?.toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</td>
-                  </tr>
-                `,
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-
-            <div class="totals-section">
-              <div class="totals-box">
-                <div class="totals-row grand-total"><span>Total TTC:</span><span>${(inv.total_ttc ?? 0).toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</span></div>
-                <div class="totals-row payed"><span>Montant payé:</span><span>${(inv.montant_paye ?? 0).toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</span></div>
-                ${
-                  (inv.montant_restant ?? 0) <= 0
-                    ? `<div style="margin-top:6px;"><span class="solde-badge">✓ SOLDÉ</span></div>`
-                    : `<div class="totals-row remaining"><span>Reste:</span><span>${(inv.montant_restant ?? 0).toLocaleString("fr-FR")} ${config?.devise || 'FCFA'}</span></div>`
-                }
-              </div>
-            </div>
-
-            <div class="footer">
-              ${[
-                [
-                  config?.telephone
-                    ? `<strong>Tél:</strong> ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}`
-                    : "",
-                  config?.email
-                    ? `<strong>Email:</strong> ${config.email}`
-                    : "",
-                  config?.adresse
-                    ? `<strong>Adresse:</strong> ${config.adresse}${config?.ville ? " " + config.ville : ""}`
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join("&nbsp;&nbsp;"),
-                [
-                  config?.secteur || "",
-                  config?.nif ? `<strong>IFU:</strong> ${config.nif}` : "",
-                  config?.rccm ? `<strong>RCCM:</strong> ${config.rccm}` : "",
-                  config?.regime_fiscal
-                    ? `<strong>Régime fiscal:</strong> ${config.regime_fiscal}`
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join("&nbsp;&nbsp;"),
-                [
-                  config?.division_fiscale
-                    ? `<strong>Division fiscale:</strong> ${config.division_fiscale}`
-                    : "",
-                  config?.numero_compte_uba
-                    ? `<strong>N° Compte UBA:</strong> ${config.numero_compte_uba}`
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join("&nbsp;&nbsp;"),
-                config?.reference_cadastrale
-                  ? `<strong>Réf. cadastrales:</strong> ${config.reference_cadastrale}`
-                  : "",
-              ]
-                .filter(Boolean)
-                .map((line) => `<p>${line}</p>`)
-                .join("")}
-            </div>
-          </div>
-          <script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},100);},500);};</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    const html = generateA5HTML(data, config, logoBase64, null);
+    openPrintWindow(html);
   };
 
   const printInvoiceA4AfterSettlement = () => {
@@ -420,134 +285,38 @@ const CustomerDebts: React.FC = () => {
       articles = inv.articles;
     } else if (Array.isArray(receipt.produits) && receipt.produits.length > 0) {
       articles = receipt.produits.map((p: any) => ({
-        designation: p.nom_produit || p.nom || p.designation || `Produit #${p.produit_id}`,
+        designation:
+          p.nom_produit || p.nom || p.designation || `Produit #${p.produit_id}`,
         quantite: p.quantite,
         prixUnitaire: p.prix_unitaire,
         total: p.sous_total ?? p.quantite * p.prix_unitaire,
       }));
     }
+
     const totalTTC = inv.total_ttc ?? receipt.total_vente ?? 0;
     const montantPaye = inv.montant_paye ?? receipt.total_vente ?? 0;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    printWindow.document.write(`<!DOCTYPE html>
-<html><head>
-  <title>Facture - ${inv.numero || `#${receipt.vente_id}`}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { size: A4; margin: 15mm; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #333; }
-    .invoice { max-width: 180mm; margin: 0 auto; }
-    .header { display: flex; align-items: center; padding-bottom: 10px; border-bottom: 2px solid #1e3a8a; margin-bottom: 16px; }
-    .company-logo img { max-height: 80px; max-width: 100px; object-fit: contain; }
-    .company-info { flex: 1; padding: 0 16px; text-align: center; }
-    .company-info h1 { font-size: 18px; font-weight: bold; color: #1e3a8a; margin-bottom: 4px; }
-    .company-info .slogan { font-size: 12px; color: #1e3a8a; }
-    .invoice-badge { background: #22c55e; color: white; padding: 8px 14px; border-radius: 6px; font-size: 15px; font-weight: bold; text-align: center; min-width: 80px; }
-    .invoice-badge .numero { font-size: 11px; font-weight: normal; margin-top: 3px; }
-    .info-grid { display: flex; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
-    .info-box { width: 48%; background: #f8fafc; padding: 10px 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
-    .info-box h3 { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
-    .info-box p { margin: 3px 0; font-size: 12px; }
-    .info-box strong { color: #1e293b; }
-    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    thead th { background: #1e40af; color: white; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; }
-    thead th.text-right { text-align: right; }
-    thead th.text-center { text-align: center; }
-    tbody td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
-    tbody tr:nth-child(even) { background: #f8fafc; }
-    tbody td.text-right { text-align: right; }
-    tbody td.text-center { text-align: center; }
-    .totals-section { display: flex; justify-content: flex-end; margin-top: 10px; }
-    .totals-box { width: 240px; background: #f0f9ff; border-radius: 6px; border: 1px solid #bae6fd; padding: 10px 14px; }
-    .totals-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-    .totals-row.grand-total { font-size: 15px; font-weight: bold; color: #1e40af; border-top: 2px solid #1e40af; padding-top: 6px; margin-top: 5px; }
-    .totals-row.payed { color: #166534; font-weight: bold; }
-    .solde-badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: bold; padding: 4px 14px; border-radius: 6px; margin-top: 8px; font-size: 13px; }
-    .footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #2563eb; text-align: center; font-size: 10px; color: #1e40af; line-height: 1.6; }
-    .footer p { margin: 2px 0; }
-    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-  </style>
-</head>
-<body>
-  <div class="invoice">
-    <div class="header">
-      <div class="company-logo">
-        ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
-      </div>
-      <div class="company-info">
-        <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-        ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
-      </div>
-      <div class="invoice-badge">
-        FACTURE
-        <div class="numero">${inv.numero || `#${receipt.vente_id}`}</div>
-      </div>
-    </div>
-    <div class="info-grid">
-      <div class="info-box">
-        <h3>Client</h3>
-        <p><strong>${receipt.client_nom || "Client"}</strong></p>
-        ${receipt.client_telephone ? `<p>Tel: ${receipt.client_telephone}</p>` : ""}
-      </div>
-      <div class="info-box">
-        <h3>Facture</h3>
-        <p><strong>N°:</strong> ${inv.numero || `#${receipt.vente_id}`}</p>
-        <p><strong>Date:</strong> ${inv.date_facture || receipt.date}</p>
-        <p><strong>Caissier:</strong> ${receipt.caissier || ""}</p>
-      </div>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Désignation</th>
-          <th class="text-center" style="width:50px">Qté</th>
-          <th class="text-right" style="width:130px">P.U.</th>
-          <th class="text-right" style="width:130px">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${articles.map((a: any) => `
-          <tr>
-            <td>${a.designation}</td>
-            <td class="text-center">${a.quantite}</td>
-            <td class="text-right">${(a.prixUnitaire ?? 0).toLocaleString("fr-FR")} ${config?.devise || "FCFA"}</td>
-            <td class="text-right">${(a.total ?? 0).toLocaleString("fr-FR")} ${config?.devise || "FCFA"}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-    <div class="totals-section">
-      <div class="totals-box">
-        <div class="totals-row grand-total"><span>Total TTC:</span><span>${totalTTC.toLocaleString("fr-FR")} ${config?.devise || "FCFA"}</span></div>
-        <div class="totals-row payed"><span>Montant payé:</span><span>${montantPaye.toLocaleString("fr-FR")} ${config?.devise || "FCFA"}</span></div>
-        <div style="margin-top:8px;"><span class="solde-badge">✓ SOLDÉ</span></div>
-      </div>
-    </div>
-    <div class="footer">
-      ${[
-        [
-          config?.telephone ? `<strong>Tél:</strong> ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}` : "",
-          config?.email ? `<strong>Email:</strong> ${config.email}` : "",
-          config?.adresse ? `<strong>Adresse:</strong> ${config.adresse}${config?.ville ? " " + config.ville : ""}` : "",
-        ].filter(Boolean).join("&nbsp;&nbsp;"),
-        [
-          config?.secteur || "",
-          config?.nif ? `<strong>IFU:</strong> ${config.nif}` : "",
-          config?.rccm ? `<strong>RCCM:</strong> ${config.rccm}` : "",
-          config?.regime_fiscal ? `<strong>Régime fiscal:</strong> ${config.regime_fiscal}` : "",
-        ].filter(Boolean).join("&nbsp;&nbsp;"),
-        [
-          config?.division_fiscale ? `<strong>Division fiscale:</strong> ${config.division_fiscale}` : "",
-          config?.numero_compte_uba ? `<strong>N° Compte UBA:</strong> ${config.numero_compte_uba}` : "",
-        ].filter(Boolean).join("&nbsp;&nbsp;"),
-        config?.reference_cadastrale ? `<strong>Réf. cadastrales:</strong> ${config.reference_cadastrale}` : "",
-      ].filter(Boolean).map((line) => `<p>${line}</p>`).join("")}
-    </div>
-  </div>
-  <script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},100);},500);};</script>
-</body></html>`);
-    printWindow.document.close();
+
+    const data: PrintData = {
+      numero: inv.numero || `#${receipt.vente_id}`,
+      date: inv.date_facture || receipt.date || "",
+      document_type: "RECU",
+      client_nom: receipt.client_nom || "Client",
+      client_telephone: receipt.client_telephone,
+      vendeur: receipt.caissier,
+      articles: articles.map((a: any) => ({
+        designation: a.designation,
+        quantite: a.quantite,
+        prix_unitaire: a.prixUnitaire ?? 0,
+        total: a.total ?? 0,
+      })),
+      total_ttc: totalTTC,
+      montant_paye: montantPaye,
+      montant_restant: 0,
+      show_fiscal_footer: true,
+    };
+
+    const html = generateA4HTML(data, config, logoBase64, null);
+    openPrintWindow(html);
   };
 
   const totalDebts = debts.reduce((sum, debt) => sum + debt.solde_du, 0);
@@ -1365,133 +1134,133 @@ const CustomerDebts: React.FC = () => {
                   </div>
 
                   {/* Table des articles si disponibles */}
-                  {((paymentReceipt?.invoice?.articles && paymentReceipt.invoice.articles.length > 0) ||
-                    (paymentReceipt?.produits && paymentReceipt.produits.length > 0)) && (
-                      <table
-                        style={{
-                          width: "100%",
-                          borderCollapse: "collapse",
-                          margin: "10px 0",
-                        }}
-                      >
-                        <thead>
-                          <tr>
-                            <th
+                  {((paymentReceipt?.invoice?.articles &&
+                    paymentReceipt.invoice.articles.length > 0) ||
+                    (paymentReceipt?.produits &&
+                      paymentReceipt.produits.length > 0)) && (
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        margin: "10px 0",
+                      }}
+                    >
+                      <thead>
+                        <tr>
+                          <th
+                            style={{
+                              background: "#1e40af",
+                              color: "white",
+                              padding: "6px 8px",
+                              textAlign: "left",
+                              fontSize: "9px",
+                              textTransform: "uppercase",
+                              borderRadius: "4px 0 0 0",
+                            }}
+                          >
+                            Designation
+                          </th>
+                          <th
+                            style={{
+                              background: "#1e40af",
+                              color: "white",
+                              padding: "6px 8px",
+                              textAlign: "right",
+                              fontSize: "9px",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Qte
+                          </th>
+                          <th
+                            style={{
+                              background: "#1e40af",
+                              color: "white",
+                              padding: "6px 8px",
+                              textAlign: "right",
+                              fontSize: "9px",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Prix U.
+                          </th>
+                          <th
+                            style={{
+                              background: "#1e40af",
+                              color: "white",
+                              padding: "6px 8px",
+                              textAlign: "right",
+                              fontSize: "9px",
+                              textTransform: "uppercase",
+                              borderRadius: "0 4px 0 0",
+                            }}
+                          >
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(paymentReceipt?.invoice?.articles?.length > 0
+                          ? paymentReceipt.invoice.articles
+                          : (paymentReceipt?.produits || []).map((p: any) => ({
+                              designation: p.nom_produit,
+                              quantite: p.quantite,
+                              prixUnitaire: p.prix_unitaire,
+                              total:
+                                p.sous_total ?? p.quantite * p.prix_unitaire,
+                            }))
+                        ).map((article: any, index: number) => (
+                          <tr
+                            key={index}
+                            style={{
+                              background: index % 2 === 0 ? "white" : "#f8fafc",
+                            }}
+                          >
+                            <td
                               style={{
-                                background: "#1e40af",
-                                color: "white",
                                 padding: "6px 8px",
-                                textAlign: "left",
-                                fontSize: "9px",
-                                textTransform: "uppercase",
-                                borderRadius: "4px 0 0 0",
+                                borderBottom: "1px solid #e2e8f0",
+                                fontSize: "10px",
                               }}
                             >
-                              Designation
-                            </th>
-                            <th
+                              {article.designation}
+                            </td>
+                            <td
                               style={{
-                                background: "#1e40af",
-                                color: "white",
                                 padding: "6px 8px",
+                                borderBottom: "1px solid #e2e8f0",
+                                fontSize: "10px",
                                 textAlign: "right",
-                                fontSize: "9px",
-                                textTransform: "uppercase",
                               }}
                             >
-                              Qte
-                            </th>
-                            <th
+                              {article.quantite}
+                            </td>
+                            <td
                               style={{
-                                background: "#1e40af",
-                                color: "white",
                                 padding: "6px 8px",
+                                borderBottom: "1px solid #e2e8f0",
+                                fontSize: "10px",
                                 textAlign: "right",
-                                fontSize: "9px",
-                                textTransform: "uppercase",
                               }}
                             >
-                              Prix U.
-                            </th>
-                            <th
+                              {formatCurrency(article.prixUnitaire)}
+                            </td>
+                            <td
                               style={{
-                                background: "#1e40af",
-                                color: "white",
                                 padding: "6px 8px",
+                                borderBottom: "1px solid #e2e8f0",
+                                fontSize: "10px",
                                 textAlign: "right",
-                                fontSize: "9px",
-                                textTransform: "uppercase",
-                                borderRadius: "0 4px 0 0",
+                                fontWeight: "500",
                               }}
                             >
-                              Total
-                            </th>
+                              {formatCurrency(article.total)}
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {(paymentReceipt?.invoice?.articles?.length > 0
-                            ? paymentReceipt.invoice.articles
-                            : (paymentReceipt?.produits || []).map((p: any) => ({
-                                designation: p.nom_produit,
-                                quantite: p.quantite,
-                                prixUnitaire: p.prix_unitaire,
-                                total: p.sous_total ?? (p.quantite * p.prix_unitaire),
-                              }))
-                          ).map(
-                            (article: any, index: number) => (
-                              <tr
-                                key={index}
-                                style={{
-                                  background:
-                                    index % 2 === 0 ? "white" : "#f8fafc",
-                                }}
-                              >
-                                <td
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderBottom: "1px solid #e2e8f0",
-                                    fontSize: "10px",
-                                  }}
-                                >
-                                  {article.designation}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderBottom: "1px solid #e2e8f0",
-                                    fontSize: "10px",
-                                    textAlign: "right",
-                                  }}
-                                >
-                                  {article.quantite}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderBottom: "1px solid #e2e8f0",
-                                    fontSize: "10px",
-                                    textAlign: "right",
-                                  }}
-                                >
-                                  {formatCurrency(article.prixUnitaire)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "6px 8px",
-                                    borderBottom: "1px solid #e2e8f0",
-                                    fontSize: "10px",
-                                    textAlign: "right",
-                                    fontWeight: "500",
-                                  }}
-                                >
-                                  {formatCurrency(article.total)}
-                                </td>
-                              </tr>
-                            ),
-                          )}
-                        </tbody>
-                      </table>
-                    )}
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
 
                   {/* Totaux */}
                   <div
@@ -1593,7 +1362,7 @@ const CustomerDebts: React.FC = () => {
                         <span>RESTE:</span>
                         <span>
                           {paymentReceipt.nouveau_restant <= 0
-                            ? `0 ${config?.devise || 'FCFA'} (Soldé)`
+                            ? `0 ${config?.devise || "FCFA"} (Soldé)`
                             : formatCurrency(paymentReceipt.nouveau_restant)}
                         </span>
                       </div>
@@ -1796,7 +1565,8 @@ const CustomerDebts: React.FC = () => {
                   Vente #{popupSale.id}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {new Date(popupSale.date_vente).toLocaleDateString("fr-FR")} · {popupSale.client_nom}
+                  {new Date(popupSale.date_vente).toLocaleDateString("fr-FR")} ·{" "}
+                  {popupSale.client_nom}
                 </p>
               </div>
               <button
@@ -1818,12 +1588,23 @@ const CustomerDebts: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {popupSale.produits?.map((p: any, i: number) => (
-                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                      <td className="py-2 px-3 text-gray-800 dark:text-gray-200">{p.nom_produit}</td>
-                      <td className="py-2 px-3 text-center text-gray-600 dark:text-gray-400">{p.quantite}</td>
-                      <td className="py-2 px-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(p.prix_unitaire)}</td>
+                    <tr
+                      key={i}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-900"
+                    >
+                      <td className="py-2 px-3 text-gray-800 dark:text-gray-200">
+                        {p.nom_produit}
+                      </td>
+                      <td className="py-2 px-3 text-center text-gray-600 dark:text-gray-400">
+                        {p.quantite}
+                      </td>
+                      <td className="py-2 px-3 text-right text-gray-600 dark:text-gray-400">
+                        {formatCurrency(p.prix_unitaire)}
+                      </td>
                       <td className="py-2 px-3 text-right font-semibold text-gray-900 dark:text-white">
-                        {formatCurrency(p.sous_total ?? p.quantite * p.prix_unitaire)}
+                        {formatCurrency(
+                          p.sous_total ?? p.quantite * p.prix_unitaire,
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1831,10 +1612,16 @@ const CustomerDebts: React.FC = () => {
               </table>
             </div>
             <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-between text-sm font-semibold">
-              <span className="text-green-600">Payé: {formatCurrency(popupSale.montant_paye)}</span>
-              <span className="text-blue-600">Total: {formatCurrency(popupSale.total)}</span>
+              <span className="text-green-600">
+                Payé: {formatCurrency(popupSale.montant_paye)}
+              </span>
+              <span className="text-blue-600">
+                Total: {formatCurrency(popupSale.total)}
+              </span>
               {popupSale.montant_restant > 0 && (
-                <span className="text-red-600">Reste: {formatCurrency(popupSale.montant_restant)}</span>
+                <span className="text-red-600">
+                  Reste: {formatCurrency(popupSale.montant_restant)}
+                </span>
               )}
             </div>
           </div>
