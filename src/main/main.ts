@@ -653,9 +653,9 @@ ipcMain.handle(
 
 ipcMain.handle(
   "get-products-paginated",
-  async (_, page: number, limit: number, search?: string, categorieId?: number, status?: string) => {
+  async (_, page: number, limit: number, search?: string, categorieId?: number, status?: string, sortByStock?: boolean) => {
     try {
-      return db.getProductsPaginated(page, limit, search, categorieId, status);
+      return db.getProductsPaginated(page, limit, search, categorieId, status, sortByStock);
     } catch (error) {
       console.error("Erreur get products paginated:", error);
       throw error;
@@ -756,15 +756,27 @@ ipcMain.handle(
     limit: number,
     startDate?: string,
     endDate?: string,
+    vendeurFilter?: string,
+    clientFilter?: string,
+    creditFilter?: string,
   ) => {
     try {
-      return db.getSalesPaginated(page, limit, startDate, endDate);
+      return db.getSalesPaginated(page, limit, startDate, endDate, vendeurFilter, clientFilter, creditFilter);
     } catch (error) {
       console.error("Erreur get sales paginated:", error);
       throw error;
     }
   },
 );
+
+ipcMain.handle("get-distinct-vendeurs", async () => {
+  try {
+    return db.getDistinctVendeurs();
+  } catch (error) {
+    console.error("Erreur get distinct vendeurs:", error);
+    return [];
+  }
+});
 
 ipcMain.handle(
   "get-clients-paginated",

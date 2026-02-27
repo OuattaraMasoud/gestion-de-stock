@@ -317,7 +317,11 @@ export interface ElectronAPI {
     limit: number,
     startDate?: string,
     endDate?: string,
+    vendeurFilter?: string,
+    clientFilter?: string,
+    creditFilter?: string,
   ) => Promise<PaginatedResponse<any>>;
+  getDistinctVendeurs: () => Promise<string[]>;
   getClientsPaginated: (
     page: number,
     limit: number,

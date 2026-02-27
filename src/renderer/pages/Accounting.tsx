@@ -186,6 +186,7 @@ const Accounting: React.FC = () => {
       'paiement_client': 'Paiement Client',
       'paiement_fournisseur': 'Paiement Fournisseur',
       'depense': 'Dépense',
+      'ouverture_caisse': 'Ouverture Caisse',
       'autre': 'Autre',
     };
     return labels[type] || type;

@@ -37,6 +37,8 @@ export interface Sale {
   id?: number;
   client_id?: number;
   client_nom?: string;
+  client_telephone?: string;
+  client_email?: string;
   client_adresse?: string;
   serveur_id?: number;
   serveur_nom?: string;
@@ -614,6 +616,7 @@ declare global {
         search?: string,
         categorieId?: number,
         status?: string,
+        sortByStock?: boolean,
       ) => Promise<{
         data: any[];
         total: number;
@@ -637,6 +640,9 @@ declare global {
         limit: number,
         startDate?: string,
         endDate?: string,
+        vendeurFilter?: string,
+        clientFilter?: string,
+        creditFilter?: string,
       ) => Promise<{
         data: any[];
         total: number;
@@ -644,6 +650,7 @@ declare global {
         limit: number;
         totalPages: number;
       }>;
+      getDistinctVendeurs: () => Promise<string[]>;
       getClientsPaginated: (
         page: number,
         limit: number,

@@ -52,6 +52,7 @@ const Invoices: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [nextTempId, setNextTempId] = useState(1);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [clientPrices, setClientPrices] = useState<any[]>([]);
 
   const loadConfig = async () => {
     try {
@@ -138,6 +139,17 @@ const Invoices: React.FC = () => {
         setEditInvoice(invoice);
         const loadedProducts = await window.electronAPI.getProducts();
         setProducts(loadedProducts);
+
+        if (invoice.client_id) {
+          try {
+            const prices = await window.electronAPI.getClientPrices(invoice.client_id);
+            setClientPrices(prices as any[]);
+          } catch (e) {
+            setClientPrices([]);
+          }
+        } else {
+          setClientPrices([]);
+        }
 
         let tempIdCounter = 1;
         const articlesWithIds = invoice.articles.map((a) => {
@@ -354,6 +366,32 @@ const Invoices: React.FC = () => {
         user?.id,
         user?.nom,
       );
+
+      if (editInvoice.client_id) {
+        for (const article of validArticles) {
+          const product = products.find((p) => p.id === article.produit_id);
+          if (product && article.prix_unitaire !== product.prix_vente) {
+            const existingPrice = clientPrices.find(
+              (p: any) => p.produit_id === article.produit_id
+            );
+            try {
+              if (existingPrice) {
+                await window.electronAPI.updateClientPrice(existingPrice.id, {
+                  prix_personnalise: article.prix_unitaire,
+                } as any);
+              } else {
+                await window.electronAPI.createClientPrice({
+                  client_id: editInvoice.client_id,
+                  produit_id: article.produit_id,
+                  prix_personnalise: article.prix_unitaire,
+                });
+              }
+            } catch (e) {
+              console.error("Erreur sauvegarde prix personnalisé:", e);
+            }
+          }
+        }
+      }
 
       toast.success("Facture modifiée avec succès");
       setShowEditModal(false);

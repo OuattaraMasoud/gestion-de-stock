@@ -919,6 +919,16 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 18,
+    description: "Ajout utilisateur_nom sur ventes pour filtrage par vendeur",
+    up: () => {
+      if (!columnExists("ventes", "utilisateur_nom")) {
+        db.exec(`ALTER TABLE ventes ADD COLUMN utilisateur_nom TEXT`);
+        console.log("✓ Migration 18 terminée");
+      }
+    },
+  },
 ];
 
 function runMigrations() {
@@ -2109,8 +2119,8 @@ export function createSale(sale: any) {
 
       // Créer la vente avec remise
       const saleStmt = db.prepare(`
-        INSERT INTO ventes (client_id, client_nom, serveur_id, total, montant_paye, montant_restant, monnaie_rendue, statut_paiement, methode_paiement, remise_type, remise_valeur, total_avant_remise, livraison_differee, delivered)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ventes (client_id, client_nom, serveur_id, total, montant_paye, montant_restant, monnaie_rendue, statut_paiement, methode_paiement, remise_type, remise_valeur, total_avant_remise, livraison_differee, delivered, utilisateur_nom)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const montantRestant =
@@ -2140,6 +2150,7 @@ export function createSale(sale: any) {
         sale.total_avant_remise || null,
         livraisonDifferee,
         livraisonDifferee ? 0 : 1,
+        sale.utilisateur_nom || null,
       );
 
       const venteId = result.lastInsertRowid;
@@ -3823,7 +3834,8 @@ export function updateClient(id: number, client: any) {
     // Propager le changement de nom dans ventes et factures
     if (oldClient.nom !== client.nom) {
       db.prepare(`UPDATE ventes SET client_nom = ? WHERE client_id = ?`).run(client.nom, id);
-      db.prepare(`UPDATE factures SET client_nom = ? WHERE client_id = ?`).run(client.nom, id);
+      db.prepare(`UPDATE factures SET client_nom = ? WHERE client_nom = ?`).run(client.nom, oldClient.nom);
+      db.prepare(`UPDATE factures_proforma SET client_nom = ? WHERE client_id = ?`).run(client.nom, id);
     }
 
     const changes = [];
@@ -6065,6 +6077,7 @@ export function getProductsPaginated(
   search?: string,
   categorieId?: number,
   status?: string,
+  sortByStock?: boolean,
 ) {
   try {
     const offset = (page - 1) * limit;
@@ -6152,7 +6165,7 @@ export function getProductsPaginated(
       FROM produits p
       LEFT JOIN categories c ON p.categorie_id = c.id
       ${whereClause}
-      ORDER BY p.created_at DESC, p.id DESC
+      ${sortByStock ? "ORDER BY p.quantite_stock ASC, p.nom ASC" : "ORDER BY p.created_at DESC, p.id DESC"}
       LIMIT ? OFFSET ?
     `);
     const data = dataStmt.all(...params, limit, offset);
@@ -6233,32 +6246,65 @@ export function getInvoicesPaginated(
   }
 }
 
+export function getDistinctVendeurs(): string[] {
+  try {
+    const rows = db.prepare(`
+      SELECT DISTINCT utilisateur_nom FROM ventes
+      WHERE utilisateur_nom IS NOT NULL AND utilisateur_nom != ''
+      ORDER BY utilisateur_nom ASC
+    `).all() as { utilisateur_nom: string }[];
+    return rows.map(r => r.utilisateur_nom);
+  } catch (error) {
+    console.error("Erreur getDistinctVendeurs:", error);
+    return [];
+  }
+}
+
 export function getSalesPaginated(
   page: number = 1,
   limit: number = 10,
   startDate?: string,
   endDate?: string,
+  vendeurFilter?: string,
+  clientFilter?: string,
+  creditFilter?: string,
 ) {
   try {
     const offset = (page - 1) * limit;
-    let whereClause = "";
-    let params: any[] = [];
+    const conditions: string[] = [];
+    const params: any[] = [];
 
     if (startDate && endDate) {
-      whereClause = "WHERE DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)";
-      params = [startDate, endDate];
+      conditions.push("DATE(v.date_vente) BETWEEN DATE(?) AND DATE(?)");
+      params.push(startDate, endDate);
     }
+    if (vendeurFilter) {
+      conditions.push("v.utilisateur_nom LIKE ?");
+      params.push(`%${vendeurFilter}%`);
+    }
+    if (clientFilter) {
+      conditions.push("(v.client_nom LIKE ? OR c.nom LIKE ?)");
+      params.push(`%${clientFilter}%`, `%${clientFilter}%`);
+    }
+    if (creditFilter === "credit") {
+      conditions.push("v.statut_paiement IN ('partiel', 'impaye')");
+    } else if (creditFilter === "comptant") {
+      conditions.push("v.statut_paiement = 'paye'");
+    }
+
+    const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
 
     const countStmt = db.prepare(`
       SELECT COUNT(*) as total
       FROM ventes v
+      LEFT JOIN clients c ON v.client_id = c.id
       ${whereClause}
     `);
     const { total } = countStmt.get(...params) as { total: number };
 
     // Charger les ventes avec pagination
     const dataStmt = db.prepare(`
-      SELECT v.*, c.nom as client_nom, s.nom as serveur_nom
+      SELECT v.*, c.nom as client_nom, c.telephone as client_telephone, c.email as client_email, s.nom as serveur_nom
       FROM ventes v
       LEFT JOIN clients c ON v.client_id = c.id
       LEFT JOIN serveurs s ON v.serveur_id = s.id
@@ -8166,6 +8212,18 @@ export function openCaisse(caisse: any): any {
         caisse.vendeur_id || null,
         caisse.vendeur_nom || null
       );
+
+      // Enregistrer le fonds de roulement dans la comptabilité
+      if ((caisse.fonds_roulement || 0) > 0) {
+        db.prepare(`
+          INSERT INTO comptabilite (type, reference_id, description, montant, type_mouvement, methode_paiement)
+          VALUES ('ouverture_caisse', ?, ?, ?, 'entree', 'especes')
+        `).run(
+          Number(result.lastInsertRowid),
+          `Fonds de roulement - Ouverture caisse`,
+          caisse.fonds_roulement
+        );
+      }
 
       logAudit(
         "ouvrir caisse",

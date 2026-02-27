@@ -376,8 +376,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ),
 
   // Server-Side Pagination
-  getProductsPaginated: (page: number, limit: number, search?: string, categorieId?: number, status?: string) =>
-    ipcRenderer.invoke("get-products-paginated", page, limit, search, categorieId, status),
+  getProductsPaginated: (page: number, limit: number, search?: string, categorieId?: number, status?: string, sortByStock?: boolean) =>
+    ipcRenderer.invoke("get-products-paginated", page, limit, search, categorieId, status, sortByStock),
   getInvoicesPaginated: (page: number, limit: number, search?: string) =>
     ipcRenderer.invoke("get-invoices-paginated", page, limit, search),
   getSalesPaginated: (
@@ -385,8 +385,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
     limit: number,
     startDate?: string,
     endDate?: string,
+    vendeurFilter?: string,
+    clientFilter?: string,
+    creditFilter?: string,
   ) =>
-    ipcRenderer.invoke("get-sales-paginated", page, limit, startDate, endDate),
+    ipcRenderer.invoke("get-sales-paginated", page, limit, startDate, endDate, vendeurFilter, clientFilter, creditFilter),
+  getDistinctVendeurs: () =>
+    ipcRenderer.invoke("get-distinct-vendeurs"),
   getClientsPaginated: (page: number, limit: number, search?: string) =>
     ipcRenderer.invoke("get-clients-paginated", page, limit, search),
   getUsersPaginated: (page: number, limit: number, search?: string) =>

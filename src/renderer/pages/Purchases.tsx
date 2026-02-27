@@ -10,6 +10,7 @@ import {
   X,
   History,
   Minus,
+  TrendingDown,
 } from "lucide-react";
 import { Product, Supplier, Purchase, PurchaseItem } from "../types";
 import { formatCurrency } from "../utils/formatters";
@@ -50,6 +51,7 @@ const Purchases: React.FC = () => {
   const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
   const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
   const [totalHistoryItems, setTotalHistoryItems] = useState(0);
+  const [sortByStock, setSortByStock] = useState(true);
 
   const loadSuppliers = async () => {
     try {
@@ -66,6 +68,9 @@ const Purchases: React.FC = () => {
         currentPage,
         itemsPerPage,
         searchQuery || undefined,
+        undefined,
+        undefined,
+        sortByStock,
       );
       setProducts(result.data);
       setTotalProducts(result.total);
@@ -96,7 +101,7 @@ const Purchases: React.FC = () => {
 
   useEffect(() => {
     loadProducts();
-  }, [currentPage, itemsPerPage]);
+  }, [currentPage, itemsPerPage, sortByStock]);
 
   useEffect(() => {
     loadPurchaseHistory();
@@ -349,24 +354,98 @@ const Purchases: React.FC = () => {
                           className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
                         />
                       </div>
+                      <button
+                        onClick={() => { setSortByStock(!sortByStock); setCurrentPage(1); }}
+                        className={`flex items-center gap-1 px-3 py-2 text-sm rounded-lg border-2 transition-all ${
+                          sortByStock
+                            ? "border-orange-500 bg-orange-50 text-orange-700"
+                            : "border-gray-200 text-gray-600"
+                        }`}
+                        title="Trier par niveau de stock (plus bas en premier)"
+                      >
+                        <TrendingDown className="w-4 h-4" />
+                        Stock ↑
+                      </button>
                     </div>
 
-                    {/* Ajouter la sélection */}
-                    {selectedProductIds.size > 0 && (
-                      <button
-                        onClick={() => {
-                          selectedProductIds.forEach((id) => {
-                            const product = products.find((p) => p.id === id);
-                            if (product) handleAddToCart(product);
-                          });
-                          setSelectedProductIds(new Set());
-                        }}
-                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all"
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        Ajouter la sélection ({selectedProductIds.size})
-                      </button>
-                    )}
+                    {/* Ajouter la sélection + Tout ajouter */}
+                    <div className="flex gap-2">
+                      {selectedProductIds.size > 0 && (
+                        <button
+                          onClick={() => {
+                            const toAdd = [...selectedProductIds]
+                              .map((id) => products.find((p) => p.id === id))
+                              .filter(Boolean) as typeof products;
+                            setPurchaseItems((prev) => {
+                              let updated = [...prev];
+                              for (const product of toAdd) {
+                                const idx = updated.findIndex((item) => item.produit_id === product.id);
+                                if (idx >= 0) {
+                                  updated[idx] = {
+                                    ...updated[idx],
+                                    quantite: updated[idx].quantite + 1,
+                                    sous_total: (updated[idx].quantite + 1) * updated[idx].prix_unitaire,
+                                  };
+                                } else {
+                                  const price = product.prix_achat || 0;
+                                  if (price <= 0) showWarningToast(`Le prix d'achat de "${product.nom}" n'est pas défini.`);
+                                  updated.push({
+                                    produit_id: product.id!,
+                                    nom_produit: product.nom,
+                                    quantite: 1,
+                                    prix_unitaire: price,
+                                    prix_achat_ref: price,
+                                    sous_total: price,
+                                  });
+                                }
+                              }
+                              return updated;
+                            });
+                            setSelectedProductIds(new Set());
+                          }}
+                          className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          Ajouter la sélection ({selectedProductIds.size})
+                        </button>
+                      )}
+                      {products.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setPurchaseItems((prev) => {
+                              let updated = [...prev];
+                              for (const product of products) {
+                                const idx = updated.findIndex((item) => item.produit_id === product.id);
+                                if (idx >= 0) {
+                                  updated[idx] = {
+                                    ...updated[idx],
+                                    quantite: updated[idx].quantite + 1,
+                                    sous_total: (updated[idx].quantite + 1) * updated[idx].prix_unitaire,
+                                  };
+                                } else {
+                                  const price = product.prix_achat || 0;
+                                  if (price <= 0) showWarningToast(`Le prix d'achat de "${product.nom}" n'est pas défini.`);
+                                  updated.push({
+                                    produit_id: product.id!,
+                                    nom_produit: product.nom,
+                                    quantite: 1,
+                                    prix_unitaire: price,
+                                    prix_achat_ref: price,
+                                    sous_total: price,
+                                  });
+                                }
+                              }
+                              return updated;
+                            });
+                          }}
+                          className="py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm flex items-center gap-2"
+                          title="Ajouter tous les produits de cette page au panier"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Tout ajouter ({products.length})
+                        </button>
+                      )}
+                    </div>
 
                     {/* Products List */}
                     <div className="max-h-[60vh] overflow-y-auto border border-gray-200 rounded-lg">
@@ -390,6 +469,7 @@ const Purchases: React.FC = () => {
                             <th className="py-2 px-3 font-medium">Nom</th>
                             <th className="py-2 px-3 font-medium text-right w-20">Stock</th>
                             <th className="py-2 px-3 font-medium text-right w-28">Prix achat</th>
+                            <th className="py-2 px-3 w-10"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -440,9 +520,28 @@ const Purchases: React.FC = () => {
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-2 px-3 text-right text-gray-600">{product.quantite_stock}</td>
+                                <td className="py-2 px-3 text-right">
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ${
+                                    product.quantite_stock === 0
+                                      ? "bg-red-100 text-red-700"
+                                      : product.quantite_stock <= product.stock_min
+                                        ? "bg-orange-100 text-orange-700"
+                                        : "bg-green-100 text-green-700"
+                                  }`}>
+                                    {product.quantite_stock}
+                                  </span>
+                                </td>
                                 <td className="py-2 px-3 text-right font-medium text-blue-600">
                                   {formatCurrency(product.prix_achat || 0)}
+                                </td>
+                                <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => handleAddToCart(product)}
+                                    className="p-1 rounded-full hover:bg-blue-100 text-blue-600 transition-colors"
+                                    title={`Ajouter ${product.nom}`}
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </button>
                                 </td>
                               </tr>
                             );

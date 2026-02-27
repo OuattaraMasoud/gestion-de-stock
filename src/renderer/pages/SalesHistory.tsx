@@ -30,19 +30,44 @@ const SalesHistory: React.FC = () => {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [vendeurFilter, setVendeurFilter] = useState("");
+  const [clientFilter, setClientFilter] = useState("");
+  const [creditFilter, setCreditFilter] = useState("");
+  const [vendeurs, setVendeurs] = useState<string[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
 
   useEffect(() => {
     loadConfig();
+    loadVendeurs();
+    loadClients();
     loadSales();
   }, [currentPage, itemsPerPage]);
 
   useEffect(() => {
     setCurrentPage(1);
     loadSales();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, vendeurFilter, clientFilter, creditFilter]);
+
+  const loadVendeurs = async () => {
+    try {
+      const data = await window.electronAPI.getDistinctVendeurs();
+      setVendeurs(data || []);
+    } catch (error) {
+      console.error("Erreur chargement vendeurs:", error);
+    }
+  };
+
+  const loadClients = async () => {
+    try {
+      const result = await window.electronAPI.getClientsPaginated(1, 1000);
+      setClients(result.data || []);
+    } catch (error) {
+      console.error("Erreur chargement clients:", error);
+    }
+  };
 
   const loadConfig = async () => {
     try {
@@ -67,6 +92,9 @@ const SalesHistory: React.FC = () => {
         limit,
         startDateFilter,
         endDateFilter,
+        vendeurFilter,
+        clientFilter,
+        creditFilter,
       );
       setSales(result.data);
       setTotalItems(result.total);
@@ -507,6 +535,9 @@ const SalesHistory: React.FC = () => {
   const handleResetFilter = () => {
     setStartDate("");
     setEndDate("");
+    setVendeurFilter("");
+    setClientFilter("");
+    setCreditFilter("");
   };
 
   const handleDeleteSale = async (id: number) => {
@@ -606,8 +637,8 @@ const SalesHistory: React.FC = () => {
 
       {/* Filtres */}
       <div className="card">
-        <div className="flex gap-4 items-end">
-          <div className="flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Date de début
             </label>
@@ -618,7 +649,7 @@ const SalesHistory: React.FC = () => {
               className="input-field"
             />
           </div>
-          <div className="flex-1">
+          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Date de fin
             </label>
@@ -629,8 +660,52 @@ const SalesHistory: React.FC = () => {
               className="input-field"
             />
           </div>
-          {(startDate || endDate) && (
-            <button onClick={handleResetFilter} className="btn-secondary">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Vendeur
+            </label>
+            <select
+              value={vendeurFilter}
+              onChange={(e) => setVendeurFilter(e.target.value)}
+              className="input-field"
+            >
+              <option value="">Tous les vendeurs</option>
+              {vendeurs.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Client
+            </label>
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              className="input-field"
+            >
+              <option value="">Tous les clients</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.nom}>{c.nom}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Type de vente
+            </label>
+            <select
+              value={creditFilter}
+              onChange={(e) => setCreditFilter(e.target.value)}
+              className="input-field"
+            >
+              <option value="">Toutes les ventes</option>
+              <option value="comptant">Comptant</option>
+              <option value="credit">À crédit</option>
+            </select>
+          </div>
+          {(startDate || endDate || vendeurFilter || clientFilter || creditFilter) && (
+            <button onClick={handleResetFilter} className="btn-secondary h-[42px]">
               Réinitialiser
             </button>
           )}
@@ -678,8 +753,20 @@ const SalesHistory: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     #{sale.id}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                    {sale.client_nom || "Client comptoir"}
+                  <td className="px-6 py-4 text-sm">
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {sale.client_nom || "Client comptoir"}
+                    </p>
+                    {sale.client_telephone && (
+                      <p className="text-gray-500 dark:text-gray-400 text-xs">
+                        {sale.client_telephone}
+                      </p>
+                    )}
+                    {sale.client_email && (
+                      <p className="text-gray-500 dark:text-gray-400 text-xs">
+                        {sale.client_email}
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {new Date(sale.date_vente!).toLocaleString("fr-FR")}
@@ -786,6 +873,27 @@ const SalesHistory: React.FC = () => {
               </div>
             </div>
             <div className="p-6 space-y-6">
+              {/* Informations client */}
+              {(selectedSale.client_nom ||
+                selectedSale.client_telephone ||
+                selectedSale.client_email) && (
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-1">
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedSale.client_nom || "Client comptoir"}
+                  </p>
+                  {selectedSale.client_telephone && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      📞 {selectedSale.client_telephone}
+                    </p>
+                  )}
+                  {selectedSale.client_email && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      ✉ {selectedSale.client_email}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Informations de paiement */}
               <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between">
@@ -1100,6 +1208,28 @@ const SalesHistory: React.FC = () => {
                       >
                         {selectedInvoice.client_nom || "Client comptoir"}
                       </p>
+                      {selectedInvoice.client_telephone && (
+                        <p
+                          style={{
+                            margin: "3px 0",
+                            fontSize: "12px",
+                            color: "#555",
+                          }}
+                        >
+                          Tél: {selectedInvoice.client_telephone}
+                        </p>
+                      )}
+                      {selectedInvoice.client_email && (
+                        <p
+                          style={{
+                            margin: "3px 0",
+                            fontSize: "12px",
+                            color: "#555",
+                          }}
+                        >
+                          {selectedInvoice.client_email}
+                        </p>
+                      )}
                     </div>
                     <div
                       style={{
@@ -1673,6 +1803,32 @@ const SalesHistory: React.FC = () => {
                           <span>{selectedInvoice.client_nom}</span>
                         </div>
                       )}
+                    {selectedInvoice.client_telephone && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "11px",
+                          margin: "1mm 0",
+                        }}
+                      >
+                        <span>Tél:</span>
+                        <span>{selectedInvoice.client_telephone}</span>
+                      </div>
+                    )}
+                    {selectedInvoice.client_email && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "11px",
+                          margin: "1mm 0",
+                        }}
+                      >
+                        <span>Email:</span>
+                        <span>{selectedInvoice.client_email}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ marginBottom: "3mm", paddingBottom: "3mm" }}>
@@ -1875,7 +2031,7 @@ const SalesHistory: React.FC = () => {
               )}
             </div>
 
-            <div className="p-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-4 rounded-b-2xl flex-shrink-0">
+            <div className="p-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-4 rounded-b-2xl shrink-0">
               <button
                 onClick={() => setSelectedInvoice(null)}
                 className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"

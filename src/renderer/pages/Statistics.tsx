@@ -16,6 +16,7 @@ import {
   Eye,
   Truck,
   FileText,
+  Printer,
 } from "lucide-react";
 import { Sale, DashboardStats } from "../types";
 import { formatCurrency } from "../utils/formatters";
@@ -114,6 +115,7 @@ const Statistics: React.FC = () => {
   const [commandesPage, setCommandesPage] = useState(1);
   const [commandesTotal, setCommandesTotalPages] = useState(1);
   const [commandesCount, setCommandesCount] = useState(0);
+  const [selectedCommande, setSelectedCommande] = useState<any | null>(null);
 
   // Livraisons tab
   const [livraisons, setLivraisons] = useState<any[]>([]);
@@ -130,6 +132,19 @@ const Statistics: React.FC = () => {
   const [proformasTotal, setProformasTotalPages] = useState(1);
   const [proformasCount, setProformasCount] = useState(0);
   const [proformasStatut, setProformasStatut] = useState<string>("");
+
+  // Proforma detail modal
+  const [selectedProforma, setSelectedProforma] = useState<any>(null);
+
+  // Livraison detail modal
+  const [selectedLivraison, setSelectedLivraison] = useState<any>(null);
+  const [livraisonVente, setLivraisonVente] = useState<any>(null);
+  const [livraisonVenteLoading, setLivraisonVenteLoading] = useState(false);
+
+  // Report preview modal
+  const [showReportPreview, setShowReportPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
 
   // Rapports tab
   const [rapportStartDate, setRapportStartDate] = useState<string>(
@@ -273,6 +288,32 @@ const Statistics: React.FC = () => {
     }
   };
 
+  const handleShowLivraisonDetails = async (liv: any) => {
+    setSelectedLivraison(liv);
+    setLivraisonVente(null);
+    if (liv.vente_id) {
+      setLivraisonVenteLoading(true);
+      try {
+        const details = await window.electronAPI.getVenteDetails(liv.vente_id);
+        setLivraisonVente(details);
+      } finally {
+        setLivraisonVenteLoading(false);
+      }
+    }
+  };
+
+  const handlePrintFromPreview = () => {
+    const printHtml = previewHtml.replace(
+      "</body>",
+      `<script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},100);},500);}<\/script></body>`,
+    );
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(printHtml);
+      w.document.close();
+    }
+  };
+
   // Load / reload client stats when client or period changes
   useEffect(() => {
     if (selectedClientId === null) return;
@@ -376,14 +417,11 @@ const Statistics: React.FC = () => {
     </tr>
   </tbody>
 </table>
-<script>window.onload=function(){window.print();window.close();}</script>
 </body></html>`;
 
-      const win = window.open("", "_blank");
-      if (win) {
-        win.document.write(html);
-        win.document.close();
-      }
+      setPreviewHtml(html);
+      setPreviewTitle("Valeur des Ventes");
+      setShowReportPreview(true);
     } catch (error) {
       console.error("Erreur génération rapport valeur ventes:", error);
     } finally {
@@ -536,14 +574,11 @@ ${ventesRows}
     </tbody>
   </table>
 </div>
-<script>window.onload=function(){window.print();window.close();}</script>
 </body></html>`;
 
-      const win = window.open("", "_blank");
-      if (win) {
-        win.document.write(html);
-        win.document.close();
-      }
+      setPreviewHtml(html);
+      setPreviewTitle("Liste Détaillée des Ventes à Crédit");
+      setShowReportPreview(true);
     } catch (error) {
       console.error("Erreur génération rapport ventes crédit:", error);
     } finally {
@@ -781,8 +816,16 @@ ${ventesRows}
                                 year: "2-digit",
                               })}
                             </td>
-                            <td className="py-2.5 pr-4 text-right font-semibold text-gray-900 dark:text-white">
-                              {formatCurrency(sale.total ?? 0)}
+                            <td className="py-2.5 pr-4 text-right">
+                              <span className="font-semibold text-gray-900 dark:text-white">
+                                {formatCurrency(sale.total ?? 0)}
+                              </span>
+                              {(sale.statut_paiement === "partiel" || sale.statut_paiement === "impaye") && (
+                                <div className="text-xs mt-0.5 space-x-2">
+                                  <span className="text-green-600">Payé: {formatCurrency(sale.montant_paye ?? 0)}</span>
+                                  <span className="text-red-500 font-medium">Reste: {formatCurrency(sale.montant_restant ?? 0)}</span>
+                                </div>
+                              )}
                             </td>
                             <td className="py-2.5 pr-4 text-center">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -865,6 +908,7 @@ ${ventesRows}
                         <th className="py-2 pr-4 font-medium text-right">Payé</th>
                         <th className="py-2 pr-4 font-medium text-right">Reste</th>
                         <th className="py-2 font-medium text-center">Statut</th>
+                        <th className="py-2 font-medium text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -886,6 +930,15 @@ ${ventesRows}
                             }`}>
                               {cmd.statut_paiement === "paye" ? "Payé" : cmd.statut_paiement === "partiel" ? "Partiel" : "Impayé"}
                             </span>
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <button
+                              onClick={() => setSelectedCommande(cmd)}
+                              className="text-blue-600 hover:text-blue-800 p-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                              title="Voir les produits"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -963,7 +1016,8 @@ ${ventesRows}
                         <th className="py-2 pr-4 font-medium">Adresse</th>
                         <th className="py-2 pr-4 font-medium">Livreur</th>
                         <th className="py-2 pr-4 font-medium">Date</th>
-                        <th className="py-2 font-medium text-center">Statut</th>
+                        <th className="py-2 pr-4 font-medium text-center">Statut</th>
+                        <th className="py-2 w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -976,7 +1030,7 @@ ${ventesRows}
                           <td className="py-2.5 pr-4 text-gray-600 dark:text-gray-400">
                             {liv.date_livraison ? new Date(liv.date_livraison).toLocaleDateString("fr-FR") : "—"}
                           </td>
-                          <td className="py-2.5 text-center">
+                          <td className="py-2.5 pr-4 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               liv.statut === "livree" ? "bg-green-100 text-green-700" :
                               liv.statut === "en_cours" ? "bg-blue-100 text-blue-700" :
@@ -987,6 +1041,15 @@ ${ventesRows}
                                liv.statut === "en_cours" ? "En cours" :
                                liv.statut === "annulee" ? "Annulée" : "En attente"}
                             </span>
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <button
+                              onClick={() => handleShowLivraisonDetails(liv)}
+                              className="text-gray-400 hover:text-blue-600 p-1 rounded transition-colors"
+                              title="Voir les détails"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1044,9 +1107,10 @@ ${ventesRows}
               >
                 <option value="">Tous les statuts</option>
                 <option value="en_attente">En attente</option>
-                <option value="accepte">Accepté</option>
-                <option value="refuse">Refusé</option>
-                <option value="converti">Converti</option>
+                <option value="acceptee">Accepté</option>
+                <option value="refusee">Refusé</option>
+                <option value="convertie">Converti</option>
+                <option value="expiree">Expiré</option>
               </select>
             </div>
             {proformasLoading ? (
@@ -1063,7 +1127,8 @@ ${ventesRows}
                         <th className="py-2 pr-4 font-medium">Client</th>
                         <th className="py-2 pr-4 font-medium">Date</th>
                         <th className="py-2 pr-4 font-medium text-right">Total</th>
-                        <th className="py-2 font-medium text-center">Statut</th>
+                        <th className="py-2 pr-4 font-medium text-center">Statut</th>
+                        <th className="py-2 w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -1072,20 +1137,31 @@ ${ventesRows}
                           <td className="py-2.5 pr-4 text-gray-600 dark:text-gray-400">{pro.numero || `#${pro.id}`}</td>
                           <td className="py-2.5 pr-4 font-medium text-gray-900 dark:text-white">{pro.client_nom || "—"}</td>
                           <td className="py-2.5 pr-4 text-gray-600 dark:text-gray-400">
-                            {pro.date_creation ? new Date(pro.date_creation).toLocaleDateString("fr-FR") : "—"}
+                            {pro.date_proforma ? new Date(pro.date_proforma).toLocaleDateString("fr-FR") : "—"}
                           </td>
-                          <td className="py-2.5 pr-4 text-right font-semibold">{formatCurrency(pro.total ?? 0)}</td>
-                          <td className="py-2.5 text-center">
+                          <td className="py-2.5 pr-4 text-right font-semibold">{formatCurrency(pro.total_ttc ?? 0)}</td>
+                          <td className="py-2.5 pr-4 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              pro.statut === "converti" ? "bg-green-100 text-green-700" :
-                              pro.statut === "accepte" ? "bg-blue-100 text-blue-700" :
-                              pro.statut === "refuse" ? "bg-red-100 text-red-700" :
+                              pro.statut === "convertie" ? "bg-green-100 text-green-700" :
+                              pro.statut === "acceptee" ? "bg-blue-100 text-blue-700" :
+                              pro.statut === "refusee" ? "bg-red-100 text-red-700" :
+                              pro.statut === "expiree" ? "bg-gray-100 text-gray-600" :
                               "bg-yellow-100 text-yellow-700"
                             }`}>
-                              {pro.statut === "converti" ? "Converti" :
-                               pro.statut === "accepte" ? "Accepté" :
-                               pro.statut === "refuse" ? "Refusé" : "En attente"}
+                              {pro.statut === "convertie" ? "Converti" :
+                               pro.statut === "acceptee" ? "Accepté" :
+                               pro.statut === "refusee" ? "Refusé" :
+                               pro.statut === "expiree" ? "Expiré" : "En attente"}
                             </span>
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <button
+                              onClick={() => setSelectedProforma(pro)}
+                              className="text-gray-400 hover:text-blue-600 p-1 rounded transition-colors"
+                              title="Voir les articles"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1422,6 +1498,269 @@ ${ventesRows}
               <FileText className="w-5 h-5" />
               {generatingReport2 ? "Génération..." : "Générer le rapport"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal détail proforma */}
+      {selectedProforma && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  Proforma {selectedProforma.numero || `#${selectedProforma.id}`}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  {selectedProforma.client_nom || "—"} · {selectedProforma.date_proforma ? new Date(selectedProforma.date_proforma).toLocaleDateString("fr-FR") : "—"}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedProforma(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex gap-3 mb-4 text-sm">
+              {selectedProforma.date_validite && (
+                <span className="text-gray-500 dark:text-gray-400">
+                  Validité: {new Date(selectedProforma.date_validite).toLocaleDateString("fr-FR")}
+                </span>
+              )}
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                selectedProforma.statut === "convertie" ? "bg-green-100 text-green-700" :
+                selectedProforma.statut === "acceptee" ? "bg-blue-100 text-blue-700" :
+                selectedProforma.statut === "refusee" ? "bg-red-100 text-red-700" :
+                selectedProforma.statut === "expiree" ? "bg-gray-100 text-gray-600" :
+                "bg-yellow-100 text-yellow-700"
+              }`}>
+                {selectedProforma.statut === "convertie" ? "Converti" :
+                 selectedProforma.statut === "acceptee" ? "Accepté" :
+                 selectedProforma.statut === "refusee" ? "Refusé" :
+                 selectedProforma.statut === "expiree" ? "Expiré" : "En attente"}
+              </span>
+            </div>
+            <div className="overflow-y-auto max-h-64 border border-gray-100 dark:border-gray-700 rounded-xl">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900">
+                  <tr className="text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700">
+                    <th className="py-2 px-3 text-left font-medium">Article</th>
+                    <th className="py-2 px-3 text-center font-medium w-12">Qté</th>
+                    <th className="py-2 px-3 text-right font-medium">P.U.</th>
+                    <th className="py-2 px-3 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {(Array.isArray(selectedProforma.articles)
+                    ? selectedProforma.articles
+                    : JSON.parse(selectedProforma.articles || "[]")
+                  ).map((a: any, i: number) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <td className="py-2 px-3 text-gray-800 dark:text-gray-200">{a.nom || a.designation || a.nom_produit}</td>
+                      <td className="py-2 px-3 text-center text-gray-600 dark:text-gray-400">{a.quantite}</td>
+                      <td className="py-2 px-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(a.prix_unitaire ?? a.prixUnitaire ?? 0)}</td>
+                      <td className="py-2 px-3 text-right font-medium text-gray-900 dark:text-white">{formatCurrency(a.sous_total ?? a.total ?? (a.quantite * (a.prix_unitaire ?? a.prixUnitaire ?? 0)))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Total TTC</span>
+              <span className="text-lg font-bold text-blue-600">{formatCurrency(selectedProforma.total_ttc ?? 0)}</span>
+            </div>
+            {selectedProforma.notes && (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">{selectedProforma.notes}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal détail livraison */}
+      {selectedLivraison && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Truck className="w-5 h-5 text-blue-600" />
+                Livraison #{selectedLivraison.id}
+              </h2>
+              <button
+                onClick={() => { setSelectedLivraison(null); setLivraisonVente(null); }}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Client</p>
+                <p className="font-medium text-gray-900 dark:text-white">{selectedLivraison.client_nom || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Livreur</p>
+                <p className="font-medium text-gray-900 dark:text-white">{selectedLivraison.livreur || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Adresse</p>
+                <p className="font-medium text-gray-900 dark:text-white">{selectedLivraison.adresse_livraison || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Date</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {selectedLivraison.date_livraison ? new Date(selectedLivraison.date_livraison).toLocaleDateString("fr-FR") : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Statut</p>
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                  selectedLivraison.statut === "livree" ? "bg-green-100 text-green-700" :
+                  selectedLivraison.statut === "en_cours" ? "bg-blue-100 text-blue-700" :
+                  selectedLivraison.statut === "annulee" ? "bg-red-100 text-red-700" :
+                  "bg-yellow-100 text-yellow-700"
+                }`}>
+                  {selectedLivraison.statut === "livree" ? "Livrée" :
+                   selectedLivraison.statut === "en_cours" ? "En cours" :
+                   selectedLivraison.statut === "annulee" ? "Annulée" : "En attente"}
+                </span>
+              </div>
+            </div>
+            {livraisonVenteLoading && (
+              <div className="flex items-center justify-center h-20">
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600"></div>
+              </div>
+            )}
+            {livraisonVente && !livraisonVenteLoading && (
+              <>
+                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase mb-2">Produits livrés</p>
+                <div className="overflow-y-auto max-h-48 border border-gray-100 dark:border-gray-700 rounded-xl">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900">
+                      <tr className="text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700">
+                        <th className="py-2 px-3 text-left font-medium">Produit</th>
+                        <th className="py-2 px-3 text-center font-medium w-12">Qté</th>
+                        <th className="py-2 px-3 text-right font-medium">Sous-total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {livraisonVente.items?.map((item: any, i: number) => (
+                        <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td className="py-2 px-3 text-gray-800 dark:text-gray-200">{item.nom_produit}</td>
+                          <td className="py-2 px-3 text-center text-gray-600 dark:text-gray-400">{item.quantite}</td>
+                          <td className="py-2 px-3 text-right font-medium text-gray-900 dark:text-white">{formatCurrency(item.sous_total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700 flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Total</span>
+                  <span className="text-sm font-bold text-blue-600">{formatCurrency(livraisonVente.total ?? 0)}</span>
+                </div>
+              </>
+            )}
+            {!livraisonVente && !livraisonVenteLoading && !selectedLivraison.vente_id && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">Aucune vente liée à cette livraison</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal aperçu rapport */}
+      {showReportPreview && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl">
+            <div className="flex justify-between items-center p-4 border-b shrink-0">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-gray-900">
+                <FileText className="w-5 h-5 text-blue-600" />
+                Aperçu — {previewTitle}
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={handlePrintFromPreview}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimer
+                </button>
+                <button
+                  onClick={() => setShowReportPreview(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <iframe
+              srcDoc={previewHtml}
+              className="flex-1 w-full rounded-b-xl"
+              title="Aperçu"
+              sandbox="allow-same-origin"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Modal détail d'une commande */}
+      {selectedCommande && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Package className="w-5 h-5 text-blue-600" />
+                Commande #{selectedCommande.id}
+              </h2>
+              <button
+                onClick={() => setSelectedCommande(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex justify-between text-sm mb-4 text-gray-600 dark:text-gray-400">
+              <span className="font-medium text-gray-900 dark:text-white">{selectedCommande.fournisseur_nom}</span>
+              <span>{new Date(selectedCommande.date_achat).toLocaleDateString("fr-FR")}</span>
+            </div>
+            <div className="overflow-y-auto max-h-64 border border-gray-100 dark:border-gray-700 rounded-xl">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900">
+                  <tr className="text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700">
+                    <th className="py-2 px-3 text-left font-medium">Produit</th>
+                    <th className="py-2 px-3 text-center font-medium w-12">Qté</th>
+                    <th className="py-2 px-3 text-right font-medium">Prix U.</th>
+                    <th className="py-2 px-3 text-right font-medium">Sous-total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {(selectedCommande.produits || []).map((item: any, i: number) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <td className="py-2 px-3 text-gray-800 dark:text-gray-200">{item.nom_produit}</td>
+                      <td className="py-2 px-3 text-center text-gray-600 dark:text-gray-400">{item.quantite}</td>
+                      <td className="py-2 px-3 text-right text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatCurrency(item.prix_unitaire)}</td>
+                      <td className="py-2 px-3 text-right font-medium text-gray-900 dark:text-white whitespace-nowrap">{formatCurrency(item.sous_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-1">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>Payé</span>
+                <span className="text-green-600 font-medium">{formatCurrency(selectedCommande.montant_paye ?? 0)}</span>
+              </div>
+              {(selectedCommande.montant_restant ?? 0) > 0 && (
+                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                  <span>Reste</span>
+                  <span className="text-red-600 font-medium">{formatCurrency(selectedCommande.montant_restant)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Total</span>
+                <span className="text-lg font-bold text-blue-600">{formatCurrency(selectedCommande.total ?? 0)}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
