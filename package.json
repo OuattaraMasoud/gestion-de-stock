@@ -1,6 +1,6 @@
 {
   "name": "gestion-de-stock",
-  "version": "1.32.0",
+  "version": "1.33.0",
   "description": "Application de gestion de stock et caisse avec MySQL",
   "main": "out/main/index.js",
   "author": "Votre Nom",

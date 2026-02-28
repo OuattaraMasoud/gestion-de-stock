@@ -16,6 +16,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Invoice, Configuration } from "../types";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCurrency } from "../utils/formatters";
 import { useAuthStore } from "../store/useAuthStore";
 import {
@@ -58,6 +59,8 @@ const Invoices: React.FC = () => {
   const [nextTempId, setNextTempId] = useState(1);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [clientPrices, setClientPrices] = useState<any[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   const loadConfig = async () => {
     try {
@@ -114,13 +117,24 @@ const Invoices: React.FC = () => {
     0,
   );
 
-  const handleDeleteInvoice = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette facture ?")) {
-      return;
-    }
+  const handleDeleteInvoice = (id: number) => {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmDeleteInvoice = async () => {
+    if (pendingDeleteId === null) return;
+    setConfirmOpen(false);
+    setShowEditModal(false);
+    setEditInvoice(null);
+    setEditArticles([]);
+    setPendingDeleteId(null);
     try {
-      await window.electronAPI.deleteInvoice(id, user?.id, user?.nom);
+      await window.electronAPI.deleteInvoice(
+        pendingDeleteId,
+        user?.id,
+        user?.nom,
+      );
       toast.success("Facture supprimée avec succès");
       setSelectedInvoice(null);
       loadInvoices();
@@ -521,7 +535,10 @@ const Invoices: React.FC = () => {
       montant_restant: selectedInvoice.montant_restant,
       livraison_differee: (selectedInvoice as any).livraison_differee,
     };
-    return generateA4HTML(data, config, logoBase64, qrCodeUrl).replace(/<script>[\s\S]*?<\/script>/g, '');
+    return generateA4HTML(data, config, logoBase64, qrCodeUrl).replace(
+      /<script>[\s\S]*?<\/script>/g,
+      "",
+    );
   }, [selectedInvoice, config, logoBase64, qrCodeUrl]);
 
   if (loading) {
@@ -773,24 +790,27 @@ const Invoices: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-6 bg-gray-200 dark:bg-gray-600 flex justify-center items-start">
               <iframe
                 srcDoc={previewHTML}
-                style={{ width: "210mm", height: "1500px", border: "none", display: "block", colorScheme: "light", background: "white" }}
+                style={{
+                  width: "210mm",
+                  height: "1500px",
+                  border: "none",
+                  display: "block",
+                  colorScheme: "light",
+                  background: "white",
+                }}
                 title="Aperçu facture"
               />
             </div>
 
             {/* Boutons d'action */}
             <div className="p-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-4 rounded-b-2xl flex-shrink-0">
-              {(user?.role === "admin" || user?.role === "gestionnaire") && (
-                <>
-                  <button
-                    onClick={() => handleDeleteInvoice(selectedInvoice.id!)}
-                    className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                    Supprimer
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => handleDeleteInvoice(selectedInvoice.id!)}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-5 h-5" />
+                Supprimer
+              </button>
               <button
                 onClick={() => setSelectedInvoice(null)}
                 className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-black rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
@@ -1032,6 +1052,15 @@ const Invoices: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Êtes-vous sûr de vouloir supprimer cette facture ?"
+        onConfirm={handleConfirmDeleteInvoice}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setPendingDeleteId(null);
+        }}
+      />
     </div>
   );
 };

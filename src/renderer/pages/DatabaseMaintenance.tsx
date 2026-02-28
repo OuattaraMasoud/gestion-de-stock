@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from "../store/useAuthStore";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
 import ProtectedRoute from "../components/ProtectedRoute";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 interface DatabaseStats {
   totalSize: number;
@@ -32,6 +33,11 @@ const DatabaseMaintenance: React.FC = () => {
   const [salesRetention, setSalesRetention] = useState(365);
   const [purchasesRetention, setPurchasesRetention] = useState(365);
   const [repairing, setRepairing] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, message: "", onConfirm: () => {} });
 
   const loadStats = async () => {
     setLoading(true);
@@ -50,16 +56,13 @@ const DatabaseMaintenance: React.FC = () => {
     loadStats();
   }, []);
 
-  const handlePurge = async () => {
-    if (
-      !confirm(
-        "Êtes-vous sûr de vouloir purger les anciennes données ? Cette action est irréversible.",
-      )
-    ) {
-      return;
-    }
-
-    setPurging(true);
+  const handlePurge = () => {
+    setConfirmDialog({
+      isOpen: true,
+      message: "Êtes-vous sûr de vouloir purger les anciennes données ? Cette action est irréversible.",
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        setPurging(true);
     try {
       const result = await window.electronAPI.purgeOldData({
         auditLogsRetentionDays: auditLogsRetention,
@@ -74,54 +77,40 @@ const DatabaseMaintenance: React.FC = () => {
       } else {
         showErrorToast(result.message);
       }
-    } catch (error) {
-      console.error("Erreur purge:", error);
-      showErrorToast("Erreur lors de la purge");
-    } finally {
-      setPurging(false);
-    }
+        } catch (error) {
+          console.error("Erreur purge:", error);
+          showErrorToast("Erreur lors de la purge");
+        } finally {
+          setPurging(false);
+        }
+      },
+    });
   };
 
-  const handleRepairDatabase = async () => {
-    if (
-      !confirm(
-        "Êtes-vous sûr de vouloir réparer la base de données ?\n\n" +
-          "Cette opération va :\n" +
-          "1. Supprimer les tables FTS5 corrompues\n" +
-          "2. Recréer les tables FTS5\n" +
-          "3. Nettoyer la base de données\n\n" +
-          "Une sauvegarde sera automatiquement créée avant la réparation.",
-      )
-    ) {
-      return;
-    }
+  const handleRepairDatabase = () => {
+    setConfirmDialog({
+      isOpen: true,
+      message: "Êtes-vous sûr de vouloir réparer la base de données ? Une sauvegarde sera automatiquement créée avant la réparation.",
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        setRepairing(true);
+        try {
+          const result = await window.electronAPI.repairDatabase();
 
-    setRepairing(true);
-    try {
-      const result = await window.electronAPI.repairDatabase();
-
-      if (result.success) {
-        showSuccessToast(result.message);
-        if (result.backupPath) {
-          alert(
-            `Base de données réparée avec succès !\n\nSauvegarde créée : ${result.backupPath}`,
-          );
+          if (result.success) {
+            showSuccessToast(result.message);
+            loadStats();
+          } else {
+            showErrorToast(result.message);
+          }
+        } catch (error) {
+          console.error("Erreur réparation:", error);
+          showErrorToast("Erreur lors de la réparation de la base de données");
+        } finally {
+          setRepairing(false);
         }
-        loadStats();
-      } else {
-        showErrorToast(result.message);
-        if (result.backupPath) {
-          alert(
-            `Erreur lors de la réparation.\n\nUne sauvegarde a été créée : ${result.backupPath}\n\nContactez le support technique.`,
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Erreur réparation:", error);
-      showErrorToast("Erreur lors de la réparation de la base de données");
-    } finally {
-      setRepairing(false);
-    }
+      },
+    });
   };
 
   const formatBytes = (bytes: number) => {
@@ -520,6 +509,12 @@ const DatabaseMaintenance: React.FC = () => {
             </div>
           </div>
         )}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
       </div>
     </ProtectedRoute>
   );

@@ -30,6 +30,7 @@ import {
 import { useAuthStore } from "../store/useAuthStore";
 import { getAllowedRoutes } from "../utils/permissions";
 import { useThemeStore, ThemeMode } from "../store/useThemeStore";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -90,6 +91,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuthStore();
   const { mode, setMode } = useThemeStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     MENU_GROUPS.forEach((g) => {
@@ -98,12 +100,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return initial;
   });
 
-  const handleLogout = () => {
-    if (confirm("Êtes-vous sûr de vouloir vous déconnecter ?")) {
-      logout();
-      navigate("/login");
-    }
-  };
+  const handleLogout = () => setShowLogoutConfirm(true);
 
   const toggleSidebar = () => setIsCollapsed((v) => !v);
   const toggleGroup = (key: string) =>
@@ -184,6 +181,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, toggleSidebar }}>
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        message="Êtes-vous sûr de vouloir vous déconnecter ?"
+        onConfirm={() => { logout(); navigate("/login"); }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
         {/* Sidebar */}
         <aside

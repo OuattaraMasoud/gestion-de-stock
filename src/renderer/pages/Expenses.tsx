@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Expense } from "../types";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCurrency } from "../utils/formatters";
 import {
   showDeleteToast,
@@ -133,6 +134,8 @@ const Expenses: React.FC = () => {
     methode_paiement: "especes",
     reference: "",
   });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -243,13 +246,17 @@ const Expenses: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette dépense ?")) {
-      return;
-    }
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    setConfirmOpen(false);
+    setPendingDeleteId(null);
     try {
-      await window.electronAPI.deleteExpense(id, user?.id, user?.nom);
+      await window.electronAPI.deleteExpense(pendingDeleteId, user?.id, user?.nom);
       showDeleteToast("Dépense");
       loadData();
     } catch (error) {
@@ -590,6 +597,12 @@ const Expenses: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Êtes-vous sûr de vouloir supprimer cette dépense ?"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPendingDeleteId(null); }}
+      />
     </div>
   );
 };

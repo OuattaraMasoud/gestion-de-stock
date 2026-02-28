@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Configuration } from "../types";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCurrency } from "../utils/formatters";
 import { useAuthStore } from "../store/useAuthStore";
 import {
@@ -73,6 +74,11 @@ const ProformaInvoices: React.FC = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, message: "", onConfirm: () => {} });
 
   const [formData, setFormData] = useState<{
     client_id: number | null;
@@ -430,33 +436,39 @@ const ProformaInvoices: React.FC = () => {
     }
   };
 
-  const handleDeleteProforma = async (id: number) => {
-    if (
-      !confirm("Êtes-vous sûr de vouloir supprimer cette facture proforma ?")
-    ) {
-      return;
-    }
-
-    try {
-      await window.electronAPI.deleteProformaInvoice(id, user?.id, user?.nom);
-      toast.success("Facture proforma supprimée");
-      setSelectedProforma(null);
-      loadProformas();
-    } catch (error) {
-      console.error("Erreur suppression proforma:", error);
-      toast.error("Erreur lors de la suppression");
-    }
+  const handleDeleteProforma = (id: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      message: "Êtes-vous sûr de vouloir supprimer cette facture proforma ?",
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        setShowEditModal(false);
+        setEditingProforma(null);
+        try {
+          await window.electronAPI.deleteProformaInvoice(id, user?.id, user?.nom);
+          toast.success("Facture proforma supprimée");
+          setSelectedProforma(null);
+          loadProformas();
+        } catch (error) {
+          console.error("Erreur suppression proforma:", error);
+          toast.error("Erreur lors de la suppression");
+        }
+      },
+    });
   };
 
-  const handleConvertToSale = async (proforma: ProformaInvoice) => {
-    if (
-      !confirm(
-        "Convertir cette facture proforma en vente ? Le stock sera déduit.",
-      )
-    ) {
-      return;
-    }
+  const handleConvertToSale = (proforma: ProformaInvoice) => {
+    setConfirmDialog({
+      isOpen: true,
+      message: "Convertir cette facture proforma en vente ? Le stock sera déduit.",
+      onConfirm: () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        doConvertToSale(proforma);
+      },
+    });
+  };
 
+  const doConvertToSale = async (proforma: ProformaInvoice) => {
     try {
       const saleResult = await window.electronAPI.createSale({
         client_id: proforma.client_id,
@@ -1392,6 +1404,12 @@ const ProformaInvoices: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

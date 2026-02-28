@@ -5700,6 +5700,13 @@ export function deleteInvoice(
       throw new Error("Facture introuvable");
     }
 
+    // Si la facture est liée à une vente, supprimer la vente
+    // (deleteSale supprime aussi la facture + restaure le stock)
+    if (invoice.vente_id) {
+      return deleteSale(invoice.vente_id, utilisateur_id, utilisateur_nom);
+    }
+
+    // Facture sans vente liée : suppression simple
     const stmt = db.prepare("DELETE FROM factures WHERE id = ?");
     const result = stmt.run(id);
 

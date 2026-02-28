@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Client, ClientPrice, Product } from "../types";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCurrency } from "../utils/formatters";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
 import { useAuthStore } from "../store/useAuthStore";
@@ -51,6 +52,12 @@ const Clients: React.FC = () => {
   const [editingPrices, setEditingPrices] = useState<Record<number, string>>(
     {},
   );
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, message: "", onConfirm: () => {} });
 
   // Client details modal
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -147,19 +154,22 @@ const Clients: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
-      return;
-    }
-
-    try {
-      await window.electronAPI.deleteClient(id, user?.id, user?.nom);
-      showSuccessToast("Client supprimé avec succès");
-      loadClients();
-    } catch (error: any) {
-      console.error("Erreur:", error);
-      showErrorToast(error.message || "Erreur lors de la suppression");
-    }
+  const handleDelete = (id: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      message: "Êtes-vous sûr de vouloir supprimer ce client ?",
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await window.electronAPI.deleteClient(id, user?.id, user?.nom);
+          showSuccessToast("Client supprimé avec succès");
+          loadClients();
+        } catch (error: any) {
+          console.error("Erreur:", error);
+          showErrorToast(error.message || "Erreur lors de la suppression");
+        }
+      },
+    });
   };
 
   const handleOpenPricesModal = async (client: Client) => {
@@ -241,24 +251,27 @@ const Clients: React.FC = () => {
     }
   };
 
-  const handleDeletePrice = async (priceId: number, productId: number) => {
-    if (!confirm("Supprimer ce prix personnalisé ?")) {
-      return;
-    }
-
-    try {
-      await window.electronAPI.deleteClientPrice(priceId);
-      setClientPrices((prev) => prev.filter((p) => p.id !== priceId));
-      setEditingPrices((prev) => {
-        const updated = { ...prev };
-        delete updated[productId];
-        return updated;
-      });
-      showSuccessToast("Prix supprimé avec succès");
-    } catch (error) {
-      console.error("Erreur suppression prix:", error);
-      showErrorToast("Erreur lors de la suppression du prix");
-    }
+  const handleDeletePrice = (priceId: number, productId: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      message: "Supprimer ce prix personnalisé ?",
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await window.electronAPI.deleteClientPrice(priceId);
+          setClientPrices((prev) => prev.filter((p) => p.id !== priceId));
+          setEditingPrices((prev) => {
+            const updated = { ...prev };
+            delete updated[productId];
+            return updated;
+          });
+          showSuccessToast("Prix supprimé avec succès");
+        } catch (error) {
+          console.error("Erreur suppression prix:", error);
+          showErrorToast("Erreur lors de la suppression du prix");
+        }
+      },
+    });
   };
 
   const handleOpenDetailsModal = async (client: Client) => {
@@ -890,6 +903,12 @@ const Clients: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

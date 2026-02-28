@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Sale, Configuration } from "../types";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCurrency } from "../utils/formatters";
 import { useAuthStore } from "../store/useAuthStore";
 import {
@@ -43,6 +44,8 @@ const SalesHistory: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     loadConfig();
@@ -217,13 +220,17 @@ const SalesHistory: React.FC = () => {
     setCreditFilter("");
   };
 
-  const handleDeleteSale = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette vente ?")) {
-      return;
-    }
+  const handleDeleteSale = (id: number) => {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmDeleteSale = async () => {
+    if (pendingDeleteId === null) return;
+    setConfirmOpen(false);
+    setPendingDeleteId(null);
     try {
-      await window.electronAPI.deleteSale(id, user?.id, user?.nom);
+      await window.electronAPI.deleteSale(pendingDeleteId, user?.id, user?.nom);
       toast.success("Vente supprimée avec succès");
       loadSales();
     } catch (error) {
@@ -492,15 +499,12 @@ const SalesHistory: React.FC = () => {
                         <FileText className="w-4 h-4" />
                         Facture
                       </button>
-                      {(user?.role === "admin" ||
-                        user?.role === "gestionnaire") && (
-                        <button
-                          onClick={() => handleDeleteSale(sale.id!)}
-                          className="text-red-600 hover:text-red-900 flex items-center gap-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDeleteSale(sale.id!)}
+                        className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -735,6 +739,16 @@ const SalesHistory: React.FC = () => {
 
             <div className="p-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-4 rounded-b-2xl shrink-0">
               <button
+                onClick={() => {
+                  setSelectedInvoice(null);
+                  if (selectedInvoice.vente_id) handleDeleteSale(selectedInvoice.vente_id);
+                }}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-5 h-5" />
+                Supprimer
+              </button>
+              <button
                 onClick={() => setSelectedInvoice(null)}
                 className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
               >
@@ -752,6 +766,12 @@ const SalesHistory: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Êtes-vous sûr de vouloir supprimer cette vente ?"
+        onConfirm={handleConfirmDeleteSale}
+        onCancel={() => { setConfirmOpen(false); setPendingDeleteId(null); }}
+      />
     </div>
   );
 };

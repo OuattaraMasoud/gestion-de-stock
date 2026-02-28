@@ -13,6 +13,7 @@ import {
 import { Product, Category } from "../types";
 import ProductModal from "../components/ProductModal";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCurrency } from "../utils/formatters";
 import {
   showDeleteToast,
@@ -44,6 +45,8 @@ const Products: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -144,14 +147,18 @@ const Products: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handleDelete = async (id: number) => {
-    const product = products.find((p) => p.id === id);
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) {
-      return;
-    }
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    const product = products.find((p) => p.id === pendingDeleteId);
+    setConfirmOpen(false);
+    setPendingDeleteId(null);
     try {
-      await window.electronAPI.deleteProduct(id, user?.id, user?.nom);
+      await window.electronAPI.deleteProduct(pendingDeleteId, user?.id, user?.nom);
       showDeleteToast(`Produit "${product?.nom || "inconnu"}"`);
       loadData();
     } catch (error) {
@@ -731,6 +738,12 @@ const Products: React.FC = () => {
           onClose={handleModalClose}
         />
       )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Êtes-vous sûr de vouloir supprimer ce produit ?"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPendingDeleteId(null); }}
+      />
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { Plus, Edit, Trash2, Tag, FolderOpen } from "lucide-react";
 import { Category } from "../types";
 import {
@@ -16,6 +17,8 @@ const Categories: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({ nom: "", description: "" });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteCategory, setPendingDeleteCategory] = useState<{ id: number; nom: string } | null>(null);
 
   useEffect(() => {
     loadCategories();
@@ -119,20 +122,10 @@ const Categories: React.FC = () => {
                   <Edit className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={async () => {
-                    if (category.id && confirm("Supprimer cette catégorie ?")) {
-                      try {
-                        await window.electronAPI.deleteCategory(
-                          category.id,
-                          user?.id,
-                          user?.nom,
-                        );
-                        showDeleteToast(`Catégorie "${category.nom}"`);
-                        loadCategories();
-                      } catch (error) {
-                        console.error("Erreur suppression catégorie:", error);
-                        showErrorToast("Erreur lors de la suppression");
-                      }
+                  onClick={() => {
+                    if (category.id) {
+                      setPendingDeleteCategory({ id: category.id, nom: category.nom });
+                      setConfirmOpen(true);
                     }
                   }}
                   className="text-red-600 hover:text-red-800 p-2"
@@ -239,6 +232,25 @@ const Categories: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Supprimer cette catégorie ?"
+        onConfirm={async () => {
+          if (!pendingDeleteCategory) return;
+          setConfirmOpen(false);
+          const { id, nom } = pendingDeleteCategory;
+          setPendingDeleteCategory(null);
+          try {
+            await window.electronAPI.deleteCategory(id, user?.id, user?.nom);
+            showDeleteToast(`Catégorie "${nom}"`);
+            loadCategories();
+          } catch (error) {
+            console.error("Erreur suppression catégorie:", error);
+            showErrorToast("Erreur lors de la suppression");
+          }
+        }}
+        onCancel={() => { setConfirmOpen(false); setPendingDeleteCategory(null); }}
+      />
     </div>
   );
 };

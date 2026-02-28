@@ -13,6 +13,7 @@ import {
 import { User } from "../types";
 import { useAuthStore } from "../store/useAuthStore";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import {
   showAddToast,
   showUpdateToast,
@@ -38,6 +39,8 @@ const Users: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -142,26 +145,31 @@ const Users: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
     if (currentUser?.id === id) {
       showErrorToast("Vous ne pouvez pas supprimer votre propre compte");
       return;
     }
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  };
 
-    const user = users.find((u) => u.id === id);
-    if (confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) {
-      try {
-        await window.electronAPI.deleteUser(
-          id,
-          currentUser?.id,
-          currentUser?.nom,
-        );
-        showDeleteToast(`Utilisateur "${user?.nom || "inconnu"}"`);
-        loadUsers();
-      } catch (error) {
-        console.error("Erreur suppression:", error);
-        showErrorToast("Erreur lors de la suppression");
-      }
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    const user = users.find((u) => u.id === pendingDeleteId);
+    setConfirmOpen(false);
+    setPendingDeleteId(null);
+    try {
+      await window.electronAPI.deleteUser(
+        pendingDeleteId,
+        currentUser?.id,
+        currentUser?.nom,
+      );
+      showDeleteToast(`Utilisateur "${user?.nom || "inconnu"}"`);
+      loadUsers();
+    } catch (error) {
+      console.error("Erreur suppression:", error);
+      showErrorToast("Erreur lors de la suppression");
     }
   };
 
@@ -506,6 +514,12 @@ const Users: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Êtes-vous sûr de vouloir supprimer cet utilisateur ?"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPendingDeleteId(null); }}
+      />
     </div>
   );
 };

@@ -12,6 +12,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import type { Backup } from "../types";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
 import ProtectedRoute from "../components/ProtectedRoute";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 const Backup: React.FC = () => {
   const { user } = useAuthStore();
@@ -19,6 +20,10 @@ const Backup: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteFilename, setPendingDeleteFilename] = useState<string | null>(null);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const [pendingRestoreBackup, setPendingRestoreBackup] = useState<Backup | null>(null);
 
   useEffect(() => {
     if (user?.role !== "admin") {
@@ -54,21 +59,17 @@ const Backup: React.FC = () => {
     }
   };
 
-  const handleRestore = async (backup: Backup) => {
+  const handleRestore = (backup: Backup) => {
+    setPendingRestoreBackup(backup);
+    setRestoreConfirmOpen(true);
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!pendingRestoreBackup) return;
+    const backup = pendingRestoreBackup;
     const isDev = import.meta.env.DEV;
-
-    if (
-      !confirm(
-        `Êtes-vous sûr de vouloir restaurer la base de données depuis la sauvegarde du ${backup.formattedDate} ?\n\n${
-          isDev
-            ? "⚠️ Mode développement : Vous devrez relancer 'npm run dev' après la restauration."
-            : "L'application sera redémarrée automatiquement après la restauration."
-        }`,
-      )
-    ) {
-      return;
-    }
-
+    setRestoreConfirmOpen(false);
+    setPendingRestoreBackup(null);
     setRestoring(true);
     try {
       await window.electronAPI.restoreDatabase(backup.path);
@@ -92,13 +93,17 @@ const Backup: React.FC = () => {
     }
   };
 
-  const handleDelete = async (filename: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette sauvegarde ?")) {
-      return;
-    }
+  const handleDelete = (filename: string) => {
+    setPendingDeleteFilename(filename);
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteFilename) return;
+    setConfirmOpen(false);
+    setPendingDeleteFilename(null);
     try {
-      await window.electronAPI.deleteBackup(filename);
+      await window.electronAPI.deleteBackup(pendingDeleteFilename);
       showSuccessToast("Sauvegarde supprimée avec succès");
       loadBackups();
     } catch (error) {
@@ -304,6 +309,18 @@ const Backup: React.FC = () => {
             </div>
           </div>
         )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Êtes-vous sûr de vouloir supprimer cette sauvegarde ?"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPendingDeleteFilename(null); }}
+      />
+      <ConfirmDialog
+        isOpen={restoreConfirmOpen}
+        message={`Restaurer la base de données depuis la sauvegarde du ${pendingRestoreBackup?.formattedDate ?? ""} ? L'application sera redémarrée.`}
+        onConfirm={handleConfirmRestore}
+        onCancel={() => { setRestoreConfirmOpen(false); setPendingRestoreBackup(null); }}
+      />
       </div>
     </ProtectedRoute>
   );

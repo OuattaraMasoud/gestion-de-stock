@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Supplier } from "../types";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +27,8 @@ const Suppliers: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [formData, setFormData] = useState<Supplier>({
     nom: "",
     telephone: "",
@@ -129,13 +132,17 @@ const Suppliers: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce fournisseur ?")) {
-      return;
-    }
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    setConfirmOpen(false);
+    setPendingDeleteId(null);
     try {
-      await window.electronAPI.deleteSupplier(id, user?.id, user?.nom);
+      await window.electronAPI.deleteSupplier(pendingDeleteId, user?.id, user?.nom);
       showSuccessToast("Fournisseur supprimé avec succès");
       loadSuppliers();
     } catch (error) {
@@ -450,6 +457,12 @@ const Suppliers: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Êtes-vous sûr de vouloir supprimer ce fournisseur ?"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPendingDeleteId(null); }}
+      />
     </div>
   );
 };

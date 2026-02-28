@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Server } from "../types";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -23,6 +24,8 @@ const Servers: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [formData, setFormData] = useState<Server>({
     nom: "",
     telephone: "",
@@ -108,13 +111,17 @@ const Servers: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce serveur ?")) {
-      return;
-    }
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    setConfirmOpen(false);
+    setPendingDeleteId(null);
     try {
-      await window.electronAPI.deleteServer(id, user?.id, user?.nom);
+      await window.electronAPI.deleteServer(pendingDeleteId, user?.id, user?.nom);
       showSuccessToast("Serveur supprimé avec succès");
       loadServers();
     } catch (error) {
@@ -372,6 +379,12 @@ const Servers: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message="Êtes-vous sûr de vouloir supprimer ce serveur ?"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPendingDeleteId(null); }}
+      />
     </div>
   );
 };
