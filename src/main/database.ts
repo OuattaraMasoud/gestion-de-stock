@@ -109,7 +109,7 @@ export function repairDatabase(): {
         }
 
         try {
-          const data = db.prepare(`SELECT * FROM ${table.name}`).all();
+          db.prepare(`SELECT * FROM ${table.name}`).all();
           dump.push(`-- Table: ${table.name}`);
           // On pourrait faire un dump complet ici mais c'est complexe
           // Pour l'instant, on va juste recréer les tables FTS5
@@ -766,6 +766,11 @@ const migrations: Migration[] = [
     version: 12,
     description: "Ajout champs légaux/fiscaux dans configuration",
     up: () => {
+      // Si la table n'existe pas encore, createTables() la créera avec les bonnes colonnes
+      if (!tableExists("configuration")) {
+        console.log("  → Table configuration absente, sera créée par createTables()");
+        return;
+      }
       const cols = ["rccm", "regime_fiscal", "division_fiscale",
                     "numero_compte_uba", "reference_cadastrale", "secteur"];
       for (const col of cols) {
@@ -937,6 +942,18 @@ function runMigrations() {
   try {
     // Créer la table de versioning
     createSchemaVersionTable();
+
+    // Nouvelle installation : aucune table n'existe encore
+    // Marquer toutes les migrations comme déjà appliquées,
+    // createTables() créera tout avec le schéma final correct
+    if (!tableExists("ventes")) {
+      console.log("✓ Nouvelle installation détectée, toutes les migrations marquées comme appliquées");
+      for (const migration of migrations) {
+        recordMigration(migration.version, migration.description);
+      }
+      console.log("=== FIN DES MIGRATIONS ===");
+      return;
+    }
 
     // Détecter les migrations déjà appliquées sur les anciennes bases de données
     // (avant le système de versioning)

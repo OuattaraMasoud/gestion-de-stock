@@ -130,7 +130,7 @@ const CustomerDebts: React.FC = () => {
       return;
     }
 
-    if (amount > selectedSale.montant_restant) {
+    if (Math.round(amount * 100) > Math.round(selectedSale.montant_restant * 100)) {
       showErrorToast("Le montant ne peut pas dépasser le reste à payer");
       return;
     }
@@ -207,7 +207,7 @@ const CustomerDebts: React.FC = () => {
       showErrorToast("Veuillez entrer un montant valide");
       return;
     }
-    if (amount > selectedClient.solde_du) {
+    if (Math.round(amount * 100) > Math.round(selectedClient.solde_du * 100)) {
       showErrorToast("Le montant dépasse la dette totale du client");
       return;
     }
@@ -221,6 +221,35 @@ const CustomerDebts: React.FC = () => {
       );
       showSuccessToast("Paiement enregistré avec succès");
       setShowPaymentModal(false);
+
+      // Préparer le reçu de paiement global
+      const newRestant = Math.max(0, selectedClient.solde_du - amount);
+      setPaymentReceipt({
+        montant: amount,
+        methode_paiement: globalPaymentMethod,
+        client_nom: selectedClient.client_nom,
+        client_telephone: selectedClient.telephone,
+        total_vente: selectedClient.solde_du,
+        ancien_restant: selectedClient.solde_du,
+        nouveau_restant: newRestant,
+        date: new Date().toLocaleDateString("fr-FR"),
+        heure: new Date().toLocaleTimeString("fr-FR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        caissier: user?.nom,
+        invoice: {
+          numero: `GLOBAL-${Date.now()}`,
+          date_facture: new Date().toLocaleDateString("fr-FR"),
+          total_ttc: selectedClient.solde_du,
+          montant_paye: amount,
+          montant_restant: newRestant,
+          articles: [],
+        },
+        produits: [],
+      });
+      setShowReceipt(true);
+
       setGlobalPaymentAmount("");
       setGlobalPaymentMethod("especes");
       setPaymentMode("by_sale");
