@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   FileText,
   Search,
@@ -72,7 +72,6 @@ const ProformaInvoices: React.FC = () => {
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const proformaRef = useRef<HTMLDivElement>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<{
@@ -576,7 +575,7 @@ const ProformaInvoices: React.FC = () => {
   }, [selectedProforma, config?.devise]);
 
   const handlePrint = async () => {
-    if (!selectedProforma || !proformaRef.current) return;
+    if (!selectedProforma) return;
 
     const data: PrintData = {
       numero: selectedProforma.numero,
@@ -610,6 +609,32 @@ const ProformaInvoices: React.FC = () => {
     }
     openPrintWindow(html);
   };
+
+  const previewHTML = useMemo(() => {
+    if (!selectedProforma) return "";
+    const data: PrintData = {
+      numero: selectedProforma.numero,
+      date: selectedProforma.date_proforma,
+      document_type: "PROFORMA",
+      client_nom: selectedProforma.client_nom,
+      client_telephone: selectedProforma.client_telephone,
+      client_email: selectedProforma.client_email,
+      articles: selectedProforma.articles.map((a) => ({
+        designation: a.designation,
+        quantite: a.quantite,
+        prix_unitaire: a.prixUnitaire,
+        total: a.total,
+      })),
+      total_avant_remise: selectedProforma.total_avant_remise,
+      remise_type: selectedProforma.remise_type,
+      remise_valeur: selectedProforma.remise_valeur,
+      total_ttc: selectedProforma.total_ttc,
+      notes: selectedProforma.notes,
+      date_validite: selectedProforma.date_validite,
+      show_fiscal_footer: true,
+    };
+    return generateA4HTML(data, config, logoBase64, qrCodeUrl).replace(/<script>[\s\S]*?<\/script>/g, '');
+  }, [selectedProforma, config, logoBase64, qrCodeUrl]);
 
   const filteredProducts = productSearch
     ? products.filter(
@@ -1210,7 +1235,7 @@ const ProformaInvoices: React.FC = () => {
       {/* Modal Détails */}
       {selectedProforma && !showEditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
             <div className="bg-blue-500 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <FileText className="w-6 h-6" />
@@ -1228,98 +1253,12 @@ const ProformaInvoices: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 flex-1 overflow-y-auto" ref={proformaRef}>
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                    Client
-                  </p>
-                  <p className="font-semibold">{selectedProforma.client_nom}</p>
-                  {selectedProforma.client_telephone && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedProforma.client_telephone}
-                    </p>
-                  )}
-                  {selectedProforma.client_email && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedProforma.client_email}
-                    </p>
-                  )}
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                    Date
-                  </p>
-                  <p className="font-semibold">
-                    {selectedProforma.date_proforma}
-                  </p>
-                  {selectedProforma.date_validite && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Valide jusqu'au {selectedProforma.date_validite}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <table className="w-full mb-6">
-                <thead className="bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Article
-                    </th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Qté
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Prix
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {selectedProforma.articles.map((article, idx) => (
-                    <tr key={idx}>
-                      <td className="px-4 py-3">{article.designation}</td>
-                      <td className="px-4 py-3 text-center">
-                        {article.quantite}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm">
-                        {formatCurrency(article.prixUnitaire)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium">
-                        {formatCurrency(article.total)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded-lg p-4">
-                {selectedProforma.total_avant_remise && (
-                  <div className="flex justify-between mb-2">
-                    <span>Sous-total:</span>
-                    <span>
-                      {formatCurrency(selectedProforma.total_avant_remise)}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between text-xl font-bold">
-                  <span>Total TTC:</span>
-                  <span className="text-blue-600">
-                    {formatCurrency(selectedProforma.total_ttc)}
-                  </span>
-                </div>
-              </div>
-
-              {selectedProforma.notes && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Notes:</strong> {selectedProforma.notes}
-                  </p>
-                </div>
-              )}
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-200 dark:bg-gray-600 flex justify-center items-start">
+              <iframe
+                srcDoc={previewHTML}
+                style={{ width: "210mm", height: "1500px", border: "none", display: "block", colorScheme: "light", background: "white" }}
+                title="Aperçu proforma"
+              />
             </div>
             <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t flex gap-3 rounded-b-2xl">
               {selectedProforma.statut === "en_attente" && (

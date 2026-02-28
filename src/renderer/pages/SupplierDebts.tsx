@@ -40,21 +40,31 @@ interface Purchase {
 const SupplierDebts: React.FC = () => {
   const { user } = useAuthStore();
   const [debts, setDebts] = useState<SupplierDebt[]>([]);
-  const [selectedSupplier, setSelectedSupplier] = useState<SupplierDebt | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<SupplierDebt | null>(
+    null,
+  );
   const [supplierPurchases, setSupplierPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
+  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(
+    null,
+  );
   const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"especes" | "carte" | "virement" | "cheque">("especes");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "especes" | "carte" | "virement" | "cheque"
+  >("especes");
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentComment, setPaymentComment] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Mode paiement par montant global
-  const [paymentMode, setPaymentMode] = useState<"by_purchase" | "by_amount">("by_purchase");
+  const [paymentMode, setPaymentMode] = useState<"by_purchase" | "by_amount">(
+    "by_purchase",
+  );
   const [globalPaymentAmount, setGlobalPaymentAmount] = useState("");
-  const [globalPaymentMethod, setGlobalPaymentMethod] = useState<"especes" | "carte" | "virement" | "cheque">("especes");
+  const [globalPaymentMethod, setGlobalPaymentMethod] = useState<
+    "especes" | "carte" | "virement" | "cheque"
+  >("especes");
 
   const loadDebts = async () => {
     try {
@@ -69,7 +79,8 @@ const SupplierDebts: React.FC = () => {
 
   const loadSupplierPurchases = async (supplierId: number) => {
     try {
-      const data = await window.electronAPI.getSupplierUnpaidPurchases(supplierId);
+      const data =
+        await window.electronAPI.getSupplierUnpaidPurchases(supplierId);
       setSupplierPurchases(data);
     } catch (error) {
       showErrorToast("Erreur lors du chargement des achats");
@@ -155,7 +166,10 @@ const SupplierDebts: React.FC = () => {
       setPaymentMode("by_purchase");
       const updatedDebts = await window.electronAPI.getSupplierDebts();
       setDebts(updatedDebts);
-      const updated = updatedDebts.find((d: SupplierDebt) => d.fournisseur_id === selectedSupplier.fournisseur_id);
+      const updated = updatedDebts.find(
+        (d: SupplierDebt) =>
+          d.fournisseur_id === selectedSupplier.fournisseur_id,
+      );
       if (updated) setSelectedSupplier(updated);
       loadSupplierPurchases(selectedSupplier.fournisseur_id);
     } catch (error: any) {
@@ -171,9 +185,10 @@ const SupplierDebts: React.FC = () => {
 
   const totalDebts = debts.reduce((sum, debt) => sum + debt.solde_du, 0);
 
-  const filteredDebts = debts.filter(debt =>
-    debt.fournisseur_nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    debt.telephone?.includes(searchQuery)
+  const filteredDebts = debts.filter(
+    (debt) =>
+      debt.fournisseur_nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      debt.telephone?.includes(searchQuery),
   );
 
   return (
@@ -181,13 +196,17 @@ const SupplierDebts: React.FC = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dettes Fournisseurs</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Dettes Fournisseurs
+            </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               {debts.length} fournisseur(s) avec des dettes
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-600 dark:text-gray-400">Total des dettes</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Total des dettes
+            </p>
             <p className="text-2xl font-bold text-red-600">
               {formatCurrency(totalDebts)}
             </p>
@@ -200,7 +219,9 @@ const SupplierDebts: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className={`card ${selectedSupplier ? 'hidden lg:block' : ''}`}>
+            <div
+              className={`card ${selectedSupplier ? "hidden lg:block" : ""}`}
+            >
               <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
                 <div className="bg-red-100 p-2 rounded-lg">
                   <AlertCircle className="w-5 h-5 text-red-600" />
@@ -241,15 +262,15 @@ const SupplierDebts: React.FC = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 dark:text-white truncate">
+                        <p className="font-semibold text-gray-900 dark:text-black truncate">
                           {debt.fournisseur_nom}
                         </p>
                         {debt.telephone && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                          <p className="text-xs text-gray-600 dark:text-black">
                             {debt.telephone}
                           </p>
                         )}
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-black mt-1">
                           {debt.nb_achats_impayes} achat(s) impayé(s)
                         </p>
                       </div>
@@ -258,7 +279,7 @@ const SupplierDebts: React.FC = () => {
                           {formatCurrency(debt.solde_du)}
                         </p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 ml-2" />
+                      <ChevronRight className="w-4 h-4 text-gray-400 dark:text-black ml-2" />
                     </div>
                   </div>
                 ))}
@@ -293,7 +314,8 @@ const SupplierDebts: React.FC = () => {
                           {selectedSupplier.fournisseur_nom}
                         </h2>
                         <p className="text-xs text-gray-600 dark:text-gray-400">
-                          Dette totale: {formatCurrency(selectedSupplier.solde_du)}
+                          Dette totale:{" "}
+                          {formatCurrency(selectedSupplier.solde_du)}
                         </p>
                       </div>
                     </div>
@@ -323,11 +345,14 @@ const SupplierDebts: React.FC = () => {
                               Commande #{purchase.id}
                             </p>
                             <p className="text-xs text-gray-600 dark:text-gray-400">
-                              {new Date(purchase.date_achat).toLocaleDateString("fr-FR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                              })}
+                              {new Date(purchase.date_achat).toLocaleDateString(
+                                "fr-FR",
+                                {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                },
+                              )}
                             </p>
                           </div>
                           <div className="text-right">
@@ -354,19 +379,25 @@ const SupplierDebts: React.FC = () => {
 
                         <div className="grid grid-cols-3 gap-3 mb-3 text-sm">
                           <div>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Payé</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              Payé
+                            </p>
                             <p className="font-semibold text-green-600">
                               {formatCurrency(purchase.montant_paye)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Reste à payer</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              Reste à payer
+                            </p>
                             <p className="font-bold text-red-600">
                               {formatCurrency(purchase.montant_restant)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Produits</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              Produits
+                            </p>
                             <p className="font-semibold text-gray-900 dark:text-white">
                               {purchase.produits.length}
                             </p>
@@ -379,7 +410,9 @@ const SupplierDebts: React.FC = () => {
                               setSelectedPurchase(purchase);
                               setPaymentMode("by_purchase");
                               setShowPaymentModal(true);
-                              setPaymentAmount(purchase.montant_restant.toString());
+                              setPaymentAmount(
+                                purchase.montant_restant.toString(),
+                              );
                             }}
                             className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
                           >
@@ -393,7 +426,7 @@ const SupplierDebts: React.FC = () => {
                               setShowPaymentModal(true);
                               setPaymentAmount("");
                             }}
-                            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold text-sm transition-all"
+                            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-black rounded-lg font-semibold text-sm transition-all"
                           >
                             Montant libre
                           </button>
@@ -436,10 +469,15 @@ const SupplierDebts: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-5">
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {paymentMode === "by_purchase" ? "Paiement par achat" : "Paiement global"}
+                  {paymentMode === "by_purchase"
+                    ? "Paiement par achat"
+                    : "Paiement global"}
                 </h3>
                 <button
-                  onClick={() => { setShowPaymentModal(false); setSelectedPurchase(null); }}
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setSelectedPurchase(null);
+                  }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-5 h-5" />
@@ -449,17 +487,27 @@ const SupplierDebts: React.FC = () => {
               {/* Onglets de mode */}
               <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-4">
                 <button
-                  onClick={() => { setPaymentMode("by_purchase"); setSelectedPurchase(null); }}
+                  onClick={() => {
+                    setPaymentMode("by_purchase");
+                    setSelectedPurchase(null);
+                  }}
                   className={`flex-1 py-2 text-sm font-medium transition-all ${
-                    paymentMode === "by_purchase" ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50"
+                    paymentMode === "by_purchase"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50"
                   }`}
                 >
                   Par achat
                 </button>
                 <button
-                  onClick={() => { setPaymentMode("by_amount"); setSelectedPurchase(null); }}
+                  onClick={() => {
+                    setPaymentMode("by_amount");
+                    setSelectedPurchase(null);
+                  }}
                   className={`flex-1 py-2 text-sm font-medium transition-all ${
-                    paymentMode === "by_amount" ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50"
+                    paymentMode === "by_amount"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50"
                   }`}
                 >
                   Par montant global
@@ -472,30 +520,41 @@ const SupplierDebts: React.FC = () => {
                   <div className="space-y-2 mb-4 text-sm">
                     <div className="flex justify-between text-gray-600 dark:text-gray-400">
                       <span>Fournisseur:</span>
-                      <span className="font-semibold">{selectedSupplier.fournisseur_nom}</span>
+                      <span className="font-semibold">
+                        {selectedSupplier.fournisseur_nom}
+                      </span>
                     </div>
                     <div className="flex justify-between text-gray-600 dark:text-gray-400">
                       <span>Commande:</span>
-                      <span className="font-semibold">#{selectedPurchase.id}</span>
+                      <span className="font-semibold">
+                        #{selectedPurchase.id}
+                      </span>
                     </div>
                     <div className="flex justify-between text-gray-600 dark:text-gray-400">
                       <span>Total:</span>
-                      <span className="font-semibold">{formatCurrency(selectedPurchase.total)}</span>
+                      <span className="font-semibold">
+                        {formatCurrency(selectedPurchase.total)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-red-600 font-semibold">
                       <span>Reste à payer:</span>
-                      <span>{formatCurrency(selectedPurchase.montant_restant)}</span>
+                      <span>
+                        {formatCurrency(selectedPurchase.montant_restant)}
+                      </span>
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Montant</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Montant
+                      </label>
                       <button
                         onClick={handlePayFullAmount}
                         className="w-full mb-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-medium text-sm transition-all"
                       >
-                        Payer le reste ({formatCurrency(selectedPurchase.montant_restant)})
+                        Payer le reste (
+                        {formatCurrency(selectedPurchase.montant_restant)})
                       </button>
                       <input
                         type="number"
@@ -510,32 +569,48 @@ const SupplierDebts: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Mode de paiement</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Mode de paiement
+                      </label>
                       <div className="grid grid-cols-2 gap-2">
                         {[
-                          { value: "especes", label: "Espèces", icon: Banknote },
+                          {
+                            value: "especes",
+                            label: "Espèces",
+                            icon: Banknote,
+                          },
                           { value: "carte", label: "Carte", icon: CreditCard },
-                          { value: "virement", label: "Virement", icon: CardIcon },
+                          {
+                            value: "virement",
+                            label: "Virement",
+                            icon: CardIcon,
+                          },
                           { value: "cheque", label: "Chèque", icon: FileText },
                         ].map((method) => (
                           <button
                             key={method.value}
-                            onClick={() => setPaymentMethod(method.value as any)}
+                            onClick={() =>
+                              setPaymentMethod(method.value as any)
+                            }
                             className={`p-2 rounded-lg border-2 transition-all ${
                               paymentMethod === method.value
-                                ? "border-blue-500 bg-blue-50"
+                                ? "border-blue-500 bg-blue-50 dark:bg-gray-700"
                                 : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                             }`}
                           >
                             <method.icon className="w-4 h-4 mx-auto" />
-                            <span className="text-xs block mt-1">{method.label}</span>
+                            <span className="text-xs block mt-1">
+                              {method.label}
+                            </span>
                           </button>
                         ))}
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Référence (optionnel)</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Référence (optionnel)
+                      </label>
                       <input
                         type="text"
                         value={paymentReference}
@@ -546,7 +621,9 @@ const SupplierDebts: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Commentaire (optionnel)</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Commentaire (optionnel)
+                      </label>
                       <textarea
                         value={paymentComment}
                         onChange={(e) => setPaymentComment(e.target.value)}
@@ -558,14 +635,19 @@ const SupplierDebts: React.FC = () => {
 
                     <div className="flex gap-3 pt-4">
                       <button
-                        onClick={() => { setShowPaymentModal(false); setSelectedPurchase(null); }}
-                        className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all text-sm"
+                        onClick={() => {
+                          setShowPaymentModal(false);
+                          setSelectedPurchase(null);
+                        }}
+                        className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-black rounded-lg font-semibold transition-all text-sm"
                       >
                         Annuler
                       </button>
                       <button
                         onClick={handlePayment}
-                        disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
+                        disabled={
+                          !paymentAmount || parseFloat(paymentAmount) <= 0
+                        }
                         className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
                       >
                         <Check className="w-4 h-4" />
@@ -580,7 +662,9 @@ const SupplierDebts: React.FC = () => {
                   <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 text-sm space-y-1">
                     <div className="flex justify-between text-gray-600 dark:text-gray-400">
                       <span>Fournisseur:</span>
-                      <span className="font-semibold">{selectedSupplier.fournisseur_nom}</span>
+                      <span className="font-semibold">
+                        {selectedSupplier.fournisseur_nom}
+                      </span>
                     </div>
                     <div className="flex justify-between text-red-600 font-semibold">
                       <span>Dette totale:</span>
@@ -589,9 +673,15 @@ const SupplierDebts: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Montant à payer</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Montant à payer
+                    </label>
                     <button
-                      onClick={() => setGlobalPaymentAmount(selectedSupplier.solde_du.toString())}
+                      onClick={() =>
+                        setGlobalPaymentAmount(
+                          selectedSupplier.solde_du.toString(),
+                        )
+                      }
                       className="w-full mb-2 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg font-medium text-sm transition-all"
                     >
                       Payer tout ({formatCurrency(selectedSupplier.solde_du)})
@@ -606,29 +696,42 @@ const SupplierDebts: React.FC = () => {
                       placeholder="Montant global"
                       className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-sm"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Le montant sera réparti automatiquement sur les achats les plus anciens</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Le montant sera réparti automatiquement sur les achats les
+                      plus anciens
+                    </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Mode de paiement</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Mode de paiement
+                    </label>
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { value: "especes", label: "Espèces", icon: Banknote },
                         { value: "carte", label: "Carte", icon: CreditCard },
-                        { value: "virement", label: "Virement", icon: CardIcon },
+                        {
+                          value: "virement",
+                          label: "Virement",
+                          icon: CardIcon,
+                        },
                         { value: "cheque", label: "Chèque", icon: FileText },
                       ].map((method) => (
                         <button
                           key={method.value}
-                          onClick={() => setGlobalPaymentMethod(method.value as any)}
+                          onClick={() =>
+                            setGlobalPaymentMethod(method.value as any)
+                          }
                           className={`p-2 rounded-lg border-2 transition-all ${
                             globalPaymentMethod === method.value
-                              ? "border-blue-500 bg-blue-50"
+                              ? "border-blue-500 bg-blue-50 dark:bg-gray-700"
                               : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                           }`}
                         >
                           <method.icon className="w-4 h-4 mx-auto" />
-                          <span className="text-xs block mt-1">{method.label}</span>
+                          <span className="text-xs block mt-1">
+                            {method.label}
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -636,14 +739,20 @@ const SupplierDebts: React.FC = () => {
 
                   <div className="flex gap-3 pt-2">
                     <button
-                      onClick={() => { setShowPaymentModal(false); setPaymentMode("by_purchase"); }}
-                      className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all text-sm"
+                      onClick={() => {
+                        setShowPaymentModal(false);
+                        setPaymentMode("by_purchase");
+                      }}
+                      className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-black rounded-lg font-semibold transition-all text-sm"
                     >
                       Annuler
                     </button>
                     <button
                       onClick={handleGlobalPayment}
-                      disabled={!globalPaymentAmount || parseFloat(globalPaymentAmount) <= 0}
+                      disabled={
+                        !globalPaymentAmount ||
+                        parseFloat(globalPaymentAmount) <= 0
+                      }
                       className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
                     >
                       <Check className="w-4 h-4" />
@@ -654,7 +763,10 @@ const SupplierDebts: React.FC = () => {
               ) : (
                 /* Mode by_purchase mais aucun achat sélectionné */
                 <div className="text-center py-6">
-                  <p className="text-sm text-gray-500">Sélectionnez un achat dans la liste ou utilisez le mode "Paiement global"</p>
+                  <p className="text-sm text-gray-500">
+                    Sélectionnez un achat dans la liste ou utilisez le mode
+                    "Paiement global"
+                  </p>
                   <button
                     onClick={() => setShowPaymentModal(false)}
                     className="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm"

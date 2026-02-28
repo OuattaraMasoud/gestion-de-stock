@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -68,7 +68,6 @@ const CustomerDebts: React.FC = () => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [config, setConfig] = useState<Configuration | null>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
-  const receiptRef = useRef<HTMLDivElement>(null);
   const [paymentMode, setPaymentMode] = useState<"by_sale" | "by_amount">(
     "by_sale",
   );
@@ -318,6 +317,48 @@ const CustomerDebts: React.FC = () => {
     const html = generateA4HTML(data, config, logoBase64, null);
     openPrintWindow(html);
   };
+
+  const previewHTML = useMemo(() => {
+    if (!paymentReceipt) return "";
+    const receipt = paymentReceipt;
+    const inv = receipt.invoice || {};
+    let articles: any[] = [];
+    if (Array.isArray(inv.articles) && inv.articles.length > 0) {
+      articles = inv.articles;
+    } else if (Array.isArray(receipt.produits) && receipt.produits.length > 0) {
+      articles = receipt.produits.map((p: any) => ({
+        designation:
+          p.nom_produit || p.nom || p.designation || `Produit #${p.produit_id}`,
+        quantite: p.quantite,
+        prixUnitaire: p.prix_unitaire,
+        total: p.sous_total ?? p.quantite * p.prix_unitaire,
+      }));
+    }
+    const totalTTC = inv.total_ttc ?? receipt.total_vente ?? 0;
+    const montantPaye = inv.montant_paye ?? receipt.total_vente ?? 0;
+    const data: PrintData = {
+      numero: inv.numero || `#${receipt.vente_id}`,
+      date: inv.date_facture || receipt.date || "",
+      document_type: "RECU",
+      client_nom: receipt.client_nom || "Client",
+      client_telephone: receipt.client_telephone,
+      vendeur: receipt.caissier,
+      articles: articles.map((a: any) => ({
+        designation: a.designation,
+        quantite: a.quantite,
+        prix_unitaire: a.prixUnitaire ?? 0,
+        total: a.total ?? 0,
+      })),
+      total_ttc: totalTTC,
+      montant_paye: montantPaye,
+      montant_restant: receipt.nouveau_restant ?? 0,
+      show_fiscal_footer: true,
+    };
+    return generateA4HTML(data, config, logoBase64, null).replace(
+      /<script>[\s\S]*?<\/script>/g,
+      "",
+    );
+  }, [paymentReceipt, config, logoBase64]);
 
   const totalDebts = debts.reduce((sum, debt) => sum + debt.solde_du, 0);
 
@@ -574,7 +615,7 @@ const CustomerDebts: React.FC = () => {
                               setShowPaymentModal(true);
                               setPaymentAmount("");
                             }}
-                            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold text-sm transition-all"
+                            className="px-3 py-2 bg-gray-200 dark:text-black hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700  rounded-lg font-semibold text-sm transition-all"
                           >
                             Montant libre
                           </button>
@@ -732,7 +773,7 @@ const CustomerDebts: React.FC = () => {
                               onClick={() =>
                                 setPaymentMethod(method.value as any)
                               }
-                              className={`p-2 rounded-lg border-2 transition-all ${paymentMethod === method.value ? "border-blue-500 bg-blue-50" : "border-gray-200 dark:border-gray-700 hover:border-gray-300"}`}
+                              className={`p-2 rounded-lg border-2 transition-all ${paymentMethod === method.value ? "border-blue-500 bg-blue-50 dark:bg-gray-700" : "border-gray-200 dark:border-gray-700 hover:border-gray-300"}`}
                             >
                               <method.icon className="w-4 h-4 mx-auto" />
                               <span className="text-xs block mt-1">
@@ -775,7 +816,7 @@ const CustomerDebts: React.FC = () => {
                             setShowPaymentModal(false);
                             setPaymentMode("by_sale");
                           }}
-                          className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-all text-sm"
+                          className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-black rounded-lg font-semibold transition-all text-sm"
                         >
                           Annuler
                         </button>
@@ -898,7 +939,7 @@ const CustomerDebts: React.FC = () => {
         {/* Modal reçu de paiement */}
         {showReceipt && paymentReceipt && (
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[95vh] flex flex-col">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col">
               {/* Header */}
               <div className="bg-green-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -920,550 +961,28 @@ const CustomerDebts: React.FC = () => {
                 </button>
               </div>
 
-              {/* Contenu du reçu - Format A5 */}
-              <div className="flex-1 overflow-y-auto p-6 bg-gray-200 dark:bg-gray-600 flex justify-center">
-                <div
-                  ref={receiptRef}
-                  className="bg-white shadow-xl dark:text-gray-900"
+              {/* Contenu du reçu */}
+              <div className="flex-1 overflow-y-auto p-6 bg-gray-200 dark:bg-gray-600 flex justify-center items-start">
+                <iframe
+                  srcDoc={previewHTML}
+                  sandbox=""
                   style={{
-                    width: "148mm",
-                    minHeight: "200mm",
-                    padding: "10mm",
-                    fontFamily: "'Segoe UI', Arial, sans-serif",
-                    fontSize: "11px",
-                    lineHeight: "1.4",
-                    color: "#333",
-                    transform: "scale(0.85)",
-                    transformOrigin: "top center",
+                    width: "210mm",
+                    height: "1500px",
+                    border: "none",
+                    display: "block",
+                    colorScheme: "light",
+                    background: "white",
                   }}
-                >
-                  {/* Header */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      paddingBottom: "10px",
-                      borderBottom: "2px solid #2563eb",
-                      marginBottom: "15px",
-                    }}
-                  >
-                    <div>
-                      {logoBase64 && (
-                        <img
-                          src={logoBase64}
-                          alt="Logo"
-                          style={{
-                            maxHeight: "60px",
-                            maxWidth: "120px",
-                            marginBottom: "5px",
-                            objectFit: "contain",
-                          }}
-                        />
-                      )}
-                      <h1
-                        style={{
-                          fontSize: "16px",
-                          color: "#1e40af",
-                          marginBottom: "3px",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {config?.nom_entreprise || "Mon Entreprise"}
-                      </h1>
-                      {config?.description_entreprise && (
-                        <p
-                          style={{
-                            fontSize: "10px",
-                            color: "#666",
-                            fontStyle: "italic",
-                            marginBottom: "3px",
-                          }}
-                        >
-                          {config.description_entreprise}
-                        </p>
-                      )}
-                      {config?.adresse && (
-                        <p
-                          style={{
-                            fontSize: "9px",
-                            color: "#555",
-                            margin: "1px 0",
-                          }}
-                        >
-                          {config.adresse}
-                          {config?.ville ? ", " + config.ville : ""}
-                        </p>
-                      )}
-                      {config?.telephone && (
-                        <p
-                          style={{
-                            fontSize: "9px",
-                            color: "#555",
-                            margin: "1px 0",
-                          }}
-                        >
-                          Tel: {config.telephone}
-                          {config?.telephone2 ? " / " + config.telephone2 : ""}
-                        </p>
-                      )}
-                      {config?.email && (
-                        <p
-                          style={{
-                            fontSize: "9px",
-                            color: "#555",
-                            margin: "1px 0",
-                          }}
-                        >
-                          {config.email}
-                        </p>
-                      )}
-                      {config?.nif && (
-                        <p
-                          style={{
-                            fontSize: "9px",
-                            color: "#555",
-                            margin: "1px 0",
-                          }}
-                        >
-                          NIF: {config.nif}
-                        </p>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        background: "#22c55e",
-                        color: "white",
-                        padding: "6px 15px",
-                        borderRadius: "4px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div style={{ fontSize: "14px", fontWeight: "bold" }}>
-                        RECU
-                      </div>
-                      <div style={{ fontSize: "10px" }}>Paiement Dette</div>
-                    </div>
-                  </div>
-
-                  {/* Info grid */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "15px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "48%",
-                        background: "#f8fafc",
-                        padding: "10px",
-                        borderRadius: "6px",
-                        border: "1px solid #e2e8f0",
-                      }}
-                    >
-                      <h3
-                        style={{
-                          fontSize: "9px",
-                          textTransform: "uppercase",
-                          color: "#64748b",
-                          letterSpacing: "0.5px",
-                          marginBottom: "5px",
-                          paddingBottom: "4px",
-                          borderBottom: "1px solid #e2e8f0",
-                        }}
-                      >
-                        Client
-                      </h3>
-                      <p
-                        style={{
-                          margin: "2px 0",
-                          fontWeight: "bold",
-                          color: "#1e293b",
-                        }}
-                      >
-                        {paymentReceipt.client_nom}
-                      </p>
-                      {paymentReceipt.client_telephone && (
-                        <p style={{ margin: "2px 0", fontSize: "10px" }}>
-                          Tel: {paymentReceipt.client_telephone}
-                        </p>
-                      )}
-                      {paymentReceipt.client_email && (
-                        <p style={{ margin: "2px 0", fontSize: "10px" }}>
-                          Email: {paymentReceipt.client_email}
-                        </p>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        width: "48%",
-                        background: "#f8fafc",
-                        padding: "10px",
-                        borderRadius: "6px",
-                        border: "1px solid #e2e8f0",
-                      }}
-                    >
-                      <h3
-                        style={{
-                          fontSize: "9px",
-                          textTransform: "uppercase",
-                          color: "#64748b",
-                          letterSpacing: "0.5px",
-                          marginBottom: "5px",
-                          paddingBottom: "4px",
-                          borderBottom: "1px solid #e2e8f0",
-                        }}
-                      >
-                        Details
-                      </h3>
-                      <p style={{ margin: "2px 0", fontSize: "10px" }}>
-                        <strong>Date:</strong> {paymentReceipt.date}
-                      </p>
-                      <p style={{ margin: "2px 0", fontSize: "10px" }}>
-                        <strong>Heure:</strong> {paymentReceipt.heure}
-                      </p>
-                      <p style={{ margin: "2px 0", fontSize: "10px" }}>
-                        <strong>Caissier:</strong> {paymentReceipt.caissier}
-                      </p>
-                      <p style={{ margin: "2px 0", fontSize: "10px" }}>
-                        <strong>Vente:</strong> #{paymentReceipt.vente_id}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Table des articles si disponibles */}
-                  {((paymentReceipt?.invoice?.articles &&
-                    paymentReceipt.invoice.articles.length > 0) ||
-                    (paymentReceipt?.produits &&
-                      paymentReceipt.produits.length > 0)) && (
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        margin: "10px 0",
-                      }}
-                    >
-                      <thead>
-                        <tr>
-                          <th
-                            style={{
-                              background: "#1e40af",
-                              color: "white",
-                              padding: "6px 8px",
-                              textAlign: "left",
-                              fontSize: "9px",
-                              textTransform: "uppercase",
-                              borderRadius: "4px 0 0 0",
-                            }}
-                          >
-                            Designation
-                          </th>
-                          <th
-                            style={{
-                              background: "#1e40af",
-                              color: "white",
-                              padding: "6px 8px",
-                              textAlign: "right",
-                              fontSize: "9px",
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            Qte
-                          </th>
-                          <th
-                            style={{
-                              background: "#1e40af",
-                              color: "white",
-                              padding: "6px 8px",
-                              textAlign: "right",
-                              fontSize: "9px",
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            Prix U.
-                          </th>
-                          <th
-                            style={{
-                              background: "#1e40af",
-                              color: "white",
-                              padding: "6px 8px",
-                              textAlign: "right",
-                              fontSize: "9px",
-                              textTransform: "uppercase",
-                              borderRadius: "0 4px 0 0",
-                            }}
-                          >
-                            Total
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(paymentReceipt?.invoice?.articles?.length > 0
-                          ? paymentReceipt.invoice.articles
-                          : (paymentReceipt?.produits || []).map((p: any) => ({
-                              designation: p.nom_produit,
-                              quantite: p.quantite,
-                              prixUnitaire: p.prix_unitaire,
-                              total:
-                                p.sous_total ?? p.quantite * p.prix_unitaire,
-                            }))
-                        ).map((article: any, index: number) => (
-                          <tr
-                            key={index}
-                            style={{
-                              background: index % 2 === 0 ? "white" : "#f8fafc",
-                            }}
-                          >
-                            <td
-                              style={{
-                                padding: "6px 8px",
-                                borderBottom: "1px solid #e2e8f0",
-                                fontSize: "10px",
-                              }}
-                            >
-                              {article.designation}
-                            </td>
-                            <td
-                              style={{
-                                padding: "6px 8px",
-                                borderBottom: "1px solid #e2e8f0",
-                                fontSize: "10px",
-                                textAlign: "right",
-                              }}
-                            >
-                              {article.quantite}
-                            </td>
-                            <td
-                              style={{
-                                padding: "6px 8px",
-                                borderBottom: "1px solid #e2e8f0",
-                                fontSize: "10px",
-                                textAlign: "right",
-                              }}
-                            >
-                              {formatCurrency(article.prixUnitaire)}
-                            </td>
-                            <td
-                              style={{
-                                padding: "6px 8px",
-                                borderBottom: "1px solid #e2e8f0",
-                                fontSize: "10px",
-                                textAlign: "right",
-                                fontWeight: "500",
-                              }}
-                            >
-                              {formatCurrency(article.total)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-
-                  {/* Totaux */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "flex-end",
-                      marginTop: "10px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "220px",
-                        background: "#f0f9ff",
-                        borderRadius: "6px",
-                        border: "1px solid #bae6fd",
-                        padding: "10px 12px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "4px 0",
-                          fontSize: "10px",
-                        }}
-                      >
-                        <span>Total vente:</span>
-                        <span>
-                          {formatCurrency(paymentReceipt.total_vente)}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "4px 0",
-                          fontSize: "10px",
-                        }}
-                      >
-                        <span>Ancien solde:</span>
-                        <span>
-                          {formatCurrency(paymentReceipt.ancien_restant)}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "6px 0",
-                          fontSize: "14px",
-                          fontWeight: "bold",
-                          color: "#1e40af",
-                          borderTop: "2px solid #1e40af",
-                          marginTop: "4px",
-                        }}
-                      >
-                        <span>PAIEMENT:</span>
-                        <span>{formatCurrency(paymentReceipt.montant)}</span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: "10px",
-                          margin: "2px 0",
-                        }}
-                      >
-                        <span>Mode:</span>
-                        <span>{paymentReceipt.methode_paiement}</span>
-                      </div>
-                      {paymentReceipt.reference && (
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            fontSize: "10px",
-                            margin: "2px 0",
-                          }}
-                        >
-                          <span>Réf:</span>
-                          <span>{paymentReceipt.reference}</span>
-                        </div>
-                      )}
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                          marginTop: "6px",
-                          paddingTop: "6px",
-                          borderTop: "1px solid #e2e8f0",
-                          color:
-                            paymentReceipt.nouveau_restant <= 0
-                              ? "#16a34a"
-                              : "#dc2626",
-                        }}
-                      >
-                        <span>RESTE:</span>
-                        <span>
-                          {paymentReceipt.nouveau_restant <= 0
-                            ? `0 ${config?.devise || "FCFA"} (Soldé)`
-                            : formatCurrency(paymentReceipt.nouveau_restant)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer */}
-                  <div
-                    style={{
-                      marginTop: "20px",
-                      textAlign: "center",
-                      paddingTop: "10px",
-                      borderTop: "1px solid #e2e8f0",
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: "500",
-                        color: "#1e40af",
-                        marginBottom: "3px",
-                      }}
-                    >
-                      {config?.message_pied || "Merci de votre confiance !"}
-                    </p>
-                    {config?.support_text && (
-                      <p style={{ fontSize: "9px", color: "#94a3b8" }}>
-                        {config.support_text}
-                      </p>
-                    )}
-                    <div
-                      style={{
-                        marginTop: "8px",
-                        fontSize: "8px",
-                        color: "#1e40af",
-                        lineHeight: "1.5",
-                      }}
-                    >
-                      {config?.telephone && (
-                        <p>
-                          <strong>Tél:</strong> {config.telephone}
-                          {config?.telephone2 ? ` / ${config.telephone2}` : ""}
-                        </p>
-                      )}
-                      {config?.email && (
-                        <p>
-                          <strong>Email:</strong> {config.email}
-                        </p>
-                      )}
-                      {config?.secteur && <p>{config.secteur}</p>}
-                      <p>
-                        {config?.nif && (
-                          <>
-                            <strong>IFU:</strong> {config.nif}
-                          </>
-                        )}
-                        {config?.rccm && (
-                          <>
-                            {" "}
-                            <strong>RCCM:</strong> {config.rccm}
-                          </>
-                        )}
-                        {config?.regime_fiscal && (
-                          <>
-                            {" "}
-                            <strong>Régime fiscal:</strong>{" "}
-                            {config.regime_fiscal}
-                          </>
-                        )}
-                      </p>
-                      <p>
-                        {config?.division_fiscale && (
-                          <>
-                            <strong>Division fiscale:</strong>{" "}
-                            {config.division_fiscale}
-                          </>
-                        )}
-                        {config?.numero_compte_uba && (
-                          <>
-                            {" "}
-                            <strong>N° Compte UBA:</strong>{" "}
-                            {config.numero_compte_uba}
-                          </>
-                        )}
-                      </p>
-                      {config?.reference_cadastrale && (
-                        <p>
-                          <strong>Réf. cadastrales:</strong>{" "}
-                          {config.reference_cadastrale}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  title="Aperçu reçu"
+                />
               </div>
 
               {/* Boutons */}
               <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 rounded-b-2xl flex-shrink-0 flex-wrap">
                 <button
                   onClick={() => setShowReceipt(false)}
-                  className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 min-w-[100px]"
+                  className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:text-black rounded-xl font-semibold transition-all flex items-center justify-center gap-2 min-w-[100px]"
                 >
                   <X className="w-5 h-5" />
                   Fermer

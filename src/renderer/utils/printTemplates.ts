@@ -81,6 +81,62 @@ function buildFiscalFooterContent(config: Configuration | null): string {
     .join("");
 }
 
+function buildTableTotals(data: PrintData): string {
+  const isProforma = data.document_type === "PROFORMA";
+  const isRecu = data.document_type === "RECU";
+  const remiseAmount = (data.total_avant_remise ?? 0) - data.total_ttc;
+  let rows = "";
+
+  if (data.total_avant_remise && remiseAmount > 0) {
+    rows += `<tr class="tfoot-sub"><td colspan="3">Sous-total</td><td class="text-right">${formatCurrency(data.total_avant_remise)}</td></tr>`;
+    rows += `<tr class="tfoot-sub"><td colspan="3">Remise (${data.remise_type === "pourcentage" ? data.remise_valeur + "%" : formatCurrency(data.remise_valeur || 0)})</td><td class="text-right">-${formatCurrency(remiseAmount)}</td></tr>`;
+  }
+  rows += `<tr class="tfoot-total"><td colspan="3">Total Général</td><td class="text-right">${formatCurrency(data.total_ttc)}</td></tr>`;
+
+  if (!isProforma) {
+    if (isRecu && (data.montant_paye ?? 0) > 0) {
+      rows += `<tr class="tfoot-pay"><td colspan="3">Montant payé</td><td class="text-right">${formatCurrency(data.montant_paye!)}</td></tr>`;
+    }
+    if ((data.monnaie_rendue ?? 0) > 0) {
+      rows += `<tr class="tfoot-pay"><td colspan="3">Monnaie rendue</td><td class="text-right">${formatCurrency(data.monnaie_rendue!)}</td></tr>`;
+    }
+    if ((data.montant_restant ?? 0) > 0) {
+      rows += `<tr class="tfoot-remaining"><td colspan="3">Reste à payer</td><td class="text-right">${formatCurrency(data.montant_restant!)}</td></tr>`;
+    }
+    if (isRecu && (data.montant_restant ?? 0) <= 0) {
+      rows += `<tr class="tfoot-solde"><td colspan="4">✓ SOLDÉ</td></tr>`;
+    }
+  }
+  return rows;
+}
+
+function buildRightInfo(data: PrintData): string {
+  const isProforma = data.document_type === "PROFORMA";
+  const isRecu = data.document_type === "RECU";
+
+  if (isProforma) {
+    return `
+      ${data.date_validite ? `<div class="info-row"><span class="info-label">Valide jusqu'au :</span><span>${data.date_validite}</span></div>` : ""}
+      ${data.vendeur ? `<div class="info-row"><span class="info-label">Établi par :</span><span>${data.vendeur}</span></div>` : ""}
+    `;
+  } else if (isRecu) {
+    return `
+      ${data.vendeur ? `<div class="info-row"><span class="info-label">Caissier :</span><span>${data.vendeur}</span></div>` : ""}
+      ${data.methode_paiement ? `<div class="info-row"><span class="info-label">Règlement :</span><span>${data.methode_paiement}</span></div>` : ""}
+    `;
+  } else {
+    return `
+      <div class="info-row"><span class="info-label">Montant à payer :</span><span>${formatCurrency(data.total_ttc)}</span></div>
+      ${(data.montant_paye ?? 0) > 0 ? `<div class="info-row"><span class="info-label">Versement :</span><span>${formatCurrency(data.montant_paye!)}</span></div>` : ""}
+      ${(data.montant_restant ?? 0) > 0 ? `<div class="info-row"><span class="info-label">Reste à payer :</span><span>${formatCurrency(data.montant_restant!)}</span></div>` : ""}
+      ${data.methode_paiement ? `<div class="info-row"><span class="info-label">Règlement :</span><span>${data.methode_paiement}</span></div>` : ""}
+      ${data.vendeur ? `<div class="info-row"><span class="info-label">Caissier :</span><span>${data.vendeur}${data.serveur_nom ? " | " + data.serveur_nom : ""}</span></div>` : ""}
+    `;
+  }
+}
+
+// ─── A4 ───────────────────────────────────────────────────────────────────────
+
 export function generateA4HTML(
   data: PrintData,
   config: Configuration | null,
@@ -89,227 +145,151 @@ export function generateA4HTML(
 ): string {
   const isProforma = data.document_type === "PROFORMA";
   const isRecu = data.document_type === "RECU";
+  const docTitle = isProforma ? "PROFORMA" : isRecu ? "REÇU" : "FACTURE";
 
-  const primaryColor = isProforma || isRecu ? "#1e3a8a" : "#1e40af";
-  const headerBorderColor = isProforma || isRecu ? "#1e3a8a" : "#2563eb";
-  const infoBoxBg = isProforma ? "#eff6ff" : "#f8fafc";
-  const infoBoxBorder = isProforma ? "#bfdbfe" : "#e2e8f0";
-  const tableHeaderCSS = isProforma
-    ? `background: #1e3a8a; color: white; padding: 6px 8px; text-align: left; font-size: 18px; text-transform: uppercase; letter-spacing: 0.2px;`
-    : `background: #1e40af; color: white; padding: 8px 10px; text-align: left; font-size: 18px; text-transform: uppercase; letter-spacing: 0.2px;`;
-  const tableEvenBg = isProforma ? "#eff6ff" : "#eef2ff";
+  const tfootRows = buildTableTotals(data);
+  const rightInfoHTML = buildRightInfo(data);
 
-  const remiseAmount = (data.total_avant_remise ?? 0) - data.total_ttc;
-
-  // Badge
-  const badgeStyle = isRecu
-    ? `background: #22c55e; color: white; padding: 7px 16px; border-radius: 4px; font-size: 20px; font-weight: bold; text-align: center; min-width: 75px;`
-    : `color: black; padding: 7px 16px; border-radius: 4px; font-size: 20px; font-weight: bold; text-align: center; min-width: 75px;`;
-  const badgeLabel = isRecu ? "RECU" : data.document_type;
-  const badgeSubLabel = isRecu ? "Paiement Dette" : `N° ${data.numero}`;
-
-  // Info box 2
-  const infoBox2Title = isProforma ? "Document" : "Facture";
-  let infoBox2Content = "";
-  if (isRecu) {
-    infoBox2Content = `
-      <p><strong>N°:</strong> ${data.numero}</p>
-      <p><strong>Date:</strong> ${data.date}</p>
-      ${data.vendeur ? `<p><strong>Caissier:</strong> ${data.vendeur}</p>` : ""}
-    `;
-  } else if (isProforma) {
-    infoBox2Content = `
-      <p><strong>N°:</strong> ${data.numero} | <strong>Date:</strong> ${data.date}</p>
-      ${data.date_validite ? `<p><strong>Valide jusqu'au:</strong> ${data.date_validite}</p>` : ""}
-    `;
-  } else {
-    infoBox2Content = `
-      <p><strong>Date:</strong> ${data.date}${data.heure ? ` | <strong>Heure:</strong> ${data.heure}` : ""}</p>
-      ${data.vendeur ? `<p><strong>Caissier:</strong> ${data.vendeur}${data.serveur_nom ? ` | <strong>Serveur:</strong> ${data.serveur_nom}` : ""}</p>` : ""}
-    `;
-  }
-
-  // Totals
-  let totalsHTML = "";
-  if (data.total_avant_remise) {
-    totalsHTML += `
-      <div class="totals-row subtotal">
-        <span>Sous-total:</span>
-        <span>${formatCurrency(data.total_avant_remise)}</span>
-      </div>
-      <div class="totals-row discount">
-        <span>Remise (${data.remise_type === "pourcentage" ? data.remise_valeur + "%" : formatCurrency(data.remise_valeur || 0)}):</span>
-        <span>-${formatCurrency(remiseAmount)}</span>
-      </div>
-    `;
-  }
-  totalsHTML += `
-    <div class="totals-row grand-total">
-      <span>Total TTC:</span>
-      <span>${formatCurrency(data.total_ttc)}</span>
-    </div>
-  `;
-  if (isRecu) {
-    if ((data.montant_paye ?? 0) > 0) {
-      totalsHTML += `<div class="totals-row payed"><span>Montant payé:</span><span>${formatCurrency(data.montant_paye!)}</span></div>`;
-    }
-    if ((data.montant_restant ?? 0) <= 0) {
-      totalsHTML += `<div style="margin-top:8px;"><span class="solde-badge">✓ SOLDÉ</span></div>`;
-    } else {
-      totalsHTML += `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(data.montant_restant!)}</span></div>`;
-    }
-  } else if (!isProforma) {
-    if (data.methode_paiement) {
-      totalsHTML += `<div class="totals-row payment-info"><span>Reglement: ${data.methode_paiement} | Recu: ${formatCurrency(data.montant_paye || 0)}</span></div>`;
-    }
-    if ((data.monnaie_rendue ?? 0) > 0) {
-      totalsHTML += `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(data.monnaie_rendue!)}</span></div>`;
-    }
-    if ((data.montant_restant ?? 0) > 0) {
-      totalsHTML += `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(data.montant_restant!)}</span></div>`;
-    }
-    totalsHTML += `
-      <div style="margin-top: 6px;">
-        <span class="delivery-status ${data.livraison_differee ? "deferred" : "delivered"}">
-          ${data.livraison_differee ? "NON LIVRÉ" : "✓ LIVRÉ"}
-        </span>
-      </div>
-    `;
-  }
-
-  // Amount words
-  let amountWordsSection = "";
-  if (!isRecu) {
-    const label = isProforma ? "facture proforma" : "facture";
-    amountWordsSection = `
-      <div class="amount-words">
-        Arrete la presente ${label} a la somme de : <strong>${montantEnLettres(data.total_ttc, "francs CFA")}</strong>
-      </div>
-    `;
-  }
-
-  // Extra sections for PROFORMA
-  let extraSections = "";
-  if (isProforma) {
-    if (data.notes) {
-      extraSections += `<div class="notes"><strong>Notes:</strong> ${data.notes}</div>`;
-    }
-    if (data.date_validite) {
-      extraSections += `<div class="validity-notice"><strong>Important:</strong> Offre valable jusqu'au ${data.date_validite}</div>`;
-    }
-  }
-
-  // Footer
-  let footerContent = "";
-  let footerCSS = "";
-  if (data.show_fiscal_footer) {
-    footerContent = buildFiscalFooterContent(config);
-    footerCSS = `.footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid ${primaryColor}; text-align: center; font-size: 10px; color: ${primaryColor}; line-height: 1.6; } .footer p { margin: 2px 0; }`;
-  } else {
-    footerContent = `
-      <p class="message">${config?.message_pied || "Merci de votre confiance !"}</p>
-      ${config?.support_text ? `<p class="sub">${config.support_text}</p>` : ""}
-    `;
-    footerCSS = `.footer { margin-top: 15px; text-align: center; padding-top: 10px; border-top: 1px solid #e2e8f0; } .footer .message { font-size: 18px; font-weight: bold; color: ${primaryColor}; margin-bottom: 3px; } .footer .sub { font-size: 15px; color: #111; }`;
-  }
-
-  const soldeBadgeCSS = isRecu
-    ? `.totals-row.payed { color: #166534; font-weight: bold; } .solde-badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: bold; padding: 4px 14px; border-radius: 6px; margin-top: 8px; font-size: 17px; }`
+  const amountWordsSection = !isRecu
+    ? `<div class="amount-words">Arrêté la présente ${isProforma ? "proforma" : "facture"} à la somme de : <strong>${montantEnLettres(data.total_ttc, "francs CFA")}</strong></div>`
     : "";
+
+  const deliverySection =
+    !isProforma && !isRecu
+      ? `<div class="delivery-section"><span class="delivery-status ${data.livraison_differee ? "deferred" : "delivered"}">${data.livraison_differee ? "NON LIVRÉ" : "✓ LIVRÉ"}</span></div>`
+      : "";
+
+  const notesSection =
+    isProforma && data.notes
+      ? `<div class="notes"><strong>Notes :</strong> ${data.notes}</div>`
+      : "";
+
+  const signatureSection = !isRecu
+    ? `<div class="signatures">
+        <div class="sig-box"><div class="sig-title">Le vendeur</div><div class="sig-space"></div><div class="sig-line"></div></div>
+        <div class="sig-box"><div class="sig-title">Le Client</div><div class="sig-space"></div><div class="sig-line"></div></div>
+      </div>`
+    : "";
+
+  let footerContent = data.show_fiscal_footer
+    ? buildFiscalFooterContent(config)
+    : `<p>${config?.message_pied || "Merci de votre confiance !"}</p>${config?.support_text ? `<p>${config.support_text}</p>` : ""}`;
 
   return `<!DOCTYPE html>
 <html>
   <head>
-    <title>${data.document_type} - ${data.numero}</title>
+    <title>${docTitle} - ${data.numero}</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      @page { size: A4; margin: 8mm; }
-      body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 18px; font-weight: bold; line-height: 1.4; color: #000; }
-      .invoice { max-width: 194mm; margin: 0 auto; }
-      .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 2px solid ${headerBorderColor}; margin-bottom: 12px; }
-      .company-logo { width: 150px; display: flex; align-items: center; }
-      .company-logo img { max-height: 110px; max-width: 150px; object-fit: contain; }
-      .company-info { flex: 1; text-align: center; padding: 0 15px; }
-      .company-info h1 { font-size: 15px; color: ${primaryColor}; margin-bottom: 3px; }
-      .company-info p { font-size: 14px; color: #000; margin: 2px 0; }
-      .invoice-badge { ${badgeStyle} }
-      .invoice-badge .numero { font-size: 16px; font-weight: bold; margin-top: 2px; }
-      .info-grid { display: flex; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
-      .info-box { width: 48%; background: ${infoBoxBg}; padding: 10px 12px; border-radius: 4px; border: 1px solid ${infoBoxBorder}; }
-      .info-box h3 { font-size: 16px; text-transform: uppercase; color: #111; letter-spacing: 0.3px; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid ${infoBoxBorder}; }
-      .info-box p { margin: 3px 0; font-size: 18px; }
-      .info-box strong { color: #000; }
-      table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-      thead th { ${tableHeaderCSS} }
-      thead th:first-child { border-radius: 4px 0 0 0; }
-      thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
+      @page { size: A4; margin: 10mm; }
+      body { font-family: Arial, sans-serif; font-size: 15px; font-weight: bold; color: #000; line-height: 1.4; background: white; color-scheme: light; }
+      .invoice { max-width: 190mm; margin: 0 auto; }
+
+      /* Header */
+      .header { display: flex; align-items: flex-start; padding-bottom: 8px; border-bottom: 2px solid #000; margin-bottom: 8px; gap: 10px; }
+      .company-logo { flex-shrink: 0; }
+      .company-logo img { max-height: 80px; max-width: 100px; object-fit: contain; }
+      .company-info { flex: 1; text-align: center; }
+      .company-info h1 { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
+      .company-info .slogan { font-size: 10px; color: #444; font-style: italic; white-space: nowrap; }
+      .company-info p { font-size: 11px; margin: 1px 0; }
+      .invoice-ref { flex-shrink: 0; text-align: right; }
+      .invoice-ref .doc-type { font-size: 14px; font-weight: bold; display: block; }
+      .invoice-ref .doc-number { display: inline-block; border: 1.5px solid #000; padding: 3px 10px; font-size: 11px; font-weight: bold; margin-top: 4px; white-space: nowrap; }
+
+      /* Date */
+      .date-line { text-align: right; font-size: 14px; margin-bottom: 8px; color: #333; }
+
+      /* Info section */
+      .info-section { display: flex; justify-content: space-between; margin-bottom: 10px; padding: 6px 0; border-top: 1px solid #bbb; border-bottom: 1px solid #bbb; }
+      .info-col { width: 48%; }
+      .info-col h3 { font-size: 15px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 2px; display: inline-block; }
+      .info-row { display: flex; font-size: 14px; margin: 3px 0; gap: 5px; }
+      .info-label { font-weight: bold; min-width: 120px; flex-shrink: 0; }
+
+      /* Table */
+      table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+      thead th { background: #d4d4d4; padding: 6px 8px; text-align: left; font-size: 15px; border: 1px solid #999; font-weight: bold; }
       thead th.text-right { text-align: right; }
-      tbody td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; font-size: 19px; color: #000; }
-      tbody tr:nth-child(even) { background: ${tableEvenBg}; }
+      tbody td { padding: 5px 8px; border: 1px solid #ddd; font-size: 15px; }
+      tbody tr:nth-child(even) { background: #f4f4f4; }
       tbody td.text-right { text-align: right; }
-      .totals-section { display: flex; justify-content: flex-end; margin-top: 10px; }
-      .totals-box { width: 325px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 10px 12px; }
-      .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 18px; }
-      .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
-      .totals-row.discount { color: #dc2626; }
-      .totals-row.grand-total { font-size: 21px; font-weight: bold; color: ${primaryColor}; border-top: 2px solid ${primaryColor}; padding-top: 6px; margin-top: 5px; }
-      .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 5px; font-size: 17px; }
-      .totals-row.remaining { color: #dc2626; font-weight: bold; }
-      .delivery-status { font-weight: bold; padding: 3px 8px; border-radius: 3px; display: inline-block; margin-top: 6px; font-size: 17px; }
-      .delivered { background: #dcfce7; color: #166534; }
-      .deferred { background: #fef3c7; color: #92400e; }
-      .amount-words { margin-top: 10px; padding: 6px 10px; background: #fefce8; border: 1px solid #fde68a; border-radius: 4px; font-style: italic; font-size: 19px; color: #78350f; }
-      .notes { margin-top: 8px; padding: 6px 10px; background: #f9f9f9; border-radius: 4px; font-size: 16px; color: #000; }
-      .validity-notice { background: #eff6ff; border: 1px solid #bfdbfe; padding: 6px 10px; margin-top: 8px; border-radius: 4px; font-size: 16px; color: #000; }
-      .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 12px; padding-top: 10px; }
-      .qr-code { text-align: center; }
-      .qr-code img { width: 80px; height: 80px; }
-      .qr-code p { font-size: 15px; color: #111; margin-top: 3px; }
-      ${soldeBadgeCSS}
-      ${footerCSS}
+      tfoot td { padding: 5px 8px; border: 1px solid #aaa; font-size: 15px; }
+      tfoot .tfoot-total td { background: #d4d4d4; font-weight: bold; font-size: 16px; }
+      tfoot .tfoot-sub td { background: #e8e8e8; }
+      tfoot .tfoot-pay td { background: #f0f0f0; }
+      tfoot .tfoot-remaining td { background: #fee2e2; color: #991b1b; font-weight: bold; }
+      tfoot .tfoot-solde td { background: #dcfce7; color: #166534; font-weight: bold; text-align: center; }
+
+      /* Below table */
+      .amount-words { font-size: 14px; margin: 6px 0 8px; font-style: italic; }
+      .delivery-section { margin: 4px 0 8px; }
+      .delivery-status { font-weight: bold; padding: 3px 10px; border-radius: 3px; display: inline-block; font-size: 15px; border: 1px solid; }
+      .delivered { background: #dcfce7; color: #166534; border-color: #86efac; }
+      .deferred { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+      .notes { font-size: 14px; margin: 6px 0; padding: 6px 8px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 3px; }
+
+      /* Signatures */
+      .signatures { display: flex; justify-content: space-between; margin-top: 25px; margin-bottom: 10px; }
+      .sig-box { width: 30%; text-align: center; }
+      .sig-title { font-size: 15px; font-weight: bold; margin-bottom: 3px; }
+      .sig-space { height: 160px; }
+      .sig-line { border-top: 1px solid #000; padding-top: 3px; font-size: 13px; }
+
+      /* QR */
+      .qr-section { margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+      .qr-section img { width: 65px; height: 65px; }
+      .qr-section p { font-size: 12px; color: #555; }
+
+      /* Footer */
+      .footer { text-align: center; margin-top: 10px; padding-top: 6px; border-top: 1px solid #ccc; font-size: 12px; color: #333; line-height: 1.6; }
+      .footer p { margin: 1px 0; }
+      .footer strong { font-weight: bold; }
+
       @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
     </style>
   </head>
   <body>
     <div class="invoice">
+
       <div class="header">
         <div class="company-logo">
           ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
         </div>
         <div class="company-info">
           <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
-          ${config?.description_entreprise ? `<p style="font-size: 11px; color: #333; font-style: italic; white-space: nowrap;">${config.description_entreprise}</p>` : ""}
-          ${!isProforma && config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
-          ${!isProforma && config?.telephone ? `<p>Tel: ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}${config?.nif ? " | NIF: " + config.nif : ""}</p>` : ""}
-          ${!isProforma && config?.email && !config?.telephone ? `<p>${config.email}</p>` : ""}
+          ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
+          ${config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
+          ${config?.telephone ? `<p>Tel1: ${config.telephone}${config?.telephone2 ? "  Tel2: " + config.telephone2 : ""}${config?.nif ? "  NIF: " + config.nif : ""}</p>` : ""}
+          ${config?.email ? `<p>${config.email}</p>` : ""}
         </div>
-        <div class="invoice-badge">
-          ${badgeLabel}
-          <div class="numero">${badgeSubLabel}</div>
+        <div class="invoice-ref">
+          <span class="doc-type">${docTitle} N°</span>
+          <span class="doc-number">${data.numero}</span>
         </div>
-        
       </div>
 
-      <div class="info-grid">
-        <div class="info-box">
+      <div class="date-line">Date : ${data.date}${data.heure ? " &nbsp; " + data.heure : ""}</div>
+
+      <div class="info-section">
+        <div class="info-col">
           <h3>Client</h3>
-          <p><strong>${data.client_nom || "Client comptoir"}</strong></p>
-          ${data.client_telephone ? `<p>Tel: ${data.client_telephone}</p>` : ""}
-          ${data.client_email ? `<p>${data.client_email}</p>` : ""}
+          <div class="info-row"><span class="info-label">Nom :</span><span>${data.client_nom || "Client comptoir"}</span></div>
+          ${data.client_telephone ? `<div class="info-row"><span class="info-label">Téléphone :</span><span>${data.client_telephone}</span></div>` : ""}
+          ${data.client_email ? `<div class="info-row"><span class="info-label">Email :</span><span>${data.client_email}</span></div>` : ""}
         </div>
-        <div class="info-box">
-          <h3>${infoBox2Title}</h3>
-          ${infoBox2Content}
+        <div class="info-col">
+          ${rightInfoHTML}
         </div>
       </div>
 
       <table>
         <thead>
           <tr>
-            <th>Designation</th>
-            <th class="text-right" style="width: 40px;">Qte</th>
-            <th class="text-right" style="width: 180px;">P.U.</th>
-            <th class="text-right" style="width: 180px;">Total</th>
+            <th>Désignation</th>
+            <th class="text-right" style="width:50px;">Quantité</th>
+            <th class="text-right" style="width:160px;">Prix Unitaire</th>
+            <th class="text-right" style="width:160px;">Prix Total</th>
           </tr>
         </thead>
         <tbody>
@@ -326,22 +306,17 @@ export function generateA4HTML(
             )
             .join("")}
         </tbody>
+        <tfoot>
+          ${tfootRows}
+        </tfoot>
       </table>
 
-      <div class="totals-section">
-        <div class="totals-box">
-          ${totalsHTML}
-        </div>
-      </div>
-
       ${amountWordsSection}
-      ${extraSections}
+      ${deliverySection}
+      ${notesSection}
+      ${signatureSection}
 
-      <div class="qr-stamp-section">
-        <div class="qr-code">
-          ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
-        </div>
-      </div>
+      ${qrCodeUrl ? `<div class="qr-section"><img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour vérifier</p></div>` : ""}
 
       <div class="footer">
         ${footerContent}
@@ -355,6 +330,8 @@ export function generateA4HTML(
   </body>
 </html>`;
 }
+
+// ─── A5 ───────────────────────────────────────────────────────────────────────
 
 export function generateA5HTML(
   data: PrintData,
@@ -364,187 +341,113 @@ export function generateA5HTML(
 ): string {
   const isProforma = data.document_type === "PROFORMA";
   const isRecu = data.document_type === "RECU";
+  const docTitle = isProforma ? "PROFORMA" : isRecu ? "REÇU" : "FACTURE";
 
-  const primaryColor = isProforma || isRecu ? "#1e3a8a" : "#1e40af";
-  const infoBoxBg = isProforma ? "#eff6ff" : "#f8fafc";
-  const infoBoxBorder = isProforma ? "#bfdbfe" : "#e2e8f0";
+  const tfootRows = buildTableTotals(data);
+  const rightInfoHTML = buildRightInfo(data);
 
-  const tableEvenBg = isProforma ? "#eff6ff" : "#eef2ff";
-
-  const tableHeaderCSS = isProforma
-    ? `background: #1e3a8a; color: white; padding: 5px 6px; text-align: left; font-size: 15px; text-transform: uppercase; letter-spacing: 0.2px;`
-    : `background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 15px; text-transform: uppercase; letter-spacing: 0.2px;`;
-
-  const remiseAmount = (data.total_avant_remise ?? 0) - data.total_ttc;
-
-  // Badge
-  const badgeStyle = isRecu
-    ? `color: black; padding: 5px 10px; border-radius: 4px; font-size: 19px; font-weight: bold; text-align: center; white-space: nowrap;`
-    : `color: black; padding: 8px 10px; border-radius: 6px; font-size: 14px; font-weight: bold; text-align: center; white-space: nowrap;`;
-  const badgeLabel = isRecu ? "RECU" : data.document_type;
-  const badgeSubLabel = isRecu ? "Paiement Dette" : `N° ${data.numero}`;
-
-  // Info box 2
-  const infoBox2Title = isProforma ? "Document" : "Facture";
-  let infoBox2Content = "";
-  if (isRecu) {
-    infoBox2Content = `
-      <p><strong>N°:</strong> ${data.numero}</p>
-      <p><strong>Date:</strong> ${data.date}</p>
-    `;
-  } else if (isProforma) {
-    infoBox2Content = `
-      <p><strong>N°:</strong> ${data.numero} | <strong>Date:</strong> ${data.date}</p>
-      ${data.date_validite ? `<p><strong>Valide jusqu'au:</strong> ${data.date_validite}</p>` : ""}
-    `;
-  } else {
-    infoBox2Content = `
-      <p><strong>Date:</strong> ${data.date}${data.heure ? ` | <strong>Heure:</strong> ${data.heure}` : ""}</p>
-      ${data.vendeur ? `<p><strong>Caissier:</strong> ${data.vendeur}${data.serveur_nom ? ` | <strong>Serveur:</strong> ${data.serveur_nom}` : ""}</p>` : ""}
-    `;
-  }
-
-  // Totals
-  let totalsHTML = "";
-  if (data.total_avant_remise) {
-    totalsHTML += `
-      <div class="totals-row subtotal">
-        <span>Sous-total:</span>
-        <span>${formatCurrency(data.total_avant_remise)}</span>
-      </div>
-      <div class="totals-row discount">
-        <span>Remise (${data.remise_type === "pourcentage" ? data.remise_valeur + "%" : formatCurrency(data.remise_valeur || 0)}):</span>
-        <span>-${formatCurrency(remiseAmount)}</span>
-      </div>
-    `;
-  }
-  totalsHTML += `
-    <div class="totals-row grand-total">
-      <span>Total TTC:</span>
-      <span>${formatCurrency(data.total_ttc)}</span>
-    </div>
-  `;
-  if (isRecu) {
-    if ((data.montant_paye ?? 0) > 0) {
-      totalsHTML += `<div class="totals-row payed"><span>Montant payé:</span><span>${formatCurrency(data.montant_paye!)}</span></div>`;
-    }
-    if ((data.montant_restant ?? 0) <= 0) {
-      totalsHTML += `<div style="margin-top:6px;"><span class="solde-badge">✓ SOLDÉ</span></div>`;
-    } else {
-      totalsHTML += `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(data.montant_restant!)}</span></div>`;
-    }
-  } else if (!isProforma) {
-    if (data.methode_paiement) {
-      totalsHTML += `<div class="totals-row payment-info"><span>Reglement: ${data.methode_paiement} | Recu: ${formatCurrency(data.montant_paye || 0)}</span></div>`;
-    }
-    if ((data.monnaie_rendue ?? 0) > 0) {
-      totalsHTML += `<div class="totals-row"><span>Monnaie:</span><span>${formatCurrency(data.monnaie_rendue!)}</span></div>`;
-    }
-    if ((data.montant_restant ?? 0) > 0) {
-      totalsHTML += `<div class="totals-row remaining"><span>Reste:</span><span>${formatCurrency(data.montant_restant!)}</span></div>`;
-    }
-    totalsHTML += `
-      <div style="margin-top: 4px;">
-        <span class="delivery-status ${data.livraison_differee ? "deferred" : "delivered"}">
-          ${data.livraison_differee ? "NON LIVRÉ" : "✓ LIVRÉ"}
-        </span>
-      </div>
-    `;
-  }
-
-  // Amount words
-  let amountWordsSection = "";
-  if (!isRecu) {
-    amountWordsSection = `
-      <div style="margin-top: 3mm">
-        Arrêté à : <strong>${montantEnLettres(data.total_ttc, "francs CFA")}</strong>
-      </div>
-    `;
-  }
-
-  // Extra sections for PROFORMA
-  let extraSections = "";
-  if (isProforma) {
-    if (data.notes) {
-      extraSections += `<div class="notes"><strong>Notes:</strong> ${data.notes}</div>`;
-    }
-    if (data.date_validite) {
-      extraSections += `<div class="validity-notice"><strong>Important:</strong> Offre valable jusqu'au ${data.date_validite}</div>`;
-    }
-  }
-
-  // Footer
-  let footerContent = "";
-  if (data.show_fiscal_footer) {
-    footerContent = buildFiscalFooterContent(config);
-  } else {
-    footerContent = `
-      <p>${config?.message_pied || "Merci de votre confiance !"}</p>
-      ${config?.support_text ? `<p>${config.support_text}</p>` : ""}
-    `;
-  }
-
-  const soldeBadgeCSS = isRecu
-    ? `.totals-row.payed { color: #166534; font-weight: bold; } .solde-badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: bold; padding: 3px 10px; border-radius: 4px; margin-top: 6px; font-size: 18px; }`
+  const amountWordsSection = !isRecu
+    ? `<div class="amount-words">Arrêté la présente ${isProforma ? "proforma" : "facture"} à la somme de : <strong>${montantEnLettres(data.total_ttc, "francs CFA")}</strong></div>`
     : "";
+
+  const deliverySection =
+    !isProforma && !isRecu
+      ? `<div class="delivery-section"><span class="delivery-status ${data.livraison_differee ? "deferred" : "delivered"}">${data.livraison_differee ? "NON LIVRÉ" : "✓ LIVRÉ"}</span></div>`
+      : "";
+
+  const notesSection =
+    isProforma && data.notes
+      ? `<div class="notes"><strong>Notes :</strong> ${data.notes}</div>`
+      : "";
+
+  const signatureSection = !isRecu
+    ? `<div class="signatures">
+        <div class="sig-box"><div class="sig-title">Le vendeur</div><div class="sig-space"></div><div class="sig-line"></div></div>
+        <div class="sig-box"><div class="sig-title">Le Client</div><div class="sig-space"></div><div class="sig-line"></div></div>
+      </div>`
+    : "";
+
+  let footerContent = data.show_fiscal_footer
+    ? buildFiscalFooterContent(config)
+    : `<p>${config?.message_pied || "Merci de votre confiance !"}</p>${config?.support_text ? `<p>${config.support_text}</p>` : ""}`;
 
   return `<!DOCTYPE html>
 <html>
   <head>
-    <title>${data.document_type} - ${data.numero}</title>
+    <title>${docTitle} - ${data.numero}</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      @page { size: A5; margin: 6mm; }
-      body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; font-weight: bold; line-height: 1.3; color: #000; }
-      .invoice { max-width: 136mm; margin: 0 auto; }
-      .header { display: flex; align-items: center; padding-bottom: 8px; border-bottom: 2px solid ${primaryColor}; margin-bottom: 10px; }
-      .company-logo { display: flex; align-items: center; }
-      .company-logo img { max-height: 70px; max-width: 60px; object-fit: contain; }
-      .company-info { flex: 1; min-width: 0; padding: 0 10px; text-align: center; overflow: hidden; }
-      .company-info h1 { font-size: 15px; font-weight: bold; color: ${primaryColor}; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .company-info .slogan { font-size: 10px; color: ${primaryColor}; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .company-info .header-detail { font-size: 10px; color: #000; margin: 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .invoice-badge { ${badgeStyle} flex-shrink: 0; }
-      .invoice-badge .numero { font-size: 11px; font-weight: bold; margin-top: 3px; white-space: nowrap; }
-      .info-grid { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
-      .info-box { width: 48%; background: ${infoBoxBg}; padding: 8px 10px; border-radius: 4px; border: 1px solid ${infoBoxBorder}; }
-      .info-box h3 { font-size: 12px; text-transform: uppercase; color: ${isProforma ? primaryColor : "#111"}; letter-spacing: 0.3px; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid ${infoBoxBorder}; }
-      .info-box p { margin: 2px 0; font-size: 14px; }
-      .info-box strong { color: #000; }
-      table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-      thead th { ${tableHeaderCSS} }
-      thead th:first-child { border-radius: 4px 0 0 0; }
-      thead th:last-child { border-radius: 0 4px 0 0; text-align: right; }
+      @page { size: A5; margin: 8mm; }
+      body { font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; color: #000; line-height: 1.4; background: white; color-scheme: light; }
+      .invoice { max-width: 132mm; margin: 0 auto; }
+
+      /* Header */
+      .header { display: flex; align-items: flex-start; padding-bottom: 6px; border-bottom: 2px solid #000; margin-bottom: 6px; gap: 8px; }
+      .company-logo { flex-shrink: 0; }
+      .company-logo img { max-height: 60px; max-width: 75px; object-fit: contain; }
+      .company-info { flex: 1; min-width: 0; text-align: center; overflow: hidden; }
+      .company-info h1 { font-size: 13px; font-weight: bold; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .company-info .slogan { font-size: 8px; color: #444; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .company-info p { font-size: 9px; margin: 1px 0; }
+      .invoice-ref { flex-shrink: 0; text-align: right; }
+      .invoice-ref .doc-type { font-size: 12px; font-weight: bold; display: block; white-space: nowrap; }
+      .invoice-ref .doc-number { display: inline-block; border: 1.5px solid #000; padding: 2px 7px; font-size: 9px; font-weight: bold; margin-top: 3px; white-space: nowrap; }
+
+      /* Date */
+      .date-line { text-align: right; font-size: 12px; margin-bottom: 6px; color: #333; }
+
+      /* Info section */
+      .info-section { display: flex; justify-content: space-between; margin-bottom: 8px; padding: 4px 0; border-top: 1px solid #bbb; border-bottom: 1px solid #bbb; }
+      .info-col { width: 48%; }
+      .info-col h3 { font-size: 13px; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 1px; display: inline-block; }
+      .info-row { display: flex; font-size: 12px; margin: 2px 0; gap: 4px; }
+      .info-label { font-weight: bold; min-width: 95px; flex-shrink: 0; }
+
+      /* Table */
+      table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+      thead th { background: #d4d4d4; padding: 4px 6px; text-align: left; font-size: 13px; border: 1px solid #999; font-weight: bold; }
       thead th.text-right { text-align: right; }
-      tbody td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 15px; color: #000; }
-      tbody tr:nth-child(even) { background: ${tableEvenBg}; }
+      tbody td { padding: 3px 6px; border: 1px solid #ddd; font-size: 13px; }
+      tbody tr:nth-child(even) { background: #f4f4f4; }
       tbody td.text-right { text-align: right; }
-      .totals-section { display: flex; justify-content: flex-end; margin-top: 8px; }
-      .totals-box { width: 300px; background: #f0f9ff; border-radius: 4px; border: 1px solid #bae6fd; padding: 8px 10px; }
-      .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
-      .totals-row.subtotal { border-bottom: 1px solid #e2e8f0; }
-      .totals-row.discount { color: #dc2626; }
-      .totals-row.grand-total { font-size: 17px; font-weight: bold; color: ${primaryColor}; border-top: 2px solid ${primaryColor}; padding-top: 5px; margin-top: 4px; }
-      .totals-row.payment-info { border-top: 1px dashed #bae6fd; padding-top: 5px; margin-top: 4px; font-size: 13px; }
-      .totals-row.remaining { color: #dc2626; font-weight: bold; }
-      .delivery-status { font-weight: bold; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 5px; font-size: 13px; }
-      .delivered { background: #dcfce7; color: #166534; }
-      .deferred { background: #fef3c7; color: #92400e; }
-      .notes { margin-top: 6px; padding: 4px 8px; background: #f9f9f9; border-radius: 4px; font-size: 17px; color: #000; }
-      .validity-notice { background: #eff6ff; border: 1px solid #bfdbfe; padding: 4px 8px; margin-top: 6px; border-radius: 4px; font-size: 17px; color: #000; }
-      .qr-stamp-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px; padding-top: 8px; }
-      .qr-code { text-align: center; }
-      .qr-code img { width: 60px; height: 60px; }
-      .qr-code p { font-size: 11px; color: #111; margin-top: 2px; }
-      .footer { margin-top: 10px; border-top: 1px solid ${primaryColor}; padding-top: 4px; text-align: center; font-size: 9px; color: ${primaryColor}; line-height: 1.5; }
+      tfoot td { padding: 4px 6px; border: 1px solid #aaa; font-size: 13px; }
+      tfoot .tfoot-total td { background: #d4d4d4; font-weight: bold; font-size: 14px; }
+      tfoot .tfoot-sub td { background: #e8e8e8; }
+      tfoot .tfoot-pay td { background: #f0f0f0; }
+      tfoot .tfoot-remaining td { background: #fee2e2; color: #991b1b; font-weight: bold; }
+      tfoot .tfoot-solde td { background: #dcfce7; color: #166534; font-weight: bold; text-align: center; }
+
+      /* Below table */
+      .amount-words { font-size: 12px; margin: 5px 0 6px; font-style: italic; }
+      .delivery-section { margin: 3px 0 6px; }
+      .delivery-status { font-weight: bold; padding: 2px 7px; border-radius: 3px; display: inline-block; font-size: 12px; border: 1px solid; }
+      .delivered { background: #dcfce7; color: #166534; border-color: #86efac; }
+      .deferred { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+      .notes { font-size: 12px; margin: 4px 0; padding: 4px 6px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 3px; }
+
+      /* Signatures */
+      .signatures { display: flex; justify-content: space-between; margin-top: 18px; margin-bottom: 8px; }
+      .sig-box { width: 30%; text-align: center; }
+      .sig-title { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
+      .sig-space { height: 110px; }
+      .sig-line { border-top: 1px solid #000; padding-top: 2px; font-size: 11px; }
+
+      /* QR */
+      .qr-section { margin-top: 6px; display: flex; align-items: center; gap: 5px; }
+      .qr-section img { width: 45px; height: 45px; }
+      .qr-section p { font-size: 11px; color: #555; }
+
+      /* Footer */
+      .footer { text-align: center; margin-top: 8px; padding-top: 5px; border-top: 1px solid #ccc; font-size: 11px; color: #333; line-height: 1.5; }
       .footer p { margin: 1px 0; }
-      .footer strong { font-weight: 700; }
-      ${soldeBadgeCSS}
+      .footer strong { font-weight: bold; }
+
       @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
     </style>
   </head>
   <body>
     <div class="invoice">
+
       <div class="header">
         <div class="company-logo">
           ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ""}
@@ -552,36 +455,37 @@ export function generateA5HTML(
         <div class="company-info">
           <h1>${config?.nom_entreprise || "Mon Entreprise"}</h1>
           ${config?.description_entreprise ? `<p class="slogan">${config.description_entreprise}</p>` : ""}
-          ${!isProforma && config?.adresse ? `<p class="header-detail">${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
-          ${!isProforma && config?.telephone ? `<p class="header-detail">Tel: ${config.telephone}${config?.telephone2 ? " / " + config.telephone2 : ""}${config?.nif ? " | NIF: " + config.nif : ""}</p>` : ""}
-          ${!isProforma && config?.email && !config?.telephone ? `<p class="header-detail">${config.email}</p>` : ""}
+          ${!isProforma && config?.adresse ? `<p>${config.adresse}${config?.ville ? ", " + config.ville : ""}</p>` : ""}
+          ${!isProforma && config?.telephone ? `<p>Tel1: ${config.telephone}${config?.telephone2 ? "  Tel2: " + config.telephone2 : ""}${config?.nif ? "  NIF: " + config.nif : ""}</p>` : ""}
+          ${!isProforma && config?.email ? `<p>${config.email}</p>` : ""}
         </div>
-        <div class="invoice-badge">
-          ${badgeLabel}
-          <div class="numero">${badgeSubLabel}</div>
+        <div class="invoice-ref">
+          <span class="doc-type">${docTitle} N°</span>
+          <span class="doc-number">${data.numero}</span>
         </div>
       </div>
 
-      <div class="info-grid">
-        <div class="info-box">
+      <div class="date-line">Date : ${data.date}${data.heure ? " &nbsp; " + data.heure : ""}</div>
+
+      <div class="info-section">
+        <div class="info-col">
           <h3>Client</h3>
-          <p><strong>${data.client_nom || "Client comptoir"}</strong></p>
-          ${data.client_telephone ? `<p>Tel: ${data.client_telephone}</p>` : ""}
-          ${data.client_email ? `<p>${data.client_email}</p>` : ""}
+          <div class="info-row"><span class="info-label">Nom :</span><span>${data.client_nom || "Client comptoir"}</span></div>
+          ${data.client_telephone ? `<div class="info-row"><span class="info-label">Téléphone :</span><span>${data.client_telephone}</span></div>` : ""}
+          ${data.client_email ? `<div class="info-row"><span class="info-label">Email :</span><span>${data.client_email}</span></div>` : ""}
         </div>
-        <div class="info-box">
-          <h3>${infoBox2Title}</h3>
-          ${infoBox2Content}
+        <div class="info-col">
+          ${rightInfoHTML}
         </div>
       </div>
 
       <table>
         <thead>
           <tr>
-            <th>Designation</th>
-            <th class="text-right" style="width: 35px;">Qte</th>
-            <th class="text-right" style="width: 140px;">P.U.</th>
-            <th class="text-right" style="width: 140px;">Total</th>
+            <th>Désignation</th>
+            <th class="text-right" style="width:35px;">Qté</th>
+            <th class="text-right" style="width:120px;">Prix Unitaire</th>
+            <th class="text-right" style="width:120px;">Prix Total</th>
           </tr>
         </thead>
         <tbody>
@@ -598,22 +502,17 @@ export function generateA5HTML(
             )
             .join("")}
         </tbody>
+        <tfoot>
+          ${tfootRows}
+        </tfoot>
       </table>
 
-      <div class="totals-section">
-        <div class="totals-box">
-          ${totalsHTML}
-        </div>
-      </div>
-
       ${amountWordsSection}
-      ${extraSections}
+      ${deliverySection}
+      ${notesSection}
+      ${signatureSection}
 
-      <div class="qr-stamp-section">
-        <div class="qr-code">
-          ${qrCodeUrl ? `<img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour verifier</p>` : ""}
-        </div>
-      </div>
+      ${qrCodeUrl ? `<div class="qr-section"><img src="${qrCodeUrl}" alt="QR Code" /><p>Scanner pour vérifier</p></div>` : ""}
 
       <div class="footer">
         ${footerContent}
@@ -627,6 +526,8 @@ export function generateA5HTML(
   </body>
 </html>`;
 }
+
+// ─── 80mm ─────────────────────────────────────────────────────────────────────
 
 export function generate80mmHTML(
   data: PrintData,
@@ -639,7 +540,6 @@ export function generate80mmHTML(
     ? `PROFORMA N° ${data.numero}`
     : `${data.document_type} N° ${data.numero}`;
 
-  // Articles section
   const articlesHTML = data.articles
     .map(
       (a) => `
@@ -654,7 +554,6 @@ export function generate80mmHTML(
     )
     .join("");
 
-  // Totals section
   let totalsHTML = "";
   if (data.total_avant_remise) {
     totalsHTML += `
@@ -673,7 +572,6 @@ export function generate80mmHTML(
     </div>
   `;
 
-  // Payment section (non-proforma)
   let paymentHTML = "";
   if (!isProforma) {
     if ((data.montant_paye ?? 0) > 0) {
@@ -699,7 +597,6 @@ export function generate80mmHTML(
     }
   }
 
-  // Notes (proforma)
   const notesHTML =
     isProforma && data.notes
       ? `<div style="font-size: 10px; margin: 2mm 0; padding: 2mm 0; border-bottom: 1px dashed #000;"><strong>Notes:</strong> ${data.notes}</div>`
