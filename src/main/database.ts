@@ -7,7 +7,7 @@ let db: Database.Database;
 
 // Version actuelle du schéma de la base de données
 // Incrémentez ce numéro à chaque nouveau changement de schéma
-const CURRENT_SCHEMA_VERSION = 17;
+const CURRENT_SCHEMA_VERSION = 18;
 
 // Vérifier l'intégrité de la base de données
 function checkAndRepairDatabase(): { success: boolean; message: string } {
@@ -1107,6 +1107,11 @@ function createTables() {
       remise_type TEXT DEFAULT NULL,
       remise_valeur REAL DEFAULT 0,
       total_avant_remise REAL DEFAULT NULL,
+      locked INTEGER DEFAULT 0,
+      delivered INTEGER DEFAULT 1,
+      date_livraison DATETIME,
+      livraison_differee INTEGER DEFAULT 0,
+      utilisateur_nom TEXT,
       date_vente DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
       FOREIGN KEY (serveur_id) REFERENCES serveurs(id) ON DELETE SET NULL
@@ -1253,6 +1258,7 @@ function createTables() {
       remise_type TEXT DEFAULT NULL,
       remise_valeur REAL DEFAULT 0,
       total_avant_remise REAL DEFAULT NULL,
+      locked INTEGER DEFAULT 0,
       articles TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (vente_id) REFERENCES ventes(id) ON DELETE CASCADE
@@ -1300,6 +1306,12 @@ function createTables() {
       telephone2 TEXT,
       email TEXT,
       nif TEXT,
+      rccm TEXT DEFAULT '',
+      regime_fiscal TEXT DEFAULT '',
+      division_fiscale TEXT DEFAULT '',
+      numero_compte_uba TEXT DEFAULT '',
+      reference_cadastrale TEXT DEFAULT '',
+      secteur TEXT DEFAULT '',
       ville TEXT,
       pays TEXT,
       devise TEXT DEFAULT 'FCFA',
@@ -1323,6 +1335,80 @@ function createTables() {
       user_agent TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Table client_prix (migration 8)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_prix (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL,
+      produit_id INTEGER NOT NULL,
+      prix_personnalise REAL NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+      FOREIGN KEY (produit_id) REFERENCES produits(id) ON DELETE CASCADE,
+      UNIQUE(client_id, produit_id)
+    )
+  `);
+
+  // Table depenses (migration 9)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS depenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      categorie TEXT NOT NULL CHECK(categorie IN ('restauration', 'energie', 'carburant', 'transport', 'fournitures', 'salaire', 'loyer', 'communication', 'don', 'maintenance', 'autre')),
+      description TEXT NOT NULL,
+      montant REAL NOT NULL,
+      date_depense DATE NOT NULL,
+      methode_paiement TEXT CHECK(methode_paiement IN ('especes', 'carte', 'virement', 'cheque', 'mobile')),
+      reference TEXT,
+      utilisateur_id INTEGER,
+      utilisateur_nom TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Table caisses (migration 14)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS caisses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date_ouverture DATE NOT NULL,
+      heure_ouverture TEXT NOT NULL,
+      fonds_roulement REAL NOT NULL DEFAULT 0,
+      date_fermeture DATE,
+      heure_fermeture TEXT,
+      vendeur_id INTEGER,
+      vendeur_nom TEXT,
+      total_ventes REAL DEFAULT 0,
+      total_especes REAL DEFAULT 0,
+      total_carte REAL DEFAULT 0,
+      total_mobile REAL DEFAULT 0,
+      statut TEXT DEFAULT 'ouverte' CHECK(statut IN ('ouverte', 'fermee')),
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vendeur_id) REFERENCES utilisateurs(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Table livraisons (migration 16)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS livraisons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      vente_id INTEGER NOT NULL,
+      client_id INTEGER,
+      client_nom TEXT,
+      adresse_livraison TEXT,
+      date_prevue DATE,
+      date_livraison DATETIME,
+      statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'en_cours', 'livree', 'annulee')),
+      notes TEXT,
+      livreur TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vente_id) REFERENCES ventes(id) ON DELETE CASCADE,
+      FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
     )
   `);
 
@@ -1356,6 +1442,17 @@ function createTables() {
     CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_logs(table_cible);
     CREATE INDEX IF NOT EXISTS idx_achats_date ON achats(date_achat);
     CREATE INDEX IF NOT EXISTS idx_serveurs_actif ON serveurs(actif);
+    CREATE INDEX IF NOT EXISTS idx_client_prix_client ON client_prix(client_id);
+    CREATE INDEX IF NOT EXISTS idx_client_prix_produit ON client_prix(produit_id);
+    CREATE INDEX IF NOT EXISTS idx_depenses_categorie ON depenses(categorie);
+    CREATE INDEX IF NOT EXISTS idx_depenses_date ON depenses(date_depense);
+    CREATE INDEX IF NOT EXISTS idx_depenses_montant ON depenses(montant);
+    CREATE INDEX IF NOT EXISTS idx_caisses_date ON caisses(date_ouverture);
+    CREATE INDEX IF NOT EXISTS idx_caisses_statut ON caisses(statut);
+    CREATE INDEX IF NOT EXISTS idx_livraisons_vente ON livraisons(vente_id);
+    CREATE INDEX IF NOT EXISTS idx_livraisons_client ON livraisons(client_id);
+    CREATE INDEX IF NOT EXISTS idx_livraisons_statut ON livraisons(statut);
+    CREATE INDEX IF NOT EXISTS idx_livraisons_date ON livraisons(date_prevue);
   `);
 
   // Créer des index COMPOSÉS pour pagination optimisée (critique pour 1M+)
